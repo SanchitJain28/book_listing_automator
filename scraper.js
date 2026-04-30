@@ -222,6 +222,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
           delivery: "N/A",
           format: "Unknown",
           used_available: "No Used Options",
+          hasUsedOptions: false,
         };
 
         const getText = (selector) => {
@@ -237,19 +238,17 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
           getText("#deliveryBlockMessage") ||
           "N/A";
 
-        // Used Options
+        // Detect if there are Used options to trigger the Side Panel
         const usedLink = Array.from(document.querySelectorAll("a, span")).find(
           (el) =>
             el.innerText &&
-            (el.innerText.includes("Used from") ||
-              el.innerText.includes("New & Used")),
+            (el.innerText.toLowerCase().includes("used from") ||
+              el.innerText.toLowerCase().includes("new & used") ||
+              el.innerText.toLowerCase().includes("used & new")),
         );
+
         if (usedLink) {
-          // Clean up the text a bit so it looks nicer in your Excel file
-          result.used_available = usedLink.innerText
-            .replace(/\n/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
+          result.hasUsedOptions = true;
         }
 
         // Check Format (Reads the Currently Selected Box)
@@ -279,17 +278,15 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       });
 
       // ==========================================
-      // 4. SEE ALL BUYING OPTIONS PANEL (If Price is missing)
+      // 4. SEE ALL BUYING OPTIONS PANEL
       // ==========================================
-      if (scrapedData.price === "N/A") {
+      if (scrapedData.price === "N/A" || scrapedData.hasUsedOptions) {
         const seeAllBtn = await page.$(
-          'a[title="See All Buying Options"], #buybox-see-all-buying-choices a',
+          'a[title="See All Buying Options"], #buybox-see-all-buying-choices a, #moreBuyingChoices_feature_div a, a:has-text("used & new"), a:has-text("New & Used")',
         );
 
         if (seeAllBtn) {
-          console.log(
-            `   -> "Buy Now" box missing. Opening "See All Buying Options" panel...`,
-          );
+          console.log(`   -> Opening "All Buying Options" panel...`);
           await seeAllBtn.click();
 
           await page
@@ -299,20 +296,22 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
           const panelData = await page.evaluate(() => {
             let pPrice = "N/A",
               pMrp = "N/A",
-              pDel = "N/A";
+              pDel = "N/A",
+              pUsed = "No Used Options";
 
-            // Grab the very first offer from the actual list of options
+            // ----------------------------------------------------
+            // STEP 1: ALWAYS grab the very first offer for main details
+            // ----------------------------------------------------
             const firstOffer = document.querySelector(
               "#aod-offer-list #aod-offer",
             );
 
             if (firstOffer) {
-              // 1. Grab Price (Amazon hides it in .a-price-whole inside the drawer)
+              // Grab Price
               const priceWholeEl = firstOffer.querySelector(
                 ".a-price .a-price-whole",
               );
               if (priceWholeEl) {
-                // Removes the decimal dot so it just extracts "8,600"
                 pPrice = priceWholeEl.textContent.replace(".", "").trim();
               } else {
                 const fallbackPrice = firstOffer.querySelector(
@@ -323,20 +322,20 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
                 }
               }
 
-              // 2. Grab Delivery
+              // Grab Delivery
               const delEl = firstOffer.querySelector(
                 "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold",
               );
               if (delEl) pDel = delEl.innerText.trim();
 
-              // 3. Grab MRP directly from this first offer (since pinned offer is sometimes empty)
+              // Grab MRP directly from this first offer
               const mrpEl = firstOffer.querySelector(
                 ".a-text-price .a-offscreen",
               );
               if (mrpEl) pMrp = mrpEl.textContent.trim();
             }
 
-            // Fallback for MRP if it's only in the pinned header (just in case)
+            // Fallback for MRP if it's only in the pinned header
             if (pMrp === "N/A") {
               const pinnedMrpEl = document.querySelector(
                 "#aod-sticky-pinned-offer .a-text-price span.a-offscreen",
@@ -344,14 +343,64 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
               if (pinnedMrpEl) pMrp = pinnedMrpEl.textContent.trim();
             }
 
-            return { pPrice, pMrp, pDel };
+            // ----------------------------------------------------
+            // STEP 2: Safely check for a Used price anywhere in the list
+            // ----------------------------------------------------
+            const allOffers = document.querySelectorAll(
+              "#aod-offer-list #aod-offer",
+            );
+            for (let offer of allOffers) {
+              // FIX: Grab the whole heading regardless of HTML tags (h5, span, etc.)
+              const headingEl = offer.querySelector("#aod-offer-heading");
+              const headingText = headingEl
+                ? headingEl.textContent.trim().toLowerCase()
+                : "";
+
+              if (headingText.includes("used")) {
+                const usedPriceWholeEl = offer.querySelector(
+                  ".a-price .a-price-whole",
+                );
+                let tempUsedPrice = null;
+
+                if (usedPriceWholeEl) {
+                  tempUsedPrice = usedPriceWholeEl.textContent
+                    .replace(/[.,]/g, "")
+                    .trim();
+                } else {
+                  const fallbackUsedPrice = offer.querySelector(
+                    ".a-price .a-offscreen",
+                  );
+                  if (fallbackUsedPrice && fallbackUsedPrice.innerText.trim()) {
+                    tempUsedPrice = fallbackUsedPrice.innerText
+                      .replace(/[^\d]/g, "")
+                      .trim();
+                  }
+                }
+
+                if (tempUsedPrice && pUsed === "No Used Options") {
+                  pUsed = tempUsedPrice;
+                  break; // Stop looking once we find the first (lowest) used price
+                }
+              }
+            }
+
+            return { pPrice, pMrp, pDel, pUsed };
           });
 
-          if (panelData.pPrice !== "N/A") scrapedData.price = panelData.pPrice;
-          if (panelData.pMrp !== "N/A") scrapedData.mrp = panelData.pMrp;
-          if (panelData.pDel !== "N/A") scrapedData.delivery = panelData.pDel;
+          // Only override the main price if it was originally N/A
+          if (scrapedData.price === "N/A" && panelData.pPrice !== "N/A") {
+            scrapedData.price = panelData.pPrice;
+            scrapedData.mrp = panelData.pMrp;
+            scrapedData.delivery = panelData.pDel;
+          }
+
+          if (panelData.pUsed !== "No Used Options") {
+            scrapedData.used_available = panelData.pUsed;
+          }
         }
       }
+
+      delete scrapedData.hasUsedOptions;
 
       // Apply the MRP Math Fix
       scrapedData.mrp = cleanAndCheckMRP(scrapedData.price, scrapedData.mrp);
