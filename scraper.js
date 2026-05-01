@@ -49,6 +49,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
   const context = await browser.newContext({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    viewport: { width: 1920, height: 1080 },
   });
   const page = await context.newPage();
   console.log("⚙️ Setting Delivery Location to 122101 (Gurugram)...");
@@ -58,39 +59,49 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       waitUntil: "domcontentloaded",
     });
 
+    // 1. Check if it's already set
     const currentLocation = await page
       .textContent("#glow-ingress-line2", { timeout: 5000 })
       .catch(() => "");
     if (currentLocation && currentLocation.includes("122101")) {
-      console.log("✅ Location is already set to 122101! Skipping setup.\n");
+      console.log("✅ Location is already set! Skipping setup.\n");
     } else {
+      // 2. Wait for the button to exist in the HTML, even if it's hidden
       await page.waitForSelector("#nav-global-location-popover-link", {
+        state: "attached",
         timeout: 10000,
-        state: "visible",
       });
-      await page.click("#nav-global-location-popover-link", { force: true });
 
+      // 3. FORCE CLICK using JavaScript (bypasses invisible overlays)
+      await page.evaluate(() =>
+        document.querySelector("#nav-global-location-popover-link").click(),
+      );
+
+      // 4. Wait for the input box
       await page.waitForSelector("#GLUXZipUpdateInput", {
-        timeout: 8000,
         state: "visible",
+        timeout: 10000,
       });
 
+      // 5. Fill the pincode
       await page.fill("#GLUXZipUpdateInput", "122101");
-      await page.waitForTimeout(500); // Tiny pause to let Amazon's JS register the input
+      await page.waitForTimeout(1000); // Give Amazon JS a second to register
 
-      await page.click("#GLUXZipUpdate input[type='submit']", { force: true });
+      // 6. FORCE CLICK the submit button
+      await page.evaluate(() =>
+        document.querySelector("#GLUXZipUpdate input[type='submit']").click(),
+      );
 
+      // 7. Wait for Amazon to process and reload
       await page.waitForTimeout(3000);
-
       await page.reload({ waitUntil: "domcontentloaded" });
       console.log("✅ Location set successfully!\n");
     }
   } catch (err) {
     console.log(
-      `⚠️ Could not set location (${err.message.split("\n")[0]}). It might already be set. Continuing...\n`,
+      `⚠️ Location setup skipped or failed (${err.message.split("\n")[0]}). Moving to scraping...\n`,
     );
   }
-
   // ==========================================
   // START SCRAPING LOOP
   // ==========================================
