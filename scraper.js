@@ -21,7 +21,6 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-// Read ISBNs
 const isbns = fs
   .readFileSync(inputFile, "utf-8")
   .split("\n")
@@ -32,7 +31,6 @@ function randomDelay() {
   return Math.floor(Math.random() * 5000) + 4000;
 }
 
-// Math Check Helper for MRP vs Price
 function cleanAndCheckMRP(priceStr, mrpStr) {
   if (priceStr === "N/A" || mrpStr === "N/A" || !priceStr || !mrpStr)
     return mrpStr;
@@ -53,27 +51,43 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
   });
   const page = await context.newPage();
-
-  // ==========================================
-  // SETUP: SET LOCATION PIN CODE
-  // ==========================================
   console.log("⚙️ Setting Delivery Location to 122101 (Gurugram)...");
   try {
-    await page.goto("https://www.amazon.in/", { timeout: 60000 });
-    await page.waitForSelector("#nav-global-location-popover-link", {
-      timeout: 10000,
+    await page.goto("https://www.amazon.in/", {
+      timeout: 60000,
+      waitUntil: "domcontentloaded",
     });
-    await page.click("#nav-global-location-popover-link");
 
-    await page.waitForSelector("#GLUXZipUpdateInput", { timeout: 5000 });
-    await page.fill("#GLUXZipUpdateInput", "122101");
-    await page.click("#GLUXZipUpdate");
+    const currentLocation = await page
+      .textContent("#glow-ingress-line2", { timeout: 5000 })
+      .catch(() => "");
+    if (currentLocation && currentLocation.includes("122101")) {
+      console.log("✅ Location is already set to 122101! Skipping setup.\n");
+    } else {
+      await page.waitForSelector("#nav-global-location-popover-link", {
+        timeout: 10000,
+        state: "visible",
+      });
+      await page.click("#nav-global-location-popover-link", { force: true });
 
-    await page.waitForTimeout(3000);
-    console.log("✅ Location set successfully!\n");
+      await page.waitForSelector("#GLUXZipUpdateInput", {
+        timeout: 8000,
+        state: "visible",
+      });
+
+      await page.fill("#GLUXZipUpdateInput", "122101");
+      await page.waitForTimeout(500); // Tiny pause to let Amazon's JS register the input
+
+      await page.click("#GLUXZipUpdate input[type='submit']", { force: true });
+
+      await page.waitForTimeout(3000);
+
+      await page.reload({ waitUntil: "domcontentloaded" });
+      console.log("✅ Location set successfully!\n");
+    }
   } catch (err) {
     console.log(
-      "⚠️ Could not set location. It might already be set. Continuing...",
+      `⚠️ Could not set location (${err.message.split("\n")[0]}). It might already be set. Continuing...\n`,
     );
   }
 
