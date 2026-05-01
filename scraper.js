@@ -1,9 +1,15 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
+const os = require("os");
+const axios = require("axios");
+const FormData = require("form-data");
+
+const inputFile = process.argv[2] || "isbns.txt";
+const outputFile = `output_${inputFile.replace(".txt", "")}.json`;
 
 // Read ISBNs
 const isbns = fs
-  .readFileSync("isbns.txt", "utf-8")
+  .readFileSync(inputFile, "utf-8")
   .split("\n")
   .map((i) => i.trim())
   .filter(Boolean);
@@ -415,7 +421,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       }
 
       const data = { isbn, ...scrapedData };
-      fs.appendFileSync("output.json", JSON.stringify(data) + "\n");
+      fs.appendFileSync(outputFile, JSON.stringify(data) + "\n");
       console.log(
         `✅ Success: ${data.format} | Price: ${data.price} | MRP: ${data.mrp} | Del: ${data.delivery} | Used: ${data.used_available}`,
       );
@@ -425,7 +431,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       console.log(`❌ Error processing ${isbn}: ${err.message}`);
 
       fs.appendFileSync(
-        "output.json",
+        outputFile,
         JSON.stringify({
           isbn,
           price: "Error",
@@ -442,4 +448,30 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
 
   await browser.close();
   console.log("\n🎉 Finished scraping batch!");
+  const webhookUrl =
+    "https://discord.com/api/webhooks/1499613573561716817/_0ypn7IZkCc7C0Pvq1aOdrWbKm1voPgBJCHqP8khad42q8mkrrAjLdJ3-p0cIBtAllVe";
+
+  console.log("📤 Uploading results to Discord...");
+  try {
+    const form = new FormData();
+    form.append(
+      "content",
+      `✅ **Job Completed!**\n**PC Name:** ${os.hostname()}\n**List Finished:** ${inputFile}`,
+    );
+    if (fs.existsSync(outputFile) && fs.statSync(outputFile).size > 0) {
+      form.append("file", fs.createReadStream(outputFile));
+    } else {
+      form.append(
+        "content",
+        `✅ **Job Completed!**\n**PC Name:** ${os.hostname()}\n**List Finished:** ${inputFile}\n\n*Note: No data was generated (output file was empty or missing).*`,
+      );
+    }
+
+    await axios.post(webhookUrl, form, {
+      headers: form.getHeaders(),
+    });
+    console.log("🟢 Successfully sent results to Discord!");
+  } catch (e) {
+    console.error("🔴 Failed to upload to Discord:", e.message);
+  }
 })();
