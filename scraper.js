@@ -3,9 +3,16 @@ const fs = require("fs");
 const os = require("os");
 const axios = require("axios");
 const FormData = require("form-data");
+const path = require("path");
 
 const inputFile = process.argv[2] || "isbns.txt";
-const outputFile = `output_${inputFile.replace(".txt", "")}.json`;
+const outputDir = path.join(__dirname, "output");
+const outputFile = `output_${path.basename(inputFile).replace(".txt", ".json")}`;
+const outputFilePath = path.join(outputDir, outputFile);
+
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true });
+}
 
 // Read ISBNs
 const isbns = fs
@@ -421,7 +428,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       }
 
       const data = { isbn, ...scrapedData };
-      fs.appendFileSync(outputFile, JSON.stringify(data) + "\n");
+      fs.appendFileSync(outputFilePath, JSON.stringify(data) + "\n");
       console.log(
         `✅ Success: ${data.format} | Price: ${data.price} | MRP: ${data.mrp} | Del: ${data.delivery} | Used: ${data.used_available}`,
       );
@@ -431,7 +438,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       console.log(`❌ Error processing ${isbn}: ${err.message}`);
 
       fs.appendFileSync(
-        outputFile,
+        outputFilePath,
         JSON.stringify({
           isbn,
           price: "Error",
@@ -459,7 +466,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       `✅ **Job Completed!**\n**PC Name:** ${os.hostname()}\n**List Finished:** ${inputFile}`,
     );
     if (fs.existsSync(outputFile) && fs.statSync(outputFile).size > 0) {
-      form.append("file", fs.createReadStream(outputFile));
+      form.append("file", fs.createReadStream(outputFilePath));
     } else {
       form.append(
         "content",
