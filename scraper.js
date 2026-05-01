@@ -89,7 +89,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
 
       await page.waitForSelector(
         'div[data-component-type="s-search-result"], #productTitle',
-        { timeout: 15000 },
+        { timeout: 4000},
       );
       const isProductPage = await page.$("#productTitle");
 
@@ -229,7 +229,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
           `   -> Cheaper physical format found! Switching to ${cheaperTarget.format} (₹${cheaperTarget.price})...`,
         );
         await page.goto(cheaperTarget.url, { timeout: 60000 });
-        await page.waitForSelector("#productTitle", { timeout: 15000 });
+        await page.waitForSelector("#productTitle", { timeout: 5000 });
       }
 
       // ==========================================
