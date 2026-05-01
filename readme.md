@@ -8,3 +8,6 @@ npm install
 npx playwright install
 
 node scraper.js 1may_isbn_list3.txt
+
+## Install NVM
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
