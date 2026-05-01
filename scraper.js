@@ -6,6 +6,13 @@ const FormData = require("form-data");
 const path = require("path");
 
 const inputFile = process.argv[2] || "isbns.txt";
+if (!inputFile) {
+  console.error("Error: You must provide an input file name.");
+  console.error("Usage: node scraper.js <your_isbn_list.txt> [--headless]");
+  process.exit(1);
+}
+
+const isHeadless = process.argv.includes("--headless");
 const outputDir = path.join(__dirname, "output");
 const outputFile = `output_${path.basename(inputFile).replace(".txt", ".json")}`;
 const outputFilePath = path.join(outputDir, outputFile);
@@ -40,7 +47,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: isHeadless });
   const context = await browser.newContext({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
