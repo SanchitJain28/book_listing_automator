@@ -45,12 +45,15 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: isHeadless });
-  const context = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-    viewport: { width: 1920, height: 1080 },
+  const browser = await chromium.launch({
+    headless: isHeadless,
+    args: [
+      "--disable-dev-shm-usage", 
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+    ],
   });
+
   const page = await context.newPage();
   console.log("⚙️ Setting Delivery Location to 122101 (Gurugram)...");
   try {
@@ -108,13 +111,19 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
   for (let i = 0; i < isbns.length; i++) {
     const isbn = isbns[i];
 
+     if (i > 0 && i % 400 === 0) {
+       console.log("🧹 Flushing browser memory...");
+       await page.close();
+       page = await context.newPage();
+     }
+
     try {
       console.log(`🔍[${i + 1}/${isbns.length}] Searching ${isbn}`);
       await page.goto(`https://www.amazon.in/s?k=${isbn}`, { timeout: 60000 });
 
       await page.waitForSelector(
         'div[data-component-type="s-search-result"], #productTitle',
-        { timeout: 4000},
+        { timeout: 4000 },
       );
       const isProductPage = await page.$("#productTitle");
 
