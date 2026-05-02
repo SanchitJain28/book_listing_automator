@@ -61,7 +61,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
    });
 
 
-  const page = await context.newPage();
+  let page = await context.newPage();
   console.log("⚙️ Setting Delivery Location to 122101 (Gurugram)...");
   try {
     await page.goto("https://www.amazon.in/", {
