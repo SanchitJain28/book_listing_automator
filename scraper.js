@@ -5,9 +5,7 @@ const axios = require("axios");
 const FormData = require("form-data");
 const path = require("path");
 
-//? we learned that , we can take argument from command line while executing the script like this : node scraper.js isbns.txt --headless
 const inputFile = process.argv[2];
-//? if there is no input file provided, we will show an error message and exit the script
 if (!inputFile) {
   console.error("Error: You must provide an input file name.");
   console.error("Usage: node scraper.js <your_isbn_list.txt> [--headless]");
@@ -23,7 +21,6 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-//? Read and clean ISBNs from the input file
 const isbns = fs
   .readFileSync(inputFile, "utf-8")
   .split("\n")
@@ -48,7 +45,6 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
 }
 
 (async () => {
-  //? LAUNCH BROWSER
   const browser = await chromium.launch({
     headless: isHeadless,
     args: [
@@ -58,13 +54,22 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
     ],
   });
 
-  //? CREATE CONTEXT WITH DESKTOP USER-AGENT
   const context = await browser.newContext({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
   });
 
-  //? SET DELIVERY LOCATION (TRY CATCH TO AVOID FAILING ENTIRE BATCH IF AMAZON CHANGES THEIR LAYOUT)
+  // 🚀 OPTIMIZATION 1: BLOCK ALL IMAGES, FONTS, AND MEDIA
+  await context.route("**/*", (route) => {
+    const requestType = route.request().resourceType();
+    // Block heavy assets, but allow 'script', 'stylesheet', 'fetch', 'xhr' so Amazon works
+    if (["image", "media", "font"].includes(requestType)) {
+      route.abort();
+    } else {
+      route.continue();
+    }
+  });
+
   let page = await context.newPage();
   console.log("⚙️ Setting Delivery Location to 122101 (Gurugram)...");
   try {
@@ -109,6 +114,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       `⚠️ Location setup skipped or failed (${err.message.split("\n")[0]}). Moving to scraping...\n`,
     );
   }
+
   // ==========================================
   // START SCRAPING LOOP
   // ==========================================
@@ -123,15 +129,19 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
 
     try {
       console.log(`🔍[${i + 1}/${isbns.length}] Searching ${isbn}`);
-      await page.goto(`https://www.amazon.in/s?k=${isbn}`, { timeout: 60000 });
+
+      // 🚀 OPTIMIZATION 2: Wait ONLY for text/HTML (domcontentloaded), ignore hanging ads
+      await page.goto(`https://www.amazon.in/s?k=${isbn}`, {
+        timeout: 60000,
+        waitUntil: "domcontentloaded",
+      });
 
       await page.waitForSelector(
         'div[data-component-type="s-search-result"], #productTitle',
-        { timeout: 2500 },
+        { timeout: 5000 },
       );
       const isProductPage = await page.$("#productTitle");
 
-      // 1. SMART SEARCH SELECTION
       if (!isProductPage) {
         const bestUrl = await page.evaluate(() => {
           const results = Array.from(
@@ -190,7 +200,11 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
 
         if (bestUrl) {
           console.log(`   -> Navigating into the best matched product page...`);
-          await page.goto(bestUrl, { timeout: 60000 });
+          // 🚀 OPTIMIZATION 2: domcontentloaded here too
+          await page.goto(bestUrl, {
+            timeout: 60000,
+            waitUntil: "domcontentloaded",
+          });
           await page.waitForSelector("#productTitle", { timeout: 15000 });
         } else {
           throw new Error("No search results found.");
@@ -198,13 +212,13 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       }
 
       // ==========================================
-      // 2. SMART FORMAT SWITCH (ABSOLUTE CHEAPEST PRIORITY)
+      // 2. SMART FORMAT SWITCH
       // ==========================================
       const cheaperTarget = await page.evaluate(() => {
         const swatches = Array.from(
           document.querySelectorAll("#tmmSwatches .swatchElement"),
         );
-        if (swatches.length <= 1) return null; // Only one format available
+        if (swatches.length <= 1) return null;
 
         let lowestPrice = Infinity;
         let bestUrl = null;
@@ -223,7 +237,6 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
             const textLower = priceText.toLowerCase();
             const formatNameLower = priceText.split("\n")[0].toLowerCase();
 
-            // Ignore digital/audio formats and unavailable items
             const isForbidden =
               formatNameLower.includes("kindle") ||
               formatNameLower.includes("ebook") ||
@@ -232,7 +245,6 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
               formatNameLower.includes("audible");
 
             if (!textLower.includes("unavailable") && !isForbidden) {
-              // Extracts numbers like "1,456.00" or "1250"
               const match = priceText.match(/[\d,]+(?:\.\d+)?/);
               if (match) {
                 priceNum = parseFloat(match[0].replace(/,/g, ""));
@@ -240,7 +252,6 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
             }
           }
 
-          // Keep track of the absolute lowest price
           if (priceNum < lowestPrice) {
             lowestPrice = priceNum;
             bestUrl = url;
@@ -251,7 +262,6 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
           }
         }
 
-        // If the absolute lowest price we found is NOT the box we are currently looking at
         if (
           !isCurrentlySelectedCheapest &&
           bestUrl &&
@@ -259,20 +269,21 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
         ) {
           return { url: bestUrl, format: bestFormatName, price: lowestPrice };
         }
-        return null; // The current page is already the cheapest physical format
+        return null;
       });
 
       if (cheaperTarget) {
         console.log(
           `   -> Cheaper physical format found! Switching to ${cheaperTarget.format} (₹${cheaperTarget.price})...`,
         );
-        await page.goto(cheaperTarget.url, { timeout: 60000 });
+        // 🚀 OPTIMIZATION 2: domcontentloaded here too
+        await page.goto(cheaperTarget.url, {
+          timeout: 60000,
+          waitUntil: "domcontentloaded",
+        });
         await page.waitForSelector("#productTitle", { timeout: 5000 });
       }
 
-      // ==========================================
-      // 3. PRODUCT PAGE DATA EXTRACTION
-      // ==========================================
       // ==========================================
       // 3. PRODUCT PAGE DATA EXTRACTION
       // ==========================================
@@ -282,7 +293,7 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
           mrp: "N/A",
           delivery: "N/A",
           format: "Unknown",
-          seller: "N/A", // <--- ADDED SELLER FIELD
+          seller: "N/A",
           used_available: "No Used Options",
           hasUsedOptions: false,
         };
@@ -292,48 +303,48 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
           return el ? el.innerText.trim() : null;
         };
 
-        // Delivery
         result.delivery =
-          getText("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold") ||
+          getText(
+            "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold",
+          ) ||
           getText("#deliveryBlockMessage") ||
           "N/A";
 
-        // Detect if there are Used options to trigger the Side Panel
         const usedLink = Array.from(document.querySelectorAll("a, span")).find(
           (el) =>
             el.innerText &&
             (el.innerText.toLowerCase().includes("used from") ||
               el.innerText.toLowerCase().includes("new & used") ||
-              el.innerText.toLowerCase().includes("used & new"))
+              el.innerText.toLowerCase().includes("used & new")),
         );
 
         if (usedLink) {
           result.hasUsedOptions = true;
         }
 
-        // Check Format
-        const formatBoxes = Array.from(document.querySelectorAll("#tmmSwatches .swatchElement"));
-        let selectedBox = formatBoxes.find((box) => box.classList.contains("selected"));
+        const formatBoxes = Array.from(
+          document.querySelectorAll("#tmmSwatches .swatchElement"),
+        );
+        let selectedBox = formatBoxes.find((box) =>
+          box.classList.contains("selected"),
+        );
         if (selectedBox) {
-          result.format = selectedBox.innerText.split("\n")[0].trim(); 
+          result.format = selectedBox.innerText.split("\n")[0].trim();
         } else {
           result.format = getText("#productSubtitle") || "Unknown Format";
         }
 
-        // Grab Main Price
         result.price =
           getText(".priceToPay .a-price-whole") ||
           getText("#corePriceDisplay_desktop_feature_div .a-price-whole") ||
           "N/A";
 
-        // Grab MRP
         const mrpEl = document.querySelector(".a-text-price span.a-offscreen");
         if (mrpEl) result.mrp = mrpEl.textContent.trim();
 
-        // Grab Seller (Based on the HTML you provided + a fallback)
-        result.seller = 
-          getText("#sellerProfileTriggerId") || 
-          getText("#merchant-info a") || 
+        result.seller =
+          getText("#sellerProfileTriggerId") ||
+          getText("#merchant-info a") ||
           "N/A";
 
         return result;
@@ -344,67 +355,96 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       // ==========================================
       if (scrapedData.price === "N/A" || scrapedData.hasUsedOptions) {
         const seeAllBtn = await page.$(
-          'a[title="See All Buying Options"], #buybox-see-all-buying-choices a, #moreBuyingChoices_feature_div a, a:has-text("used & new"), a:has-text("New & Used")'
+          'a[title="See All Buying Options"], #buybox-see-all-buying-choices a, #moreBuyingChoices_feature_div a, a:has-text("used & new"), a:has-text("New & Used")',
         );
 
         if (seeAllBtn) {
           console.log(`   -> Opening "All Buying Options" panel...`);
           await seeAllBtn.click();
 
-          await page.waitForSelector("#aod-offer-list", { timeout: 8000 }).catch(() => {});
+          await page
+            .waitForSelector("#aod-offer-list", { timeout: 8000 })
+            .catch(() => {});
 
           const panelData = await page.evaluate(() => {
-            let pPrice = "N/A", pMrp = "N/A", pDel = "N/A", pSeller = "N/A", pUsed = "No Used Options"; // Added pSeller
+            let pPrice = "N/A",
+              pMrp = "N/A",
+              pDel = "N/A",
+              pSeller = "N/A",
+              pUsed = "No Used Options";
 
-            const firstOffer = document.querySelector("#aod-offer-list #aod-offer");
+            const firstOffer = document.querySelector(
+              "#aod-offer-list #aod-offer",
+            );
             if (firstOffer) {
-              const priceWholeEl = firstOffer.querySelector(".a-price .a-price-whole");
+              const priceWholeEl = firstOffer.querySelector(
+                ".a-price .a-price-whole",
+              );
               if (priceWholeEl) {
                 pPrice = priceWholeEl.textContent.replace(".", "").trim();
               } else {
-                const fallbackPrice = firstOffer.querySelector(".a-price .a-offscreen");
+                const fallbackPrice = firstOffer.querySelector(
+                  ".a-price .a-offscreen",
+                );
                 if (fallbackPrice && fallbackPrice.innerText.trim()) {
                   pPrice = fallbackPrice.innerText.trim();
                 }
               }
 
-              const delEl = firstOffer.querySelector("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold");
+              const delEl = firstOffer.querySelector(
+                "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold",
+              );
               if (delEl) pDel = delEl.innerText.trim();
 
-              const mrpEl = firstOffer.querySelector(".a-text-price .a-offscreen");
+              const mrpEl = firstOffer.querySelector(
+                ".a-text-price .a-offscreen",
+              );
               if (mrpEl) pMrp = mrpEl.textContent.trim();
 
-              // Grab Seller from the side panel
               const sellerEl = firstOffer.querySelector("#aod-offer-soldBy a");
               if (sellerEl) pSeller = sellerEl.textContent.trim();
             }
 
             if (pMrp === "N/A") {
-              const pinnedMrpEl = document.querySelector("#aod-sticky-pinned-offer .a-text-price span.a-offscreen");
+              const pinnedMrpEl = document.querySelector(
+                "#aod-sticky-pinned-offer .a-text-price span.a-offscreen",
+              );
               if (pinnedMrpEl) pMrp = pinnedMrpEl.textContent.trim();
             }
 
-            const allOffers = document.querySelectorAll("#aod-offer-list #aod-offer");
+            const allOffers = document.querySelectorAll(
+              "#aod-offer-list #aod-offer",
+            );
             for (let offer of allOffers) {
               const headingEl = offer.querySelector("#aod-offer-heading");
-              const headingText = headingEl ? headingEl.textContent.trim().toLowerCase() : "";
+              const headingText = headingEl
+                ? headingEl.textContent.trim().toLowerCase()
+                : "";
 
               if (headingText.includes("used")) {
-                const usedPriceWholeEl = offer.querySelector(".a-price .a-price-whole");
+                const usedPriceWholeEl = offer.querySelector(
+                  ".a-price .a-price-whole",
+                );
                 let tempUsedPrice = null;
 
                 if (usedPriceWholeEl) {
-                  tempUsedPrice = usedPriceWholeEl.textContent.replace(/[.,]/g, "").trim();
+                  tempUsedPrice = usedPriceWholeEl.textContent
+                    .replace(/[.,]/g, "")
+                    .trim();
                 } else {
-                  const fallbackUsedPrice = offer.querySelector(".a-price .a-offscreen");
+                  const fallbackUsedPrice = offer.querySelector(
+                    ".a-price .a-offscreen",
+                  );
                   if (fallbackUsedPrice && fallbackUsedPrice.innerText.trim()) {
-                    tempUsedPrice = fallbackUsedPrice.innerText.replace(/[^\d]/g, "").trim();
+                    tempUsedPrice = fallbackUsedPrice.innerText
+                      .replace(/[^\d]/g, "")
+                      .trim();
                   }
                 }
 
                 if (tempUsedPrice && pUsed === "No Used Options") {
                   pUsed = tempUsedPrice;
-                  break; 
+                  break;
                 }
               }
             }
@@ -416,7 +456,8 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
             scrapedData.price = panelData.pPrice;
             scrapedData.mrp = panelData.pMrp;
             scrapedData.delivery = panelData.pDel;
-            if (panelData.pSeller !== "N/A") scrapedData.seller = panelData.pSeller; // Update seller if found in panel
+            if (panelData.pSeller !== "N/A")
+              scrapedData.seller = panelData.pSeller;
           }
 
           if (panelData.pUsed !== "No Used Options") {
@@ -428,17 +469,21 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
       delete scrapedData.hasUsedOptions;
       scrapedData.mrp = cleanAndCheckMRP(scrapedData.price, scrapedData.mrp);
 
-      if (scrapedData.price === "N/A" && scrapedData.used_available === "No Used Options") {
+      if (
+        scrapedData.price === "N/A" &&
+        scrapedData.used_available === "No Used Options"
+      ) {
         scrapedData.mrp = "N/A";
         scrapedData.delivery = "N/A";
-        scrapedData.seller = "N/A"; // Clean up seller if out of stock
+        scrapedData.seller = "N/A";
       }
 
       const data = { isbn, ...scrapedData };
       fs.appendFileSync(outputFilePath, JSON.stringify(data) + "\n");
-      
-      // Updated Console Log to show the Seller
-      console.log(`✅ Success: ${data.format} | Price: ${data.price} | MRP: ${data.mrp} | Del: ${data.delivery} | Seller: ${data.seller} | Used: ${data.used_available}`);
+
+      console.log(
+        `✅ Success: ${data.format} | Price: ${data.price} | MRP: ${data.mrp} | Del: ${data.delivery} | Seller: ${data.seller} | Used: ${data.used_available}`,
+      );
 
       await new Promise((r) => setTimeout(r, randomDelay()));
     } catch (err) {
@@ -451,9 +496,9 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
           mrp: "Error",
           delivery: "Error",
           format: "Error",
-          seller: "Error", // Added Error state for Seller
+          seller: "Error",
           used_available: "Error",
-        }) + "\n"
+        }) + "\n",
       );
       await new Promise((r) => setTimeout(r, randomDelay()));
     }
@@ -461,30 +506,4 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
 
   await browser.close();
   console.log("\n🎉 Finished scraping batch!");
-  const webhookUrl =
-    "https://discord.com/api/webhooks/1499613573561716817/_0ypn7IZkCc7C0Pvq1aOdrWbKm1voPgBJCHqP8khad42q8mkrrAjLdJ3-p0cIBtAllVe";
-
-  console.log("📤 Uploading results to Discord...");
-  try {
-    const form = new FormData();
-    form.append(
-      "content",
-      `✅ **Job Completed!**\n**PC Name:** ${os.hostname()}\n**List Finished:** ${inputFile}`,
-    );
-    if (fs.existsSync(outputFile) && fs.statSync(outputFile).size > 0) {
-      form.append("file", fs.createReadStream(outputFilePath));
-    } else {
-      form.append(
-        "content",
-        `✅ **Job Completed!**\n**PC Name:** ${os.hostname()}\n**List Finished:** ${inputFile}\n\n*Note: No data was generated (output file was empty or missing).*`,
-      );
-    }
-
-    await axios.post(webhookUrl, form, {
-      headers: form.getHeaders(),
-    });
-    console.log("🟢 Successfully sent results to Discord!");
-  } catch (e) {
-    console.error("🔴 Failed to upload to Discord:", e.message);
-  }
 })();
