@@ -9,7 +9,7 @@ echo "🚀 Starting VPS Setup for Scraping..."
 # 1. Update system packages
 echo "📦 Updating system packages..."
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl git unzip wget xvfb libxi6 libgconf-2-4
+sudo apt install -y curl git unzip wget
 
 # 2. Install Node.js (v22 - latest LTS for this environment)
 echo "🟢 Installing Node.js..."
