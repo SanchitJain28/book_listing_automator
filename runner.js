@@ -90,29 +90,49 @@ async function main() {
   const headlessChoice = await askQuestion("\n👻 Run in headless mode? (Y/n): ");
   const isHeadless = headlessChoice.toLowerCase() !== 'n';
 
+  // 4. Ask for background mode (tmux)
+  const bgChoice = await askQuestion("\n🖥️  Run in background using tmux? (Y/n): ");
+  const isBackground = bgChoice.toLowerCase() !== 'n';
+
   console.log("\n==================================================");
   console.log(`🎯 TARGET SCRIPT:  ${selectedScraper}`);
   console.log(`📄 INPUT FILE:     ${selectedInput}`);
   console.log(`👻 HEADLESS:       ${isHeadless ? 'Yes' : 'No'}`);
+  console.log(`🖥️  BACKGROUND:     ${isBackground ? 'Yes (tmux)' : 'No (terminal)'}`);
   console.log("==================================================\n");
 
   rl.close();
 
-  // 4. Spawn the child process
+  // 5. Spawn the child process
   const args = [selectedScraper, selectedInput];
   if (isHeadless) {
     args.push('--headless');
   }
 
-  console.log(`> node ${args.join(' ')}\n`);
+  if (isBackground) {
+    const { execSync } = require('child_process');
+    const sessionName = "scrape_" + Math.floor(Math.random() * 10000);
+    const cmd = `tmux new-session -d -s ${sessionName} "node ${args.join(' ')}"`;
+    
+    try {
+      execSync(cmd);
+      console.log(`✅ Scraper is now running safely in the background!`);
+      console.log(`\n👀 To view it live at any time, run:`);
+      console.log(`   \x1b[36mtmux attach -t ${sessionName}\x1b[0m\n`);
+      console.log(`(Remember: To exit the view safely without killing the scraper, press Ctrl+B then D)`);
+    } catch (e) {
+      console.error("❌ Failed to start tmux. Make sure tmux is installed.");
+    }
+  } else {
+    console.log(`> node ${args.join(' ')}\n`);
+    const child = spawn('node', args, {
+      stdio: 'inherit'
+    });
 
-  const child = spawn('node', args, {
-    stdio: 'inherit' // This pipes stdout and stderr directly to the terminal so spinners and colors work perfectly!
-  });
-
-  child.on('close', (code) => {
-    console.log(`\n✅ Process exited with code ${code}`);
-  });
+    child.on('close', (code) => {
+      console.log(`\n✅ Process exited with code ${code}`);
+    });
+  }
 }
 
 main().catch(err => {
