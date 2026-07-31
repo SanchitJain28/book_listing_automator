@@ -13,7 +13,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
     "-stage-1.json",
   );
   const searchTerms = readSearchTerms(inputFile);
-  const { context, page } = await initBrowser(isHeadless);
+  let { context, page } = await initBrowser(isHeadless);
 
   for (let i = 0; i < searchTerms.length; i++) {
     const term = searchTerms[i];
@@ -104,7 +104,16 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
         hasNextPage = false;
       }
     }
-    await page.waitForTimeout(getRandomDelay(5000, 10000));
+    try {
+      if (!page.isClosed()) {
+        await page.waitForTimeout(getRandomDelay(5000, 10000));
+      }
+    } catch (e) {
+      console.log("Browser was closed. Reinitializing...");
+      const browserState = await initBrowser(isHeadless);
+      context = browserState.context;
+      page = browserState.page;
+    }
   }
 
   await context.close();
