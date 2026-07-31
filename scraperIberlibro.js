@@ -4,14 +4,16 @@ const path = require("path");
 
 const inputFile = process.argv[2];
 if (!inputFile) {
-  console.error("Error: You must provide an input file name.");
-  console.error("Usage: node ScraperAbey.js <your_isbn_list.txt> [--headless]");
+  console.error("❌ Error: You must provide an input file name.");
+  console.error(
+    "Usage: node scraperIberlibro.js <your_isbn_list.txt> [--headless]",
+  );
   process.exit(1);
 }
 
 const isHeadless = process.argv.includes("--headless");
 const outputDir = path.join(__dirname, "output");
-const outputFile = `output_abey_${path.basename(inputFile).replace(".txt", ".json")}`;
+const outputFile = `output_iberlibro_${path.basename(inputFile).replace(".txt", ".json")}`;
 const outputFilePath = path.join(outputDir, outputFile);
 
 if (!fs.existsSync(outputDir)) {
@@ -24,7 +26,7 @@ const isbns = fs
   .map((i) => i.trim())
   .filter(Boolean);
 
-// Slightly longer base delay: 3 to 7 seconds
+// Delay: 3 to 7 seconds
 function randomDelay() {
   return Math.floor(Math.random() * 4000) + 3000;
 }
@@ -41,8 +43,12 @@ function randomDelay() {
   });
 
   const context = await browser.newContext({
+    locale: "es-ES", // Force Spanish locale for IberLibro
+    extraHTTPHeaders: {
+      "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+    },
     userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
   });
 
   await context.route("**/*", (route) => {
@@ -58,7 +64,7 @@ function randomDelay() {
 
   console.log("==========================================");
   console.log(
-    `🚀 Starting AbeBooks Scraper (Multi-Listing & Detailed) | Total: ${isbns.length}`,
+    `🚀 Starting IberLibro Scraper (Multi-Listing & Detailed) | Total: ${isbns.length}`,
   );
   console.log("==========================================\n");
 
@@ -89,9 +95,9 @@ function randomDelay() {
           `🔍 [${i + 1}/${isbns.length}] Searching ISBN: ${targetIsbn}... (Attempt ${4 - retries}/3)`,
         );
 
-        const searchUrl = `https://www.abebooks.com/servlet/SearchResults?kn=${targetIsbn}`;
+        // 🔥 Targeting iberlibro.com directly
+        const searchUrl = `https://www.iberlibro.com/servlet/SearchResults?kn=${targetIsbn}`;
 
-        // Capture the HTTP response to check for 429
         const response = await page.goto(searchUrl, {
           timeout: 60000,
           waitUntil: "domcontentloaded",
@@ -105,7 +111,7 @@ function randomDelay() {
           console.log(
             `   🛑 429 RATE LIMIT HIT! Cooldown initiated... Waiting 60 seconds.`,
           );
-          await new Promise((r) => setTimeout(r, 60000)); // Wait 1 full minute
+          await new Promise((r) => setTimeout(r, 60000));
           retries--;
           continue;
         }
@@ -118,15 +124,18 @@ function randomDelay() {
           )
           .catch(() => {});
 
-        // Pass the targetIsbn down into page.evaluate so it can compare it
         let scrapedData = await page.evaluate((target) => {
           const cleanText = (el) => (el ? el.innerText.trim() : "N/A");
 
           const formatShipping = (rawText) => {
             if (rawText === "N/A") return "N/A";
-            const firstLine = rawText.split("\n")[0];
-            const match = firstLine.match(/(.*?shipping)/i);
-            return match ? match[1].trim() : firstLine.trim();
+            // Grab the first line and remove the hidden button text in both Spanish and English
+            let clean = rawText.split("\n")[0].trim();
+            clean = clean
+              .replace(/Learn more.*/i, "")
+              .replace(/Más información.*/i, "")
+              .trim();
+            return clean;
           };
 
           let extractedListings = [];
@@ -153,7 +162,6 @@ function randomDelay() {
                 '[data-test-id="seller-info"]',
               );
               if (sellerInfoP) {
-                // It finds the span with aria-hidden that holds the location string
                 const addressSpan = sellerInfoP.querySelector(
                   'span[aria-hidden="true"]',
                 );
@@ -168,7 +176,6 @@ function randomDelay() {
                 '[data-test-id="listing-isbn-link"]',
               );
               if (isbnLink) {
-                // Extract exactly 13 digits starting with 978 using regex
                 const match = isbnLink.innerText.match(/(978\d{10})/);
                 if (match) foundIsbn = match[1];
               }
@@ -228,9 +235,6 @@ function randomDelay() {
             let address = cleanText(
               document.querySelector("#bookseller-location"),
             );
-
-            // On the product page, ISBN is often hidden in the details.
-            // Usually, if it redirected directly, it's a 100% match. We'll default to the target if not visible.
             let foundIsbn = target;
 
             extractedListings.push({
@@ -255,7 +259,7 @@ function randomDelay() {
           }
 
           return null; // Not found
-        }, targetIsbn); // We pass `targetIsbn` into the browser evaluation block here
+        }, targetIsbn);
 
         // Save Results
         if (
@@ -314,6 +318,6 @@ function randomDelay() {
 
   await browser.close();
   console.log(
-    `\n🎉 Finished scraping AbeBooks batch! Results saved to ${outputFile}`,
+    `\n🎉 Finished scraping IberLibro batch! Results saved to ${outputFile}`,
   );
 })();
