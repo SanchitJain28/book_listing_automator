@@ -40,6 +40,20 @@ npx playwright install chromium --with-deps
 echo ""
 echo "✅ Setup Complete!"
 echo ""
-echo "You can now run your scrapers in headless mode. For example:"
-echo "cd ~/book_listing_automator"
-echo "node scrapers/amazon-search-term/amazon-search-term-stage-1.js input-data/search-term-31thJuly/input.txt --headless"
+
+read -p "Enter VPS number (1-5) to start scraping automatically (or press Enter to skip): " vps_num
+
+if [[ -n "$vps_num" ]]; then
+    chunk_num=$((vps_num + 1))
+    chunk_file="input-data/search-term-31thJuly/chunks/chunk-${chunk_num}-vps${vps_num}.txt"
+    
+    if [ -f "$chunk_file" ]; then
+        echo "🚀 Starting scraper on ${chunk_file} in headless mode..."
+        cd ~/book_listing_automator
+        node scrapers/amazon-search-term/amazon-search-term-stage-1.js "$chunk_file" --headless
+    else
+        echo "❌ Error: Could not find ${chunk_file}. Make sure you pushed the latest chunks to GitHub!"
+    fi
+else
+    echo "Skipping automatic execution. You can run it manually later!"
+fi
