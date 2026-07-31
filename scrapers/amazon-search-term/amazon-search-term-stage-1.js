@@ -16,6 +16,15 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
   let { context, page } = await initBrowser(isHeadless);
 
   for (let i = 0; i < searchTerms.length; i++) {
+    // Memory flush every 100 search terms to free up RAM
+    if (i > 0 && i % 100 === 0) {
+      console.log(`\n\x1b[33m[Memory Flush] Processed ${i} terms. Restarting browser...\x1b[0m`);
+      await context.close().catch(() => {});
+      const browserState = await initBrowser(isHeadless);
+      context = browserState.context;
+      page = browserState.page;
+    }
+
     const term = searchTerms[i];
     console.log(`\n\x1b[1mProcessing search term: ${term}\x1b[0m`);
 
