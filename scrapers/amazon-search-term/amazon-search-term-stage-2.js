@@ -1,7 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 const { initBrowser, getRandomDelay } = require("../../utils/browser");
-const { readJsonLines, appendResult } = require("../../utils/file");
+const {
+  readJsonLines,
+  readSearchTerms,
+  appendResult,
+} = require("../../utils/file");
 const { initScraper } = require("../../utils/scraperInit");
 const { checkDogPage, cleanAndCheckMRP } = require("../../utils/amazon");
 const { startSpinner, stopSpinner } = require("../../utils/spinner");
@@ -12,15 +16,30 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
     "amazon-search-term",
     "-stage-2.json",
   );
-  
-  const stage1Items = readJsonLines(inputFile);
+
+  const isTxt = inputFile.endsWith(".txt");
+  let stage1Items = [];
+
+  if (isTxt) {
+    const asins = readSearchTerms(inputFile);
+    stage1Items = asins.map((asin) => ({ asin }));
+  } else {
+    stage1Items = readJsonLines(inputFile);
+  }
+
   let { context, page } = await initBrowser(isHeadless);
 
   for (let i = 0; i < stage1Items.length; i++) {
     const item = stage1Items[i];
     const asin = item.asin;
-    
-    console.log(`\n\x1b[1m[${i + 1}/${stage1Items.length}] Processing ASIN: ${asin}\x1b[0m`);
+
+    delete item.term;
+    delete item.page;
+    delete item.link;
+
+    console.log(
+      `\n\x1b[1m[${i + 1}/${stage1Items.length}] Processing ASIN: ${asin}\x1b[0m`,
+    );
 
     if (i > 0 && i % 500 === 0) {
       stopSpinner(`Flushing browser memory after ${i} items...`, "info");
@@ -41,7 +60,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
     while (retries > 0 && !success) {
       try {
         startSpinner(`Navigating to product page for ${asin}...`);
-        
+
         await page.goto(`https://www.amazon.in/dp/${asin}`, {
           timeout: 60000,
           waitUntil: "domcontentloaded",
@@ -50,19 +69,26 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
         const isDogPage = await checkDogPage(page);
 
         if (isDogPage) {
-          stopSpinner("Amazon bot block detected. Waiting 30 seconds...", "warn");
+          stopSpinner(
+            "Amazon bot block detected. Waiting 30 seconds...",
+            "warn",
+          );
           await page.waitForTimeout(30000);
           await context.clearCookies();
           retries--;
           continue;
         }
 
-        await page.waitForSelector("#productTitle", { timeout: 15000 }).catch(() => {});
+        await page
+          .waitForSelector("#productTitle", { timeout: 15000 })
+          .catch(() => {});
 
         // SMART FORMAT SWITCH
         startSpinner("Checking for cheaper physical formats...");
         const cheaperTarget = await page.evaluate(() => {
-          const swatches = Array.from(document.querySelectorAll("#tmmSwatches .swatchElement"));
+          const swatches = Array.from(
+            document.querySelectorAll("#tmmSwatches .swatchElement"),
+          );
           if (swatches.length <= 1) return null;
 
           let lowestPrice = Infinity;
@@ -96,22 +122,36 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
             if (priceNum < lowestPrice) {
               lowestPrice = priceNum;
               bestUrl = url;
-              bestFormatName = priceText ? priceText.split("\n")[0].trim() : "Unknown";
+              bestFormatName = priceText
+                ? priceText.split("\n")[0].trim()
+                : "Unknown";
               isCurrentlySelectedCheapest = isSelected;
             }
           }
 
-          if (!isCurrentlySelectedCheapest && bestUrl && lowestPrice !== Infinity) {
+          if (
+            !isCurrentlySelectedCheapest &&
+            bestUrl &&
+            lowestPrice !== Infinity
+          ) {
             return { url: bestUrl, format: bestFormatName, price: lowestPrice };
           }
           return null;
         });
 
         if (cheaperTarget) {
-          stopSpinner(`Switching to cheaper format: ${cheaperTarget.format} (₹${cheaperTarget.price})...`, "info");
+          stopSpinner(
+            `Switching to cheaper format: ${cheaperTarget.format} (₹${cheaperTarget.price})...`,
+            "info",
+          );
           startSpinner("Loading cheaper format...");
-          await page.goto(cheaperTarget.url, { timeout: 60000, waitUntil: "domcontentloaded" });
-          await page.waitForSelector("#productTitle", { timeout: 5000 }).catch(() => {});
+          await page.goto(cheaperTarget.url, {
+            timeout: 60000,
+            waitUntil: "domcontentloaded",
+          });
+          await page
+            .waitForSelector("#productTitle", { timeout: 5000 })
+            .catch(() => {});
         }
 
         // PRODUCT PAGE DATA EXTRACTION
@@ -125,6 +165,9 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
             delivery: "N/A",
             seller: "N/A",
             used_available: "No Used Options",
+            reviews_count: "0",
+            publisher: "N/A",
+            publication_date: "N/A",
             hasUsedOptions: false,
           };
 
@@ -135,24 +178,57 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
           result.title = getText("#productTitle") || "N/A";
 
-          const carouselIsbn = getText("#rpi-attribute-book_details-isbn13 .rpi-attribute-value span");
+          const reviewsText = getText("#acrCustomerReviewText");
+          if (reviewsText) {
+             result.reviews_count = reviewsText.replace(/[^\d]/g, "");
+          }
+
+          const detailBullets = Array.from(
+            document.querySelectorAll("#detailBullets_feature_div li"),
+          );
+
+          const carouselIsbn = getText(
+            "#rpi-attribute-book_details-isbn13 .rpi-attribute-value span",
+          );
           if (carouselIsbn) {
             result.found_isbn = carouselIsbn.replace(/[^\dX]/gi, "");
           } else {
-            const detailBullets = Array.from(document.querySelectorAll("#detailBullets_feature_div li"));
-            const isbn13Bullet = detailBullets.find((li) => li.innerText.includes("ISBN-13"));
+            const isbn13Bullet = detailBullets.find((li) =>
+              li.innerText.includes("ISBN-13"),
+            );
             if (isbn13Bullet) {
               const parts = isbn13Bullet.innerText.split(":");
-              if (parts.length > 1) result.found_isbn = parts[1].replace(/[^\dX]/gi, "");
+              if (parts.length > 1)
+                result.found_isbn = parts[1].replace(/[^\dX]/gi, "");
             }
           }
 
+          const pubBullet = detailBullets.find((li) =>
+            li.innerText.toLowerCase().includes("publisher"),
+          );
+          if (pubBullet) {
+            const parts = pubBullet.innerText.split(":");
+            if (parts.length > 1) result.publisher = parts[1].trim();
+          }
+
+          const dateBullet = detailBullets.find((li) =>
+            li.innerText.toLowerCase().includes("publication date"),
+          );
+          if (dateBullet) {
+            const parts = dateBullet.innerText.split(":");
+            if (parts.length > 1) result.publication_date = parts[1].trim();
+          }
+
           result.delivery =
-            getText("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold") ||
+            getText(
+              "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold",
+            ) ||
             getText("#deliveryBlockMessage") ||
             "N/A";
 
-          const usedLink = Array.from(document.querySelectorAll("a, span")).find(
+          const usedLink = Array.from(
+            document.querySelectorAll("a, span"),
+          ).find(
             (el) =>
               el.innerText &&
               (el.innerText.toLowerCase().includes("used from") ||
@@ -166,7 +242,9 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
             getText("#corePriceDisplay_desktop_feature_div .a-price-whole") ||
             "N/A";
 
-          const mrpEl = document.querySelector(".a-text-price span.a-offscreen");
+          const mrpEl = document.querySelector(
+            ".a-text-price span.a-offscreen",
+          );
           if (mrpEl) result.mrp = mrpEl.textContent.trim();
 
           result.seller =
@@ -186,46 +264,82 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
           if (seeAllBtn) {
             await seeAllBtn.click();
-            await page.waitForSelector("#aod-offer-list", { timeout: 8000 }).catch(() => {});
+            await page
+              .waitForSelector("#aod-offer-list", { timeout: 8000 })
+              .catch(() => {});
 
             const panelData = await page.evaluate(() => {
-              let pPrice = "N/A", pMrp = "N/A", pDel = "N/A", pSeller = "N/A", pUsed = "No Used Options";
+              let pPrice = "N/A",
+                pMrp = "N/A",
+                pDel = "N/A",
+                pSeller = "N/A",
+                pUsed = "No Used Options";
 
-              const firstOffer = document.querySelector("#aod-offer-list #aod-offer");
+              const firstOffer = document.querySelector(
+                "#aod-offer-list #aod-offer",
+              );
               if (firstOffer) {
-                const priceWholeEl = firstOffer.querySelector(".a-price .a-price-whole");
-                if (priceWholeEl) pPrice = priceWholeEl.textContent.replace(".", "").trim();
+                const priceWholeEl = firstOffer.querySelector(
+                  ".a-price .a-price-whole",
+                );
+                if (priceWholeEl)
+                  pPrice = priceWholeEl.textContent.replace(".", "").trim();
                 else {
-                  const fallbackPrice = firstOffer.querySelector(".a-price .a-offscreen");
-                  if (fallbackPrice && fallbackPrice.innerText.trim()) pPrice = fallbackPrice.innerText.trim();
+                  const fallbackPrice = firstOffer.querySelector(
+                    ".a-price .a-offscreen",
+                  );
+                  if (fallbackPrice && fallbackPrice.innerText.trim())
+                    pPrice = fallbackPrice.innerText.trim();
                 }
 
-                const delEl = firstOffer.querySelector("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold");
+                const delEl = firstOffer.querySelector(
+                  "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold",
+                );
                 if (delEl) pDel = delEl.innerText.trim();
-                const mrpEl = firstOffer.querySelector(".a-text-price .a-offscreen");
+                const mrpEl = firstOffer.querySelector(
+                  ".a-text-price .a-offscreen",
+                );
                 if (mrpEl) pMrp = mrpEl.textContent.trim();
-                const sellerEl = firstOffer.querySelector("#aod-offer-soldBy a");
+                const sellerEl = firstOffer.querySelector(
+                  "#aod-offer-soldBy a",
+                );
                 if (sellerEl) pSeller = sellerEl.textContent.trim();
               }
 
               if (pMrp === "N/A") {
-                const pinnedMrpEl = document.querySelector("#aod-sticky-pinned-offer .a-text-price span.a-offscreen");
+                const pinnedMrpEl = document.querySelector(
+                  "#aod-sticky-pinned-offer .a-text-price span.a-offscreen",
+                );
                 if (pinnedMrpEl) pMrp = pinnedMrpEl.textContent.trim();
               }
 
-              const allOffers = document.querySelectorAll("#aod-offer-list #aod-offer");
+              const allOffers = document.querySelectorAll(
+                "#aod-offer-list #aod-offer",
+              );
               for (let offer of allOffers) {
                 const headingEl = offer.querySelector("#aod-offer-heading");
-                const headingText = headingEl ? headingEl.textContent.trim().toLowerCase() : "";
+                const headingText = headingEl
+                  ? headingEl.textContent.trim().toLowerCase()
+                  : "";
 
                 if (headingText.includes("used")) {
-                  const usedPriceWholeEl = offer.querySelector(".a-price .a-price-whole");
+                  const usedPriceWholeEl = offer.querySelector(
+                    ".a-price .a-price-whole",
+                  );
                   let tempUsedPrice = null;
 
-                  if (usedPriceWholeEl) tempUsedPrice = usedPriceWholeEl.textContent.replace(/[.,]/g, "").trim();
+                  if (usedPriceWholeEl)
+                    tempUsedPrice = usedPriceWholeEl.textContent
+                      .replace(/[.,]/g, "")
+                      .trim();
                   else {
-                    const fallbackUsedPrice = offer.querySelector(".a-price .a-offscreen");
-                    if (fallbackUsedPrice && fallbackUsedPrice.innerText.trim()) tempUsedPrice = fallbackUsedPrice.innerText.replace(/[^\d]/g, "").trim();
+                    const fallbackUsedPrice = offer.querySelector(
+                      ".a-price .a-offscreen",
+                    );
+                    if (fallbackUsedPrice && fallbackUsedPrice.innerText.trim())
+                      tempUsedPrice = fallbackUsedPrice.innerText
+                        .replace(/[^\d]/g, "")
+                        .trim();
                   }
 
                   if (tempUsedPrice && pUsed === "No Used Options") {
@@ -241,16 +355,21 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
               scrapedData.price = panelData.pPrice;
               scrapedData.mrp = panelData.pMrp;
               scrapedData.delivery = panelData.pDel;
-              if (panelData.pSeller !== "N/A") scrapedData.seller = panelData.pSeller;
+              if (panelData.pSeller !== "N/A")
+                scrapedData.seller = panelData.pSeller;
             }
-            if (panelData.pUsed !== "No Used Options") scrapedData.used_available = panelData.pUsed;
+            if (panelData.pUsed !== "No Used Options")
+              scrapedData.used_available = panelData.pUsed;
           }
         }
 
         delete scrapedData.hasUsedOptions;
         scrapedData.mrp = cleanAndCheckMRP(scrapedData.price, scrapedData.mrp);
 
-        if (scrapedData.price === "N/A" && scrapedData.used_available === "No Used Options") {
+        if (
+          scrapedData.price === "N/A" &&
+          scrapedData.used_available === "No Used Options"
+        ) {
           scrapedData.mrp = "N/A";
           scrapedData.delivery = "N/A";
           scrapedData.seller = "N/A";
@@ -259,7 +378,9 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
         const finalData = { ...item, ...scrapedData };
         appendResult(outputFilePath, finalData);
 
-        stopSpinner(`Successfully parsed ${asin}. Price: ₹${scrapedData.price}, Seller: ${scrapedData.seller}, ISBN: ${scrapedData.found_isbn}`);
+        stopSpinner(
+          `Successfully parsed ${asin}. Price: ₹${scrapedData.price}, Seller: ${scrapedData.seller}, ISBN: ${scrapedData.found_isbn}`,
+        );
 
         success = true;
         await page.waitForTimeout(getRandomDelay(2000, 5000));
@@ -277,12 +398,18 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
             delivery: "Error",
             seller: "Error",
             used_available: "Error",
+            reviews_count: "Error",
+            publisher: "Error",
+            publication_date: "Error",
           };
           appendResult(outputFilePath, errorData);
-          
+
           const debugFolder = path.join(__dirname, "..", "..", "debug");
-          if (!fs.existsSync(debugFolder)) fs.mkdirSync(debugFolder, { recursive: true });
-          await page.screenshot({ path: path.join(debugFolder, `debug-error-${asin}.png`) });
+          if (!fs.existsSync(debugFolder))
+            fs.mkdirSync(debugFolder, { recursive: true });
+          await page.screenshot({
+            path: path.join(debugFolder, `debug-error-${asin}.png`),
+          });
         } else {
           startSpinner("Retrying in 5 seconds...");
           await page.waitForTimeout(5000);
