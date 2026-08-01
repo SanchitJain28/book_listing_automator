@@ -27,9 +27,18 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
     stage1Items = readJsonLines(inputFile);
   }
 
+  let startIndex = 0;
+  if (fs.existsSync(outputFilePath)) {
+    const existingOutput = fs.readFileSync(outputFilePath, "utf-8").split("\n").filter(Boolean);
+    startIndex = existingOutput.length;
+    if (startIndex > 0) {
+      console.log(`\n▶ Found existing output file with ${startIndex} items. Resuming from item ${startIndex + 1}...`);
+    }
+  }
+
   let { context, page } = await initBrowser(isHeadless);
 
-  for (let i = 0; i < stage1Items.length; i++) {
+  for (let i = startIndex; i < stage1Items.length; i++) {
     const item = stage1Items[i];
     const asin = item.asin;
 
