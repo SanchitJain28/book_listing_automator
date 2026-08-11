@@ -1,0 +1,417 @@
+textbook Narosa
+textbook Apress
+superconductivity textbook
+structural analysis Woodhead Publishing
+special indian edition Daya Publishing
+pulmonology textbook
+otolaryngology textbook
+orthopaedics textbook
+neurosurgery textbook
+neonatology textbook
+mineralogy textbook
+international trade Wolters Kluwer
+indology Johns Hopkins University Press
+hepatology textbook
+geophysics textbook
+food technology Jaypee Brothers
+embedded systems Elsevier Saunders
+compiler design Elsevier Saunders
+ceramics textbook
+anaesthesiology textbook
+textbook Cambridge University Press
+superconductivity World Scientific
+pulmonology World Scientific
+otolaryngology World Scientific
+orthopaedics World Scientific
+organizational behaviour McGraw-Hill Education
+neurosurgery World Scientific
+neonatology World Scientific
+mineralogy World Scientific
+medicine introduction to
+managerial economics IGI Global
+hepatology World Scientific
+geotechnical engineering Atlantic Publishers
+geophysics World Scientific
+fluid power IGI Global
+entrepreneurship development Viva Books
+control systems Lippincott
+ceramics World Scientific
+cell biology IGI Global
+anaesthesiology World Scientific
+New Central Book Agency (NCBA)
+plant biotechnology Woodhead Publishing
+physiotherapy Johns Hopkins University Press
+discrete mathematics Thieme
+company law PHI Learning
+food technology Academic Press
+clinical recent advances in
+business forecasting encyclopaedia
+applied mathematics Wiley
+analytical chemistry Viva Books
+Jaypee Brothers Medical Publishers Private Limited
+Dilpreet Publishing House/Ariana Publishers
+plant biotechnology 2nd edition
+organizational behaviour World Scientific
+machine learning Wolters Kluwer
+business law Springer
+thermal engineering Khanna Publishers
+quantum mechanics PHI Learning
+machine design Lippincott
+fundamentals IGI Global
+discrete mathematics Narosa
+discrete mathematics Daya Publishing
+discrete mathematics Apress
+digital signal processing proceedings
+digital signal processing Narosa
+digital signal processing Apress
+McGraw Hill Publishing Company
+plant pathology Woodhead Publishing
+health IGI Global
+functional foods CRC Press
+dentistry special indian edition
+structural analysis 2nd edition
+international trade Viva Books
+composite materials PHI Learning
+business forecasting fundamentals
+business economics Khanna Publishers
+VLSI design CRC Press
+numerical methods IGI Global
+indian history Khanna Publishers
+Eurospan Limited – IPG Trade
+meteorology New Age International
+hydrology Johns Hopkins University Press
+geotechnical engineering proceedings
+financial accounting Gyan Publishing
+ethnography Academic Press
+control systems S Chand
+statistical mechanics IGI Global
+pathology introduction to
+entrepreneurship development textbook
+comparative religion Johns Hopkins University Press
+Six Sigma green belt exam guide
+social anthropology Gyan Publishing
+machine learning Viva Books
+steel structures McGraw-Hill Education
+parasitology introduction to
+organizational behaviour special indian edition
+labour law PHI Learning
+control systems handbook
+analytical chemistry textbook
+physical chemistry principles
+machine design S Chand
+heat transfer introduction to
+business forecasting Daya Publishing
+SHRI ADHYA EDUCATIONAL BOOKS PVT LTD
+HARPER COLLINS UK FIRST ORDER
+real analysis Elsevier Saunders
+database systems Gyan Publishing
+Peter Pauper Press, Inc. (Consignment)
+steel structures World Scientific
+pharmacotherapy Oxford University Press
+operating systems Gyan Publishing
+obstetrics introduction to
+imaging recent advances in
+ecotoxicology atlas
+differential equations introduction to
+meteorology Johns Hopkins University Press
+medicinal chemistry principles
+machine design handbook
+international trade textbook
+discrete mathematics Academic Press
+control systems manual
+compiler design Wolters Kluwer
+business forecasting Thieme
+CONTINUUM INTERNATIONAL PUBLISHING GROUP
+signals and systems Elsevier
+plant pathology 2nd edition
+gastroenterology introduction to
+discrete mathematics Jaypee Brothers
+dentistry recent advances in
+introduction to Pearson
+physical chemistry encyclopaedia
+functional foods Shroff Publishers
+functional foods CBS Publishers
+electronics introduction to
+Shroff Publishers & Distributors PVT. Limited
+power systems principles
+mechanical vibrations Cambridge University Press
+machine learning textbook
+machine design manual
+fluid mechanics PHI Learning
+comparative religion Oxford University Press
+systems biology principles
+special indian edition Academic Press
+nursing special indian edition
+islamic studies Gyan Publishing
+inorganic chemistry Elsevier Saunders
+computer networks Elsevier Saunders
+applied mathematics Pearson
+S Chand & Co Ltd
+Atlantic Publishers & Distributors Pvt. Ltd
+superconductivity recent advances in
+recent advances in Narosa
+recent advances in Apress
+pulmonology recent advances in
+public administration IGI Global
+otolaryngology recent advances in
+orthopaedics recent advances in
+nursing recent advances in
+neurosurgery recent advances in
+neonatology recent advances in
+mineralogy recent advances in
+medicinal chemistry encyclopaedia
+hepatology recent advances in
+geotechnical engineering Khanna Publishers
+geophysics recent advances in
+embedded systems Wolters Kluwer
+ceramics recent advances in
+anaesthesiology recent advances in
+graph theory Elsevier Saunders
+entrepreneurship development CRC Press
+embedded systems Viva Books
+compiler design Viva Books
+business law Atlantic Publishers
+biochemistry introduction to
+signals and systems Springer
+business forecasting Academic Press
+Cambridge University Press-New Delh
+power systems encyclopaedia
+operations research advances in
+medicinal chemistry fundamentals
+systems biology encyclopaedia
+polymer chemistry Elsevier Saunders
+communication systems principles
+business forecasting Narosa
+business forecasting Apress
+advances in Gyan Publishing
+Vajra Publications Incorporated Pvt. Limited
+VLSI design Shroff Publishers
+VLSI design CBS Publishers
+functional foods Lippincott
+power systems Daya Publishing
+physical chemistry fundamentals
+echocardiography Wiley
+cardiology recent advances in
+steel structures special indian edition
+power systems fundamentals
+physical chemistry Daya Publishing
+international trade CRC Press
+thermal engineering Wiley
+systems biology fundamentals
+systems biology Daya Publishing
+plant biotechnology Gyan Publishing
+medicinal chemistry Daya Publishing
+analytical chemistry CRC Press
+Krishna Prakashan Media (P) Ltd.
+GAZELLE BOOK SERVICES LTD
+superconductivity IGI Global
+structural analysis Gyan Publishing
+real analysis Wolters Kluwer
+pulmonology IGI Global
+pharmacotherapy Lippincott
+pharmacology introduction to
+otolaryngology IGI Global
+orthopaedics IGI Global
+neurosurgery IGI Global
+neonatology IGI Global
+mineralogy IGI Global
+mechanical vibrations Johns Hopkins University Press
+hepatology IGI Global
+geophysics IGI Global
+epidemiology recent advances in
+dermoscopy Oxford University Press
+ceramics IGI Global
+business forecasting Jaypee Brothers
+anaesthesiology IGI Global
+rheumatology Johns Hopkins University Press
+public recent advances in
+physical chemistry Thieme
+operations research Woodhead Publishing
+computational biology advances in
+compiler design textbook
+communication systems encyclopaedia
+S CHAND & Company Limited
+power systems Thieme
+machine learning CRC Press
+VLSI design Lippincott
+textbook Oxford University Press
+organic chemistry principles
+ecotoxicology proceedings
+medicinal chemistry Thieme
+functional foods S Chand
+applied mathematics Elsevier
+plant pathology Gyan Publishing
+handbook Cambridge University Press
+digital signal processing Wiley
+business economics Wiley
+VLSI design S Chand
+inorganic chemistry Wolters Kluwer
+embedded systems textbook
+condensed matter physics dictionary
+computer networks Wolters Kluwer
+communication systems Daya Publishing
+real analysis Viva Books
+microeconomics recent advances in
+functional foods handbook
+Atlantic Publishers & Distributors (P) Limited
+systems biology Thieme
+south asian archaeology dictionary
+power systems Academic Press
+organic chemistry encyclopaedia
+engineering technician passbooks
+cardiology special indian edition
+sanskrit literature advances in
+physical chemistry Academic Press
+medicinal chemistry Academic Press
+manual Cambridge University Press
+immunology introduction to
+differential equations McGraw-Hill Education
+computational biology Woodhead Publishing
+systems biology Academic Press
+heat transfer McGraw-Hill Education
+functional foods manual
+communication systems fundamentals
+advances in Lippincott
+Arihant Edu Web Pvt. Ltd. - UP
+polymer chemistry Wolters Kluwer
+entrepreneurship development Shroff Publishers
+entrepreneurship development CBS Publishers
+VLSI design manual
+organic chemistry fundamentals
+organic chemistry Daya Publishing
+differential equations World Scientific
+Universities Press,India
+pharmacotherapy handbook
+introduction to Elsevier
+inorganic chemistry Viva Books
+heat transfer World Scientific
+computer networks Viva Books
+analytical chemistry Shroff Publishers
+analytical chemistry CBS Publishers
+VLSI design handbook
+S. Vikas & Co.- Punjab
+Publications & Information Directorate
+virology recent advances in
+surgery recent advances in
+special indian edition CRC Press
+graph theory Wolters Kluwer
+financial accounting Elsevier Saunders
+digital signal processing Pearson
+compiler design CRC Press
+communication systems Thieme
+business law Khanna Publishers
+quantum mechanics IGI Global
+applied mathematics Springer
+B. Jain Publishers Pvt. Ltd.
+B. JAIN PUBLISHERS / ABOITIZ
+B Jain Publishers Pvt Ltd (IND)
+B Jain Publishers Pvt Ltd
+real analysis textbook
+physical chemistry Jaypee Brothers
+pharmacotherapy manual
+linear algebra advances in
+graph theory Viva Books
+Amer Society for Nondestructive
+thermal engineering Pearson
+sanskrit literature Woodhead Publishing
+power systems Jaypee Brothers
+medical recent advances in
+mechanical vibrations Oxford University Press
+international trade Shroff Publishers
+international trade CBS Publishers
+geotechnical engineering Wiley
+composite materials IGI Global
+communication systems Academic Press
+polymer chemistry Viva Books
+petrology PHI Learning
+entrepreneurship development Lippincott
+ecotoxicology Jaypee Brothers
+business economics Pearson
+medicinal chemistry Jaypee Brothers
+epidemiology special indian edition
+embedded systems CRC Press
+database systems Elsevier Saunders
+NASADIYA TECHNOLOGIES PVT LTD
+water treatment operator career examination
+microbiology introduction to
+condensed matter physics atlas
+analytical chemistry Lippincott
+social anthropology Elsevier Saunders
+public special indian edition
+physical chemistry Narosa
+physical chemistry Apress
+machine learning Shroff Publishers
+machine learning CBS Publishers
+entrepreneurship development S Chand
+echocardiography Pearson
+dermoscopy Lippincott
+rheumatology New Age International
+organic chemistry Thieme
+inorganic chemistry textbook
+food chemistry dictionary
+control systems principles
+computer networks textbook
+systems biology Jaypee Brothers
+south asian archaeology atlas
+petrology McGraw-Hill Education
+organic chemistry Academic Press
+medicinal chemistry Narosa
+medicinal chemistry Apress
+Khel Sahitya Kendra K.S.K. Publishers & Distributors
+operations research Gyan Publishing
+linear algebra Woodhead Publishing
+international trade Lippincott
+fluid mechanics IGI Global
+electromagnetics introduction to
+comparative religion introduction to
+Shroff Publishers & Distributers Private Limited - Mumbai
+Hind Pocket Books Pvt Ltd
+2nd edition Gyan Publishing
+signal processing advances in
+power systems Narosa
+power systems Apress
+operations research 2nd edition
+operating systems Elsevier Saunders
+machine design principles
+control systems Daya Publishing
+CL Educate Ltd (Publication division)
+recent advances in Wiley
+thermodynamics introduction to
+polymer chemistry textbook
+nutraceuticals PHI Learning
+machine design Daya Publishing
+international trade S Chand
+fisheries introduction to
+control systems encyclopaedia
+medicine recent advances in
+machine learning Lippincott
+introduction to Atlantic Publishers
+food chemistry Atlantic Publishers
+entrepreneurship development manual
+biotechnology recent advances in
+analytical chemistry S Chand
+Usborne Publishing (Advantage (Consignment)
+systems biology Narosa
+systems biology Apress
+petrology World Scientific
+indian archaeology advances in
+entrepreneurship development handbook
+cost accounting advances in
+corporate finance advances in
+condensed matter physics proceedings
+company law IGI Global
+communication systems Jaypee Brothers
+NIIR PROJECT CONSULTANCY SERVICES
+introduction to Springer
+graph theory textbook
+functional analysis dictionary
+digital signal processing Elsevier
+computational biology Gyan Publishing
+computational biology 2nd edition
+thermal engineering Elsevier
+textbook Lippincott
+nutraceuticals McGraw-Hill Education
+machine learning S Chand
+machine design encyclopaedia
+control systems fundamentals
+analytical chemistry handbook
