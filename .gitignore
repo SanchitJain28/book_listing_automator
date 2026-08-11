@@ -7,4 +7,4 @@ node_modules
 /formatted
 /output
 /chrome_profile
-/debug
+/debug.env
