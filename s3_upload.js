@@ -50,7 +50,9 @@ async function run() {
 
   const allFiles = getAllJsonFiles(SEARCH_DIR);
   if (allFiles.length === 0) {
-    console.log("⚠️ No JSON files found in output directory. Nothing to upload.");
+    console.log(
+      "⚠️ No JSON files found in output directory. Nothing to upload.",
+    );
     return;
   }
 
@@ -75,7 +77,11 @@ async function run() {
   rl.close();
 
   const selectedIndex = parseInt(answer.trim() || "1") - 1;
-  if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= allFiles.length) {
+  if (
+    isNaN(selectedIndex) ||
+    selectedIndex < 0 ||
+    selectedIndex >= allFiles.length
+  ) {
     console.error("❌ Invalid selection.");
     process.exit(1);
   }
@@ -85,12 +91,13 @@ async function run() {
   const s3Key = path.relative(SEARCH_DIR, filePath).replace(/\\/g, "/");
 
   console.log(`\n📄 Selected file: ${s3Key}`);
-  console.log(`📦 Size: ${(fs.statSync(filePath).size / 1024 / 1024).toFixed(2)} MB`);
+  console.log(
+    `📦 Size: ${(fs.statSync(filePath).size / 1024 / 1024).toFixed(2)} MB`,
+  );
   console.log(`🚀 Uploading to S3 Bucket '${bucketName}'...`);
 
-  // Initialize S3 Client (it will automatically pick up AWS_ACCESS_KEY_ID or ~/.aws/credentials)
   const s3Client = new S3Client({
-    region: process.env.AWS_REGION || "us-east-1",
+    region: process.env.AWS_REGION || "ap-south-1",
   });
 
   try {
@@ -99,7 +106,7 @@ async function run() {
       Bucket: bucketName,
       Key: s3Key,
       Body: fileStream,
-      ContentType: "application/json"
+      ContentType: "application/json",
     });
 
     await s3Client.send(command);
