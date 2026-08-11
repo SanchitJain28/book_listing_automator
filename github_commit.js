@@ -86,7 +86,7 @@ async function run() {
   }
 
   console.log("➕ Adding file to git...");
-  execSync(`git add "${repoFilePath}"`);
+  execSync(`git add -f "${repoFilePath}"`);
 
   try {
     execSync(`git commit -m "Automated upload of output: ${latestFile}"`, { stdio: 'ignore' });
