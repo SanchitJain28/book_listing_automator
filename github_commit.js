@@ -138,13 +138,29 @@ async function run() {
   const fileContent = fs.readFileSync(filePath, "base64");
 
   // 3. Create Blob (This can handle up to 100MB)
-  console.log("☁️ Uploading blob to GitHub...");
-  const blobRes = await apiRequest("POST", "/git/blobs", {
-    content: fileContent,
-    encoding: "base64",
-  });
-  const blobSha = blobRes.sha;
-  console.log(`✅ Blob created: ${blobSha}`);
+  console.log("☁️ Uploading blob to GitHub (this might take a moment)...");
+  let blobSha = null;
+  let uploadRetries = 3;
+  
+  while (uploadRetries > 0) {
+    try {
+      const blobRes = await apiRequest("POST", "/git/blobs", {
+        content: fileContent,
+        encoding: "base64",
+      });
+      blobSha = blobRes.sha;
+      console.log(`✅ Blob created: ${blobSha}`);
+      break;
+    } catch (err) {
+      if (err.status >= 500 && uploadRetries > 1) {
+        console.warn(`⚠️ GitHub server returned ${err.status}. Retrying in 5 seconds...`);
+        uploadRetries--;
+        await new Promise(res => setTimeout(res, 5000));
+      } else {
+        throw err;
+      }
+    }
+  }
 
   // 4. Retry loop to handle concurrent commits from other VPS instances
   let retries = 5;
