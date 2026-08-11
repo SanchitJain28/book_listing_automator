@@ -89,7 +89,9 @@ async function run() {
   console.log(`🚀 Uploading to S3 Bucket '${bucketName}'...`);
 
   // Initialize S3 Client (it will automatically pick up AWS_ACCESS_KEY_ID or ~/.aws/credentials)
-  const s3Client = new S3Client({});
+  const s3Client = new S3Client({
+    region: process.env.AWS_REGION || "us-east-1",
+  });
 
   try {
     const fileStream = fs.createReadStream(filePath);
