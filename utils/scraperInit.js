@@ -8,15 +8,26 @@ function initScraper(scriptName, scraperFolder, stageSuffix) {
   }
 
   const isHeadless = process.argv.includes("--headless");
-  const fileName = path.basename(inputFile, path.extname(inputFile));
-  const inputFolderName = path.basename(path.dirname(inputFile));
-  
+  const absoluteInput = path.resolve(inputFile);
+  const inputDataRoot = path.join(__dirname, "..", "input-data");
+
+  let relativePath = path.relative(inputDataRoot, absoluteInput);
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    const fileName = path.basename(inputFile, path.extname(inputFile));
+    const inputFolderName = path.basename(path.dirname(inputFile));
+    relativePath = path.join(scraperFolder, `${inputFolderName}-${fileName}`);
+  } else {
+    const parsedPath = path.parse(relativePath);
+    relativePath = path.join(parsedPath.dir, parsedPath.name);
+    stageSuffix = ".json";
+  }
+
   const outputFilePath = path.join(
     __dirname,
     "..",
     "output",
-    scraperFolder,
-    `${inputFolderName}-${fileName}${stageSuffix}`
+    `${relativePath}${stageSuffix}`,
   );
 
   return { inputFile, isHeadless, outputFilePath };
