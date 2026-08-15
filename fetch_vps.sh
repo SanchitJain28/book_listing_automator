@@ -1,21 +1,15 @@
 #!/bin/bash
 
 PASS="Sanchit@282930"
-DEST="output/export/2026-08-10-round-2/"
+DEST="output/amazon-india/search-term/stage-2/2026-08-10/chunks"
+mkdir -p "$DEST"
 
-rm -f "$DEST"/*.json
+IPS=("162.35.163.93" "153.75.235.165" "163.245.196.45" "153.75.235.158" "163.245.196.35")
 
-for ip in 163.245.196.45 153.75.235.158 163.245.196.35 162.35.163.93 153.75.235.165; do
-  echo "Fetching from $ip..."
-  expect -c "
-    set timeout -1
-    spawn scp -o StrictHostKeyChecking=no root@$ip:~/book_listing_automator/output/amazon-search-term/chunks-chunk-?-stage-1.json $DEST
-    expect {
-      \"*assword:*\" {
-        send \"$PASS\r\"
-        exp_continue
-      }
-      eof
-    }
-  "
+for ip in "${IPS[@]}"; do
+  echo "📥 Fetching from $ip..."
+  sshpass -p "$PASS" scp -o StrictHostKeyChecking=no "root@$ip:~/book_listing_automator/$DEST/*.json" "$DEST/" || echo "⚠️ Failed to fetch from $ip"
 done
+
+echo "✅ All chunks fetched into $DEST"
+

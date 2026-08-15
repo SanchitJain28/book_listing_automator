@@ -7,6 +7,7 @@ chromium.use(stealth);
 async function initBrowser(
   headless = true,
   profileName = "amazon_search_profile",
+  blockResources = true
 ) {
   const userDataDir = path.join(__dirname, "..", "..", "..", profileName);
   const context = await chromium.launchPersistentContext(userDataDir, {
@@ -26,14 +27,16 @@ async function initBrowser(
     },
   });
 
-  await context.route("**/*", (route) => {
-    const requestType = route.request().resourceType();
-    if (["image", "media", "font", "stylesheet"].includes(requestType)) {
-      route.abort();
-    } else {
-      route.continue();
-    }
-  });
+  if (blockResources) {
+    await context.route("**/*", (route) => {
+      const requestType = route.request().resourceType();
+      if (["image", "media", "font", "stylesheet"].includes(requestType)) {
+        route.abort();
+      } else {
+        route.continue();
+      }
+    });
+  }
 
   let page =
     context.pages().length > 0 ? context.pages()[0] : await context.newPage();

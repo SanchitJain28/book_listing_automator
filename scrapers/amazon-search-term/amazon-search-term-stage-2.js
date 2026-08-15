@@ -7,7 +7,7 @@ const {
   appendResult,
 } = require("../../utils/file");
 const { initScraper } = require("../../utils/scraperInit");
-const { checkDogPage, cleanAndCheckMRP } = require("../../utils/amazon");
+const { checkDogPage, cleanAndCheckMRP, setAmazonLocation } = require("../../utils/amazon");
 const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
 (async () => {
@@ -38,6 +38,20 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
   let { context, page } = await initBrowser(isHeadless);
 
+  // Set delivery location to Gurgaon (122101)
+  startSpinner("Checking Amazon delivery location (Gurgaon 122101)...");
+  const locResult = await setAmazonLocation(page, "122101");
+  if (locResult.success) {
+    stopSpinner(
+      locResult.alreadySet
+        ? `Delivery location already active: ${locResult.location}`
+        : `Delivery location set to Gurgaon (${locResult.location || "122101"})`,
+      "success"
+    );
+  } else {
+    stopSpinner(`Delivery location setup skipped/failed: ${locResult.error}`, "warn");
+  }
+
   for (let i = startIndex; i < stage1Items.length; i++) {
     const item = stage1Items[i];
     const asin = item.asin;
@@ -56,6 +70,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
       const newBrowser = await initBrowser(isHeadless);
       context = newBrowser.context;
       page = newBrowser.page;
+      await setAmazonLocation(page, "122101");
     }
 
     if (!asin) {
