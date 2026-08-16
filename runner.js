@@ -170,25 +170,29 @@ async function main() {
   console.log(`🎯 TARGET SCRIPT:  ${selectedScraper}`);
   console.log(`📄 INPUT FILE:     ${selectedInput}`);
   console.log(`👻 HEADLESS:       ${isHeadless ? 'Yes' : 'No'}`);
+  console.log(`🛡️  WATCHER:        Enabled (Auto-Restart on Crash/Stall)`);
   console.log(`🖥️  BACKGROUND:     ${isBackground ? 'Yes (tmux)' : 'No (terminal)'}`);
   console.log("==================================================\n");
 
   rl.close();
 
-  // 5. Spawn the child process
-  const args = [selectedScraper, selectedInput];
+  // 5. Spawn the child process wrapped with the Watcher supervisor
+  const watcherScript = path.relative(__dirname, path.join(__dirname, 'utils', 'watcher.js'));
+  const scraperArgs = [selectedScraper, selectedInput];
   if (isHeadless) {
-    args.push('--headless');
+    scraperArgs.push('--headless');
   }
+
+  const fullArgs = [watcherScript, ...scraperArgs];
 
   if (isBackground) {
     const { execSync } = require('child_process');
     const sessionName = "scrape_" + Math.floor(Math.random() * 10000);
-    const cmd = `tmux new-session -d -s ${sessionName} "node ${args.join(' ')}"`;
+    const cmd = `tmux new-session -d -s ${sessionName} "node ${fullArgs.join(' ')}"`;
     
     try {
       execSync(cmd);
-      console.log(`✅ Scraper is now running safely in the background!`);
+      console.log(`✅ Scraper is now running safely in the background under Watcher supervision!`);
       console.log(`\n👀 To view it live at any time, run:`);
       console.log(`   \x1b[36mtmux attach -t ${sessionName}\x1b[0m\n`);
       console.log(`(Remember: To exit the view safely without killing the scraper, press Ctrl+B then D)`);
@@ -196,13 +200,13 @@ async function main() {
       console.error("❌ Failed to start tmux. Make sure tmux is installed.");
     }
   } else {
-    console.log(`> node ${args.join(' ')}\n`);
-    const child = spawn('node', args, {
+    console.log(`> node ${fullArgs.join(' ')}\n`);
+    const child = spawn('node', fullArgs, {
       stdio: 'inherit'
     });
 
     child.on('close', (code) => {
-      console.log(`\n✅ Process exited with code ${code}`);
+      console.log(`\n✅ Watcher exited with code ${code}`);
     });
   }
 }
