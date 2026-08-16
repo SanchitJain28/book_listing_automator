@@ -72,400 +72,410 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
       continue;
     }
 
-    let retries = 2;
-    let success = false;
+    try {
+      startSpinner(`Searching Amazon for ISBN ${isbn}...`);
 
-    while (retries > 0 && !success) {
-      try {
-        startSpinner(`Searching Amazon for ISBN ${isbn}...`);
+      await page.goto(`https://www.amazon.in/s?k=${isbn}`, {
+        timeout: 10000,
+        waitUntil: "domcontentloaded",
+      });
 
-        await page.goto(`https://www.amazon.in/s?k=${isbn}`, {
-          timeout: 60000,
-          waitUntil: "domcontentloaded",
-        });
+      let isDogPage = await checkDogPage(page);
 
-        let isDogPage = await checkDogPage(page);
+      if (isDogPage) {
+        stopSpinner("Amazon bot block detected. Waiting 10 seconds...", "warn");
+        await page.waitForTimeout(10000);
+        await context.clearCookies();
+      }
 
-        if (isDogPage) {
-          stopSpinner("Amazon bot block detected. Waiting 30 seconds...", "warn");
-          await page.waitForTimeout(30000);
-          await context.clearCookies();
-          retries--;
-          continue;
-        }
+      // Get first search result
+      const firstResult = await page.$(
+        '.s-search-results .s-result-item[data-component-type="s-search-result"] a.a-link-normal[href*="/dp/"]'
+      );
 
-        // Get first search result
-        const firstResult = await page.$('.s-search-results .s-result-item[data-component-type="s-search-result"] a.a-link-normal[href*="/dp/"]');
-        
-        if (!firstResult) {
-            throw new Error("No search results found.");
-        }
+      if (!firstResult) {
+        stopSpinner(`No search results found for ${isbn}.`, "warn");
+        const notFoundData = {
+          ...item,
+          title: "N/A",
+          found_isbn: "N/A",
+          isbn_matched: false,
+          price: "N/A",
+          mrp: "N/A",
+          delivery: "N/A",
+          seller: "N/A",
+          used_available: "No Used Options",
+          reviews_count: "0",
+          publisher: "N/A",
+          publication_date: "N/A",
+        };
+        appendResult(outputFilePath, notFoundData);
+        await page.waitForTimeout(getRandomDelay(2000, 4000));
+        continue;
+      }
 
-        const productUrl = await page.evaluate(el => el.href, firstResult);
-        
-        startSpinner(`Navigating to product page...`);
-        await page.goto(productUrl, {
-          timeout: 60000,
-          waitUntil: "domcontentloaded",
-        });
+      const productUrl = await page.evaluate((el) => el.href, firstResult);
 
-        isDogPage = await checkDogPage(page);
-        if (isDogPage) {
-          stopSpinner("Amazon bot block detected on product page. Waiting 30 seconds...", "warn");
-          await page.waitForTimeout(30000);
-          await context.clearCookies();
-          retries--;
-          continue;
-        }
+      startSpinner(`Navigating to product page...`);
+      await page.goto(productUrl, {
+        timeout: 15000,
+        waitUntil: "domcontentloaded",
+      });
 
-        await page
-          .waitForSelector("#productTitle", { timeout: 15000 })
-          .catch(() => {});
+      isDogPage = await checkDogPage(page);
+      if (isDogPage) {
+        stopSpinner("Amazon bot block detected on product page. Waiting 10 seconds...", "warn");
+        await page.waitForTimeout(10000);
+        await context.clearCookies();
+      }
 
-        // SMART FORMAT SWITCH
-        startSpinner("Checking for cheaper physical formats...");
-        const cheaperTarget = await page.evaluate(() => {
-          const swatches = Array.from(
-            document.querySelectorAll("#tmmSwatches .swatchElement")
-          );
-          if (swatches.length <= 1) return null;
+      await page
+        .waitForSelector("#productTitle", { timeout: 4000 })
+        .catch(() => {});
 
-          let lowestPrice = Infinity;
-          let bestUrl = null;
-          let bestFormatName = null;
-          let isCurrentlySelectedCheapest = false;
+      // SMART FORMAT SWITCH
+      startSpinner("Checking for cheaper physical formats...");
+      const cheaperTarget = await page.evaluate(() => {
+        const swatches = Array.from(
+          document.querySelectorAll("#tmmSwatches .swatchElement")
+        );
+        if (swatches.length <= 1) return null;
 
-          for (let swatch of swatches) {
-            const isSelected = swatch.classList.contains("selected");
-            const linkEl = swatch.querySelector("a");
-            const url = linkEl ? linkEl.href : null;
-            const priceText = swatch.innerText;
-            let priceNum = Infinity;
+        let lowestPrice = Infinity;
+        let bestUrl = null;
+        let bestFormatName = null;
+        let isCurrentlySelectedCheapest = false;
 
-            if (priceText) {
-              const textLower = priceText.toLowerCase();
-              const formatNameLower = priceText.split("\n")[0].toLowerCase();
-              const isForbidden =
-                formatNameLower.includes("kindle") ||
-                formatNameLower.includes("ebook") ||
-                formatNameLower.includes("e-book") ||
-                formatNameLower.includes("audiobook") ||
-                formatNameLower.includes("audible");
+        for (let swatch of swatches) {
+          const isSelected = swatch.classList.contains("selected");
+          const linkEl = swatch.querySelector("a");
+          const url = linkEl ? linkEl.href : null;
+          const priceText = swatch.innerText;
+          let priceNum = Infinity;
 
-              if (!textLower.includes("unavailable") && !isForbidden) {
-                const match = priceText.match(/[\d,]+(?:\.\d+)?/);
-                if (match) priceNum = parseFloat(match[0].replace(/,/g, ""));
-              }
-            }
+          if (priceText) {
+            const textLower = priceText.toLowerCase();
+            const formatNameLower = priceText.split("\n")[0].toLowerCase();
+            const isForbidden =
+              formatNameLower.includes("kindle") ||
+              formatNameLower.includes("ebook") ||
+              formatNameLower.includes("e-book") ||
+              formatNameLower.includes("audiobook") ||
+              formatNameLower.includes("audible");
 
-            if (priceNum < lowestPrice) {
-              lowestPrice = priceNum;
-              bestUrl = url;
-              bestFormatName = priceText
-                ? priceText.split("\n")[0].trim()
-                : "Unknown";
-              isCurrentlySelectedCheapest = isSelected;
-            }
-          }
-
-          if (
-            !isCurrentlySelectedCheapest &&
-            bestUrl &&
-            lowestPrice !== Infinity
-          ) {
-            return { url: bestUrl, format: bestFormatName, price: lowestPrice };
-          }
-          return null;
-        });
-
-        if (cheaperTarget) {
-          stopSpinner(`Switching to cheaper format: ${cheaperTarget.format} (₹${cheaperTarget.price})...`, "info");
-          startSpinner("Loading cheaper format...");
-          await page.goto(cheaperTarget.url, {
-            timeout: 60000,
-            waitUntil: "domcontentloaded",
-          });
-          await page
-            .waitForSelector("#productTitle", { timeout: 5000 })
-            .catch(() => {});
-        }
-
-        // PRODUCT PAGE DATA EXTRACTION
-        startSpinner("Extracting product data...");
-        let scrapedData = await page.evaluate(() => {
-          let result = {
-            title: "N/A",
-            found_isbn: "N/A",
-            price: "N/A",
-            mrp: "N/A",
-            delivery: "N/A",
-            seller: "N/A",
-            used_available: "No Used Options",
-            reviews_count: "0",
-            publisher: "N/A",
-            publication_date: "N/A",
-            hasUsedOptions: false,
-          };
-
-          const getText = (selector) => {
-            const el = document.querySelector(selector);
-            return el ? el.innerText.trim() : null;
-          };
-
-          result.title = getText("#productTitle") || "N/A";
-
-          const reviewsText = getText("#acrCustomerReviewText");
-          if (reviewsText) {
-             result.reviews_count = reviewsText.replace(/[^\d]/g, "");
-          }
-
-          const detailBullets = Array.from(
-            document.querySelectorAll("#detailBullets_feature_div li")
-          );
-
-          const carouselIsbn = getText(
-            "#rpi-attribute-book_details-isbn13 .rpi-attribute-value span"
-          );
-          if (carouselIsbn) {
-            result.found_isbn = carouselIsbn.replace(/[^\dX]/gi, "");
-          } else {
-            const isbn13Bullet = detailBullets.find((li) =>
-              li.innerText.includes("ISBN-13")
-            );
-            if (isbn13Bullet) {
-              const parts = isbn13Bullet.innerText.split(":");
-              if (parts.length > 1)
-                result.found_isbn = parts[1].replace(/[^\dX]/gi, "");
-            } else {
-              // Try ISBN-10 if 13 is missing
-              const isbn10Bullet = detailBullets.find((li) =>
-                li.innerText.includes("ISBN-10")
-              );
-              if (isbn10Bullet) {
-                 const parts = isbn10Bullet.innerText.split(":");
-                 if (parts.length > 1)
-                    result.found_isbn = parts[1].replace(/[^\dX]/gi, "");
-              }
+            if (!textLower.includes("unavailable") && !isForbidden) {
+              const match = priceText.match(/[\d,]+(?:\.\d+)?/);
+              if (match) priceNum = parseFloat(match[0].replace(/,/g, ""));
             }
           }
 
-          const pubBullet = detailBullets.find((li) =>
-            li.innerText.toLowerCase().includes("publisher")
-          );
-          if (pubBullet) {
-            const parts = pubBullet.innerText.split(":");
-            if (parts.length > 1) result.publisher = parts[1].trim();
-          }
-
-          const dateBullet = detailBullets.find((li) =>
-            li.innerText.toLowerCase().includes("publication date")
-          );
-          if (dateBullet) {
-            const parts = dateBullet.innerText.split(":");
-            if (parts.length > 1) result.publication_date = parts[1].trim();
-          }
-
-          result.delivery =
-            getText(
-              "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold"
-            ) ||
-            getText("#deliveryBlockMessage") ||
-            "N/A";
-
-          const usedLink = Array.from(
-            document.querySelectorAll("a, span")
-          ).find(
-            (el) =>
-              el.innerText &&
-              (el.innerText.toLowerCase().includes("used from") ||
-                el.innerText.toLowerCase().includes("new & used") ||
-                el.innerText.toLowerCase().includes("used & new"))
-          );
-          if (usedLink) result.hasUsedOptions = true;
-
-          result.price =
-            getText(".priceToPay .a-price-whole") ||
-            getText("#corePriceDisplay_desktop_feature_div .a-price-whole") ||
-            "N/A";
-
-          const mrpEl = document.querySelector(
-            ".a-text-price span.a-offscreen"
-          );
-          if (mrpEl) result.mrp = mrpEl.textContent.trim();
-
-          result.seller =
-            getText("#sellerProfileTriggerId") ||
-            getText("#merchant-info a") ||
-            "N/A";
-
-          return result;
-        });
-
-        // SEE ALL BUYING OPTIONS PANEL
-        if (scrapedData.price === "N/A" || scrapedData.hasUsedOptions) {
-          startSpinner("Checking 'See All Buying Options' panel...");
-          const seeAllBtn = await page.$(
-            'a[title="See All Buying Options"], #buybox-see-all-buying-choices a, #moreBuyingChoices_feature_div a, a:has-text("used & new"), a:has-text("New & Used")'
-          );
-
-          if (seeAllBtn) {
-            await seeAllBtn.click();
-            await page
-              .waitForSelector("#aod-offer-list", { timeout: 8000 })
-              .catch(() => {});
-
-            const panelData = await page.evaluate(() => {
-              let pPrice = "N/A",
-                pMrp = "N/A",
-                pDel = "N/A",
-                pSeller = "N/A",
-                pUsed = "No Used Options";
-
-              const firstOffer = document.querySelector(
-                "#aod-offer-list #aod-offer"
-              );
-              if (firstOffer) {
-                const priceWholeEl = firstOffer.querySelector(
-                  ".a-price .a-price-whole"
-                );
-                if (priceWholeEl)
-                  pPrice = priceWholeEl.textContent.replace(".", "").trim();
-                else {
-                  const fallbackPrice = firstOffer.querySelector(
-                    ".a-price .a-offscreen"
-                  );
-                  if (fallbackPrice && fallbackPrice.innerText.trim())
-                    pPrice = fallbackPrice.innerText.trim();
-                }
-
-                const delEl = firstOffer.querySelector(
-                  "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold"
-                );
-                if (delEl) pDel = delEl.innerText.trim();
-                const mrpEl = firstOffer.querySelector(
-                  ".a-text-price .a-offscreen"
-                );
-                if (mrpEl) pMrp = mrpEl.textContent.trim();
-                const sellerEl = firstOffer.querySelector(
-                  "#aod-offer-soldBy a"
-                );
-                if (sellerEl) pSeller = sellerEl.textContent.trim();
-              }
-
-              if (pMrp === "N/A") {
-                const pinnedMrpEl = document.querySelector(
-                  "#aod-sticky-pinned-offer .a-text-price span.a-offscreen"
-                );
-                if (pinnedMrpEl) pMrp = pinnedMrpEl.textContent.trim();
-              }
-
-              const allOffers = document.querySelectorAll(
-                "#aod-offer-list #aod-offer"
-              );
-              for (let offer of allOffers) {
-                const headingEl = offer.querySelector("#aod-offer-heading");
-                const headingText = headingEl
-                  ? headingEl.textContent.trim().toLowerCase()
-                  : "";
-
-                if (headingText.includes("used")) {
-                  const usedPriceWholeEl = offer.querySelector(
-                    ".a-price .a-price-whole"
-                  );
-                  let tempUsedPrice = null;
-
-                  if (usedPriceWholeEl)
-                    tempUsedPrice = usedPriceWholeEl.textContent
-                      .replace(/[.,]/g, "")
-                      .trim();
-                  else {
-                    const fallbackUsedPrice = offer.querySelector(
-                      ".a-price .a-offscreen"
-                    );
-                    if (fallbackUsedPrice && fallbackUsedPrice.innerText.trim())
-                      tempUsedPrice = fallbackUsedPrice.innerText
-                        .replace(/[^\d]/g, "")
-                        .trim();
-                  }
-
-                  if (tempUsedPrice && pUsed === "No Used Options") {
-                    pUsed = tempUsedPrice;
-                    break;
-                  }
-                }
-              }
-              return { pPrice, pMrp, pDel, pSeller, pUsed };
-            });
-
-            if (scrapedData.price === "N/A" && panelData.pPrice !== "N/A") {
-              scrapedData.price = panelData.pPrice;
-              scrapedData.mrp = panelData.pMrp;
-              scrapedData.delivery = panelData.pDel;
-              if (panelData.pSeller !== "N/A")
-                scrapedData.seller = panelData.pSeller;
-            }
-            if (panelData.pUsed !== "No Used Options")
-              scrapedData.used_available = panelData.pUsed;
+          if (priceNum < lowestPrice) {
+            lowestPrice = priceNum;
+            bestUrl = url;
+            bestFormatName = priceText
+              ? priceText.split("\n")[0].trim()
+              : "Unknown";
+            isCurrentlySelectedCheapest = isSelected;
           }
         }
-
-        delete scrapedData.hasUsedOptions;
-        scrapedData.mrp = cleanAndCheckMRP(scrapedData.price, scrapedData.mrp);
 
         if (
-          scrapedData.price === "N/A" &&
-          scrapedData.used_available === "No Used Options"
+          !isCurrentlySelectedCheapest &&
+          bestUrl &&
+          lowestPrice !== Infinity
         ) {
-          scrapedData.mrp = "N/A";
-          scrapedData.delivery = "N/A";
-          scrapedData.seller = "N/A";
+          return { url: bestUrl, format: bestFormatName, price: lowestPrice };
+        }
+        return null;
+      });
+
+      if (cheaperTarget) {
+        stopSpinner(
+          `Switching to cheaper format: ${cheaperTarget.format} (₹${cheaperTarget.price})...`,
+          "info"
+        );
+        startSpinner("Loading cheaper format...");
+        await page.goto(cheaperTarget.url, {
+          timeout: 10000,
+          waitUntil: "domcontentloaded",
+        });
+        await page
+          .waitForSelector("#productTitle", { timeout: 3000 })
+          .catch(() => {});
+      }
+
+      // PRODUCT PAGE DATA EXTRACTION
+      startSpinner("Extracting product data...");
+      let scrapedData = await page.evaluate(() => {
+        let result = {
+          title: "N/A",
+          found_isbn: "N/A",
+          price: "N/A",
+          mrp: "N/A",
+          delivery: "N/A",
+          seller: "N/A",
+          used_available: "No Used Options",
+          reviews_count: "0",
+          publisher: "N/A",
+          publication_date: "N/A",
+          hasUsedOptions: false,
+        };
+
+        const getText = (selector) => {
+          const el = document.querySelector(selector);
+          return el ? el.innerText.trim() : null;
+        };
+
+        result.title = getText("#productTitle") || "N/A";
+
+        const reviewsText = getText("#acrCustomerReviewText");
+        if (reviewsText) {
+          result.reviews_count = reviewsText.replace(/[^\d]/g, "");
         }
 
-        // ISBN matching logic
-        const isbnMatched = (scrapedData.found_isbn === isbn);
-        scrapedData.isbn_matched = isbnMatched;
-
-        const finalData = { ...item, ...scrapedData };
-        appendResult(outputFilePath, finalData);
-
-        stopSpinner(
-          `Successfully parsed. Price: ₹${scrapedData.price}, Match: ${isbnMatched ? "Yes" : "No"}`
+        const detailBullets = Array.from(
+          document.querySelectorAll("#detailBullets_feature_div li")
         );
 
-        success = true;
-        await page.waitForTimeout(getRandomDelay(2000, 5000));
-      } catch (err) {
-        stopSpinner(`Error processing ${isbn}: ${err.message}`, "error");
-        retries--;
-
-        if (retries === 0) {
-          const errorData = {
-            ...item,
-            title: "Error",
-            found_isbn: "Error",
-            isbn_matched: false,
-            price: "Error",
-            mrp: "Error",
-            delivery: "Error",
-            seller: "Error",
-            used_available: "Error",
-            reviews_count: "Error",
-            publisher: "Error",
-            publication_date: "Error",
-          };
-          appendResult(outputFilePath, errorData);
-
-          const debugFolder = path.join(__dirname, "..", "..", "debug");
-          if (!fs.existsSync(debugFolder))
-            fs.mkdirSync(debugFolder, { recursive: true });
-          await page.screenshot({
-            path: path.join(debugFolder, `debug-error-${isbn}.png`),
-          });
+        const carouselIsbn = getText(
+          "#rpi-attribute-book_details-isbn13 .rpi-attribute-value span"
+        );
+        if (carouselIsbn) {
+          result.found_isbn = carouselIsbn.replace(/[^\dX]/gi, "");
         } else {
-          startSpinner("Retrying in 5 seconds...");
-          await page.waitForTimeout(5000);
+          const isbn13Bullet = detailBullets.find((li) =>
+            li.innerText.includes("ISBN-13")
+          );
+          if (isbn13Bullet) {
+            const parts = isbn13Bullet.innerText.split(":");
+            if (parts.length > 1)
+              result.found_isbn = parts[1].replace(/[^\dX]/gi, "");
+          } else {
+            // Try ISBN-10 if 13 is missing
+            const isbn10Bullet = detailBullets.find((li) =>
+              li.innerText.includes("ISBN-10")
+            );
+            if (isbn10Bullet) {
+              const parts = isbn10Bullet.innerText.split(":");
+              if (parts.length > 1)
+                result.found_isbn = parts[1].replace(/[^\dX]/gi, "");
+            }
+          }
+        }
+
+        const pubBullet = detailBullets.find((li) =>
+          li.innerText.toLowerCase().includes("publisher")
+        );
+        if (pubBullet) {
+          const parts = pubBullet.innerText.split(":");
+          if (parts.length > 1) result.publisher = parts[1].trim();
+        }
+
+        const dateBullet = detailBullets.find((li) =>
+          li.innerText.toLowerCase().includes("publication date")
+        );
+        if (dateBullet) {
+          const parts = dateBullet.innerText.split(":");
+          if (parts.length > 1) result.publication_date = parts[1].trim();
+        }
+
+        result.delivery =
+          getText(
+            "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold"
+          ) ||
+          getText("#deliveryBlockMessage") ||
+          "N/A";
+
+        const usedLink = Array.from(
+          document.querySelectorAll("a, span")
+        ).find(
+          (el) =>
+            el.innerText &&
+            (el.innerText.toLowerCase().includes("used from") ||
+              el.innerText.toLowerCase().includes("new & used") ||
+              el.innerText.toLowerCase().includes("used & new"))
+        );
+        if (usedLink) result.hasUsedOptions = true;
+
+        result.price =
+          getText(".priceToPay .a-price-whole") ||
+          getText("#corePriceDisplay_desktop_feature_div .a-price-whole") ||
+          "N/A";
+
+        const mrpEl = document.querySelector(
+          ".a-text-price span.a-offscreen"
+        );
+        if (mrpEl) result.mrp = mrpEl.textContent.trim();
+
+        result.seller =
+          getText("#sellerProfileTriggerId") ||
+          getText("#merchant-info a") ||
+          "N/A";
+
+        return result;
+      });
+
+      // SEE ALL BUYING OPTIONS PANEL
+      if (scrapedData.price === "N/A" || scrapedData.hasUsedOptions) {
+        startSpinner("Checking 'See All Buying Options' panel...");
+        const seeAllBtn = await page.$(
+          'a[title="See All Buying Options"], #buybox-see-all-buying-choices a, #moreBuyingChoices_feature_div a, a:has-text("used & new"), a:has-text("New & Used")'
+        );
+
+        if (seeAllBtn) {
+          await seeAllBtn.click();
+          await page
+            .waitForSelector("#aod-offer-list", { timeout: 4000 })
+            .catch(() => {});
+
+          const panelData = await page.evaluate(() => {
+            let pPrice = "N/A",
+              pMrp = "N/A",
+              pDel = "N/A",
+              pSeller = "N/A",
+              pUsed = "No Used Options";
+
+            const firstOffer = document.querySelector(
+              "#aod-offer-list #aod-offer"
+            );
+            if (firstOffer) {
+              const priceWholeEl = firstOffer.querySelector(
+                ".a-price .a-price-whole"
+              );
+              if (priceWholeEl)
+                pPrice = priceWholeEl.textContent.replace(".", "").trim();
+              else {
+                const fallbackPrice = firstOffer.querySelector(
+                  ".a-price .a-offscreen"
+                );
+                if (fallbackPrice && fallbackPrice.innerText.trim())
+                  pPrice = fallbackPrice.innerText.trim();
+              }
+
+              const delEl = firstOffer.querySelector(
+                "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold"
+              );
+              if (delEl) pDel = delEl.innerText.trim();
+              const mrpEl = firstOffer.querySelector(
+                ".a-text-price .a-offscreen"
+              );
+              if (mrpEl) pMrp = mrpEl.textContent.trim();
+              const sellerEl = firstOffer.querySelector(
+                "#aod-offer-soldBy a"
+              );
+              if (sellerEl) pSeller = sellerEl.textContent.trim();
+            }
+
+            if (pMrp === "N/A") {
+              const pinnedMrpEl = document.querySelector(
+                "#aod-sticky-pinned-offer .a-text-price span.a-offscreen"
+              );
+              if (pinnedMrpEl) pMrp = pinnedMrpEl.textContent.trim();
+            }
+
+            const allOffers = document.querySelectorAll(
+              "#aod-offer-list #aod-offer"
+            );
+            for (let offer of allOffers) {
+              const headingEl = offer.querySelector("#aod-offer-heading");
+              const headingText = headingEl
+                ? headingEl.textContent.trim().toLowerCase()
+                : "";
+
+              if (headingText.includes("used")) {
+                const usedPriceWholeEl = offer.querySelector(
+                  ".a-price .a-price-whole"
+                );
+                let tempUsedPrice = null;
+
+                if (usedPriceWholeEl)
+                  tempUsedPrice = usedPriceWholeEl.textContent
+                    .replace(/[.,]/g, "")
+                    .trim();
+                else {
+                  const fallbackUsedPrice = offer.querySelector(
+                    ".a-price .a-offscreen"
+                  );
+                  if (fallbackUsedPrice && fallbackUsedPrice.innerText.trim())
+                    tempUsedPrice = fallbackUsedPrice.innerText
+                      .replace(/[^\d]/g, "")
+                      .trim();
+                }
+
+                if (tempUsedPrice && pUsed === "No Used Options") {
+                  pUsed = tempUsedPrice;
+                  break;
+                }
+              }
+            }
+            return { pPrice, pMrp, pDel, pSeller, pUsed };
+          });
+
+          if (scrapedData.price === "N/A" && panelData.pPrice !== "N/A") {
+            scrapedData.price = panelData.pPrice;
+            scrapedData.mrp = panelData.pMrp;
+            scrapedData.delivery = panelData.pDel;
+            if (panelData.pSeller !== "N/A")
+              scrapedData.seller = panelData.pSeller;
+          }
+          if (panelData.pUsed !== "No Used Options")
+            scrapedData.used_available = panelData.pUsed;
         }
       }
+
+      delete scrapedData.hasUsedOptions;
+      scrapedData.mrp = cleanAndCheckMRP(scrapedData.price, scrapedData.mrp);
+
+      if (
+        scrapedData.price === "N/A" &&
+        scrapedData.used_available === "No Used Options"
+      ) {
+        scrapedData.mrp = "N/A";
+        scrapedData.delivery = "N/A";
+        scrapedData.seller = "N/A";
+      }
+
+      // ISBN matching logic
+      const isbnMatched = scrapedData.found_isbn === isbn;
+      scrapedData.isbn_matched = isbnMatched;
+
+      const finalData = { ...item, ...scrapedData };
+      appendResult(outputFilePath, finalData);
+
+      stopSpinner(
+        `Successfully parsed. Price: ₹${scrapedData.price}, Match: ${isbnMatched ? "Yes" : "No"}`
+      );
+
+      await page.waitForTimeout(getRandomDelay(2000, 5000));
+    } catch (err) {
+      stopSpinner(`Error processing ${isbn}: ${err.message}`, "error");
+
+      const errorData = {
+        ...item,
+        title: "Error",
+        found_isbn: "Error",
+        isbn_matched: false,
+        price: "Error",
+        mrp: "Error",
+        delivery: "Error",
+        seller: "Error",
+        used_available: "Error",
+        reviews_count: "Error",
+        publisher: "Error",
+        publication_date: "Error",
+      };
+      appendResult(outputFilePath, errorData);
+
+      const debugFolder = path.join(__dirname, "..", "..", "debug");
+      if (!fs.existsSync(debugFolder))
+        fs.mkdirSync(debugFolder, { recursive: true });
+      await page
+        .screenshot({
+          path: path.join(debugFolder, `debug-error-${isbn}.png`),
+        })
+        .catch(() => {});
+
+      await page.waitForTimeout(1000);
     }
   }
 
