@@ -1,0 +1,26 @@
+# VPS Info
+
+## VPS 1
+
+- IP :162.35.163.93
+- PASSWORD : Sanchit@282930
+
+## VPS 2
+
+- IP : 153.75.235.165
+- PASSWORD : Sanchit@282930
+
+## VPS 3
+
+- IP : 163.245.196.45
+- PASSWORD : Sanchit@282930
+
+## VPS 4
+
+- IP : 153.75.235.158
+- PASSWORD : Sanchit@282930
+
+## VPS 5
+
+- IP : 163.245.196.35
+- PASSWORD : Sanchit@282930
