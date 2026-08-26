@@ -7,14 +7,18 @@ const {
   appendResult,
 } = require("../../utils/file");
 const { initScraper } = require("../../utils/scraperInit");
-const { checkDogPage, cleanAndCheckMRP, setAmazonLocation } = require("../../utils/amazon");
+const {
+  checkDogPage,
+  cleanAndCheckMRP,
+  setAmazonLocation,
+} = require("../../utils/amazon");
 const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
 (async () => {
   const { inputFile, isHeadless, outputFilePath } = initScraper(
     "amazon-isbn.js",
     "amazon-isbn",
-    ".json"
+    ".json",
   );
 
   const isTxt = inputFile.endsWith(".txt");
@@ -29,10 +33,15 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
   let startIndex = 0;
   if (fs.existsSync(outputFilePath)) {
-    const existingOutput = fs.readFileSync(outputFilePath, "utf-8").split("\n").filter(Boolean);
+    const existingOutput = fs
+      .readFileSync(outputFilePath, "utf-8")
+      .split("\n")
+      .filter(Boolean);
     startIndex = existingOutput.length;
     if (startIndex > 0) {
-      console.log(`\n▶ Found existing output file with ${startIndex} items. Resuming from item ${startIndex + 1}...`);
+      console.log(
+        `\n▶ Found existing output file with ${startIndex} items. Resuming from item ${startIndex + 1}...`,
+      );
     }
   }
 
@@ -46,17 +55,22 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
       locResult.alreadySet
         ? `Delivery location already active: ${locResult.location}`
         : `Delivery location set to Gurgaon (${locResult.location || "122101"})`,
-      "success"
+      "success",
     );
   } else {
-    stopSpinner(`Delivery location setup skipped/failed: ${locResult.error}`, "warn");
+    stopSpinner(
+      `Delivery location setup skipped/failed: ${locResult.error}`,
+      "warn",
+    );
   }
 
   for (let i = startIndex; i < inputItems.length; i++) {
     const item = inputItems[i];
     const isbn = item.searched_isbn;
 
-    console.log(`\n\x1b[1m[${i + 1}/${inputItems.length}] Processing ISBN: ${isbn}\x1b[0m`);
+    console.log(
+      `\n\x1b[1m[${i + 1}/${inputItems.length}] Processing ISBN: ${isbn}\x1b[0m`,
+    );
 
     if (i > 0 && i % 500 === 0) {
       stopSpinner(`Flushing browser memory after ${i} items...`, "info");
@@ -90,7 +104,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
       // Get first search result
       const firstResult = await page.$(
-        '.s-search-results .s-result-item[data-component-type="s-search-result"] a.a-link-normal[href*="/dp/"]'
+        '.s-search-results .s-result-item[data-component-type="s-search-result"] a.a-link-normal[href*="/dp/"]',
       );
 
       if (!firstResult) {
@@ -124,7 +138,10 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
       isDogPage = await checkDogPage(page);
       if (isDogPage) {
-        stopSpinner("Amazon bot block detected on product page. Waiting 10 seconds...", "warn");
+        stopSpinner(
+          "Amazon bot block detected on product page. Waiting 10 seconds...",
+          "warn",
+        );
         await page.waitForTimeout(10000);
         await context.clearCookies();
       }
@@ -137,7 +154,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
       startSpinner("Checking for cheaper physical formats...");
       const cheaperTarget = await page.evaluate(() => {
         const swatches = Array.from(
-          document.querySelectorAll("#tmmSwatches .swatchElement")
+          document.querySelectorAll("#tmmSwatches .swatchElement"),
         );
         if (swatches.length <= 1) return null;
 
@@ -192,7 +209,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
       if (cheaperTarget) {
         stopSpinner(
           `Switching to cheaper format: ${cheaperTarget.format} (₹${cheaperTarget.price})...`,
-          "info"
+          "info",
         );
         startSpinner("Loading cheaper format...");
         await page.goto(cheaperTarget.url, {
@@ -234,17 +251,17 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
         }
 
         const detailBullets = Array.from(
-          document.querySelectorAll("#detailBullets_feature_div li")
+          document.querySelectorAll("#detailBullets_feature_div li"),
         );
 
         const carouselIsbn = getText(
-          "#rpi-attribute-book_details-isbn13 .rpi-attribute-value span"
+          "#rpi-attribute-book_details-isbn13 .rpi-attribute-value span",
         );
         if (carouselIsbn) {
           result.found_isbn = carouselIsbn.replace(/[^\dX]/gi, "");
         } else {
           const isbn13Bullet = detailBullets.find((li) =>
-            li.innerText.includes("ISBN-13")
+            li.innerText.includes("ISBN-13"),
           );
           if (isbn13Bullet) {
             const parts = isbn13Bullet.innerText.split(":");
@@ -253,7 +270,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
           } else {
             // Try ISBN-10 if 13 is missing
             const isbn10Bullet = detailBullets.find((li) =>
-              li.innerText.includes("ISBN-10")
+              li.innerText.includes("ISBN-10"),
             );
             if (isbn10Bullet) {
               const parts = isbn10Bullet.innerText.split(":");
@@ -264,7 +281,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
         }
 
         const pubBullet = detailBullets.find((li) =>
-          li.innerText.toLowerCase().includes("publisher")
+          li.innerText.toLowerCase().includes("publisher"),
         );
         if (pubBullet) {
           const parts = pubBullet.innerText.split(":");
@@ -272,7 +289,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
         }
 
         const dateBullet = detailBullets.find((li) =>
-          li.innerText.toLowerCase().includes("publication date")
+          li.innerText.toLowerCase().includes("publication date"),
         );
         if (dateBullet) {
           const parts = dateBullet.innerText.split(":");
@@ -281,19 +298,17 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
         result.delivery =
           getText(
-            "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold"
+            "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold",
           ) ||
           getText("#deliveryBlockMessage") ||
           "N/A";
 
-        const usedLink = Array.from(
-          document.querySelectorAll("a, span")
-        ).find(
+        const usedLink = Array.from(document.querySelectorAll("a, span")).find(
           (el) =>
             el.innerText &&
             (el.innerText.toLowerCase().includes("used from") ||
               el.innerText.toLowerCase().includes("new & used") ||
-              el.innerText.toLowerCase().includes("used & new"))
+              el.innerText.toLowerCase().includes("used & new")),
         );
         if (usedLink) result.hasUsedOptions = true;
 
@@ -302,9 +317,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
           getText("#corePriceDisplay_desktop_feature_div .a-price-whole") ||
           "N/A";
 
-        const mrpEl = document.querySelector(
-          ".a-text-price span.a-offscreen"
-        );
+        const mrpEl = document.querySelector(".a-text-price span.a-offscreen");
         if (mrpEl) result.mrp = mrpEl.textContent.trim();
 
         result.seller =
@@ -319,7 +332,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
       if (scrapedData.price === "N/A" || scrapedData.hasUsedOptions) {
         startSpinner("Checking 'See All Buying Options' panel...");
         const seeAllBtn = await page.$(
-          'a[title="See All Buying Options"], #buybox-see-all-buying-choices a, #moreBuyingChoices_feature_div a, a:has-text("used & new"), a:has-text("New & Used")'
+          'a[title="See All Buying Options"], #buybox-see-all-buying-choices a, #moreBuyingChoices_feature_div a, a:has-text("used & new"), a:has-text("New & Used")',
         );
 
         if (seeAllBtn) {
@@ -336,45 +349,43 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
               pUsed = "No Used Options";
 
             const firstOffer = document.querySelector(
-              "#aod-offer-list #aod-offer"
+              "#aod-offer-list #aod-offer",
             );
             if (firstOffer) {
               const priceWholeEl = firstOffer.querySelector(
-                ".a-price .a-price-whole"
+                ".a-price .a-price-whole",
               );
               if (priceWholeEl)
                 pPrice = priceWholeEl.textContent.replace(".", "").trim();
               else {
                 const fallbackPrice = firstOffer.querySelector(
-                  ".a-price .a-offscreen"
+                  ".a-price .a-offscreen",
                 );
                 if (fallbackPrice && fallbackPrice.innerText.trim())
                   pPrice = fallbackPrice.innerText.trim();
               }
 
               const delEl = firstOffer.querySelector(
-                "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold"
+                "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE .a-text-bold",
               );
               if (delEl) pDel = delEl.innerText.trim();
               const mrpEl = firstOffer.querySelector(
-                ".a-text-price .a-offscreen"
+                ".a-text-price .a-offscreen",
               );
               if (mrpEl) pMrp = mrpEl.textContent.trim();
-              const sellerEl = firstOffer.querySelector(
-                "#aod-offer-soldBy a"
-              );
+              const sellerEl = firstOffer.querySelector("#aod-offer-soldBy a");
               if (sellerEl) pSeller = sellerEl.textContent.trim();
             }
 
             if (pMrp === "N/A") {
               const pinnedMrpEl = document.querySelector(
-                "#aod-sticky-pinned-offer .a-text-price span.a-offscreen"
+                "#aod-sticky-pinned-offer .a-text-price span.a-offscreen",
               );
               if (pinnedMrpEl) pMrp = pinnedMrpEl.textContent.trim();
             }
 
             const allOffers = document.querySelectorAll(
-              "#aod-offer-list #aod-offer"
+              "#aod-offer-list #aod-offer",
             );
             for (let offer of allOffers) {
               const headingEl = offer.querySelector("#aod-offer-heading");
@@ -384,7 +395,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
               if (headingText.includes("used")) {
                 const usedPriceWholeEl = offer.querySelector(
-                  ".a-price .a-price-whole"
+                  ".a-price .a-price-whole",
                 );
                 let tempUsedPrice = null;
 
@@ -394,7 +405,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
                     .trim();
                 else {
                   const fallbackUsedPrice = offer.querySelector(
-                    ".a-price .a-offscreen"
+                    ".a-price .a-offscreen",
                   );
                   if (fallbackUsedPrice && fallbackUsedPrice.innerText.trim())
                     tempUsedPrice = fallbackUsedPrice.innerText
@@ -443,7 +454,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
       appendResult(outputFilePath, finalData);
 
       stopSpinner(
-        `Successfully parsed. Price: ₹${scrapedData.price}, Match: ${isbnMatched ? "Yes" : "No"}`
+        `Successfully parsed. Price: ₹${scrapedData.price}, Match: ${isbnMatched ? "Yes" : "No"}`,
       );
 
       await page.waitForTimeout(getRandomDelay(2000, 5000));
