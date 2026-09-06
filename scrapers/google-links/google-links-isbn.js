@@ -9,7 +9,75 @@ const {
 const { initScraper } = require("../../utils/scraperInit");
 const { startSpinner, stopSpinner } = require("../../utils/spinner");
 
-// Helper to resolve Google /goto?url= redirects to their true canonical URLs
+// Helper to normalize and strip tracking & fragments from URLs
+function normalizeUrl(urlStr) {
+  if (!urlStr || typeof urlStr !== "string") return null;
+  try {
+    // 1. Strip hash fragments (e.g. #:~:text=...)
+    let cleanStr = urlStr.split("#")[0].trim();
+    try {
+      cleanStr = decodeURI(cleanStr);
+    } catch (e) {}
+
+    const parsed = new URL(cleanStr);
+
+    // 2. Remove ONLY tracking marketing query params
+    const trackingParams = [
+      "srsltid",
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "gclid",
+      "fbclid",
+      "_gl",
+      "ref_",
+      "ref",
+      "source",
+    ];
+
+    const rawSearch = parsed.search.replace(/^\?/, "");
+    if (rawSearch) {
+      const parts = rawSearch.split("&").filter(Boolean);
+      const filteredParts = parts.filter((part) => {
+        const key = part.split("=")[0].toLowerCase();
+        return !trackingParams.includes(key);
+      });
+      parsed.search =
+        filteredParts.length > 0 ? `?${filteredParts.join("&")}` : "";
+    }
+
+    // 3. Normalize Amazon language localization subpaths (e.g. /-/he/, /-/es/, /-/zh/, etc.) -> default English
+    if (parsed.hostname.includes("amazon.")) {
+      parsed.pathname = parsed.pathname.replace(
+        /^\/-\/[a-z]{2}(_[A-Z]{2})?\//i,
+        "/",
+      );
+    }
+
+    // 4. Normalize Flipkart language subpaths (e.g. /hi/, /ta/, etc.) and product-reviews -> product page
+    if (parsed.hostname.includes("flipkart.com")) {
+      parsed.pathname = parsed.pathname.replace(
+        /^\/(hi|ta|te|kn|ml|mr|gu|bn|pa)\//i,
+        "/",
+      );
+      if (parsed.pathname.includes("/product-reviews/")) {
+        parsed.pathname = parsed.pathname.replace("/product-reviews/", "/p/");
+      }
+    }
+
+    // 5. Remove trailing slash from pathname (unless root)
+    if (parsed.pathname.length > 1 && parsed.pathname.endsWith("/")) {
+      parsed.pathname = parsed.pathname.slice(0, -1);
+    }
+
+    return parsed.toString();
+  } catch (e) {
+    return urlStr.split("#")[0].trim();
+  }
+}
+
 async function resolveGoogleUrl(requestContext, rawUrl) {
   if (!rawUrl || typeof rawUrl !== "string") return null;
 
@@ -20,7 +88,7 @@ async function resolveGoogleUrl(requestContext, rawUrl) {
     !rawUrl.startsWith("/url?")
   ) {
     if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
-      return rawUrl;
+      return normalizeUrl(rawUrl);
     }
     return null;
   }
@@ -39,7 +107,7 @@ async function resolveGoogleUrl(requestContext, rawUrl) {
       location &&
       (location.startsWith("http://") || location.startsWith("https://"))
     ) {
-      return location;
+      return normalizeUrl(location);
     }
   } catch (e) {}
 
@@ -47,7 +115,7 @@ async function resolveGoogleUrl(requestContext, rawUrl) {
 }
 
 /**
- * Searches Google SERP for an ISBN and returns canonical organic links from Page 1.
+ * Searches Google SERP for an ISBN and returns unique, canonical organic links from Page 1 (top 20 results).
  * @param {import('playwright').Page} page
  * @param {string} targetIsbn
  * @returns {Promise<Array<string>>}
@@ -76,7 +144,9 @@ async function fetchGoogleLinksForIsbn(page, targetIsbn) {
 
     // 1. Organic cards
     document
-      .querySelectorAll("#rso .g, #rso div[data-hveid], #search a[href^='http']")
+      .querySelectorAll(
+        "#rso .g, #rso div[data-hveid], #search a[href^='http']",
+      )
       .forEach((card) => {
         const a = card.tagName === "A" ? card : card.querySelector("a[href]");
         if (a && a.href) {
@@ -119,18 +189,24 @@ async function fetchGoogleLinksForIsbn(page, targetIsbn) {
   ];
 
   const finalLinks = [];
+  const seenUrls = new Set();
+
   for (const u of resolvedUrls) {
     if (!u) continue;
     try {
-      const parsed = new URL(u);
+      const normalized = normalizeUrl(u);
+      if (!normalized) continue;
+
+      const parsed = new URL(normalized);
       const isIgnored = ignoredDomains.some((d) => parsed.hostname.includes(d));
-      if (!isIgnored && !finalLinks.includes(u)) {
-        finalLinks.push(u);
+      if (!isIgnored && !seenUrls.has(normalized)) {
+        seenUrls.add(normalized);
+        finalLinks.push(normalized);
       }
     } catch (e) {}
   }
 
-  return finalLinks.slice(0, 15);
+  return finalLinks.slice(0, 25);
 }
 
 // CLI Standalone Runner
@@ -175,58 +251,67 @@ if (require.main === module) {
     let { context, page } = await initBrowser(
       isHeadless,
       "google_links_profile",
-      false,
     );
 
     for (let i = startIndex; i < inputItems.length; i++) {
       const item = inputItems[i];
-      const targetIsbn = item.searched_isbn || item.isbn || item.query;
+      const targetIsbn = item.searched_isbn;
 
       console.log(
-        `\n\x1b[1m[${i + 1}/${inputItems.length}] Searching Google for ISBN: ${targetIsbn}\x1b[0m`,
+        `\n\x1b[1m[${i + 1}/${inputItems.length}] Processing ISBN: ${targetIsbn}\x1b[0m`,
       );
 
       if (!targetIsbn) {
-        stopSpinner("Skipping item with no ISBN/Query.", "warn");
+        stopSpinner("Skipping item with no ISBN.", "warn");
         continue;
       }
 
-      startSpinner(`Searching Google for "${targetIsbn}" (Page 1)...`);
+      startSpinner(`Searching Google for ISBN: ${targetIsbn}...`);
 
       try {
-        const finalLinks = await fetchGoogleLinksForIsbn(page, targetIsbn);
-        const resultObject = {
+        const uniqueLinks = await fetchGoogleLinksForIsbn(page, targetIsbn);
+
+        const resultData = {
+          ...item,
           searched_isbn: targetIsbn,
-          found: finalLinks.length > 0,
-          total_links_found: finalLinks.length,
-          links: finalLinks,
+          found_links_count: uniqueLinks.length,
+          links: uniqueLinks,
           scraped_at: new Date().toISOString(),
         };
 
-        appendResult(outputFilePath, resultObject);
-        stopSpinner(
-          `[${i + 1}/${inputItems.length}] Found ${finalLinks.length} Page-1 links for ISBN ${targetIsbn}`,
-          finalLinks.length > 0 ? "success" : "warn",
-        );
-      } catch (err) {
-        stopSpinner(`Error searching Google for ${targetIsbn}: ${err.message}`, "error");
-        appendResult(outputFilePath, {
-          searched_isbn: targetIsbn,
-          found: false,
-          error: err.message,
-          links: [],
-          scraped_at: new Date().toISOString(),
-        });
-      }
+        appendResult(outputFilePath, resultData);
 
-      await page.waitForTimeout(getRandomDelay(2000, 4000));
+        stopSpinner(
+          `Found ${uniqueLinks.length} unique link(s) for ${targetIsbn}`,
+          uniqueLinks.length > 0 ? "success" : "warn",
+        );
+
+        await page.waitForTimeout(getRandomDelay(2000, 4000));
+      } catch (err) {
+        stopSpinner(`Error searching ${targetIsbn}: ${err.message}`, "error");
+
+        const errorData = {
+          ...item,
+          searched_isbn: targetIsbn,
+          found_links_count: 0,
+          links: [],
+          error: err.message,
+          scraped_at: new Date().toISOString(),
+        };
+        appendResult(outputFilePath, errorData);
+
+        await page.waitForTimeout(1000);
+      }
     }
 
     await context.close();
     console.log(
-      `\n🎉 Google Link Scraping Complete! Results saved to: ${outputFilePath}`,
+      `\n🎉 Google Links Scraper completed. Results saved to: ${outputFilePath}`,
     );
   })();
 }
 
-module.exports = { fetchGoogleLinksForIsbn };
+module.exports = {
+  fetchGoogleLinksForIsbn,
+  normalizeUrl,
+};

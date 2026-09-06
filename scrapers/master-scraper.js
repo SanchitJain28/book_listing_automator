@@ -1,44 +1,132 @@
 const fs = require("fs");
 const path = require("path");
+const readline = require("readline");
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
 const { initBrowser, getRandomDelay } = require("../utils/browser");
 const { readSearchTerms, appendResult } = require("../utils/file");
 const { initScraper } = require("../utils/scraperInit");
 const { startSpinner, stopSpinner } = require("../utils/spinner");
 const { extractBookDataWithGemini } = require("../utils/geminiVision");
 
-// Import Google Links Harvester
-const { fetchGoogleLinksForIsbn } = require("./google-links/google-links-isbn");
+function waitForEnter(
+  promptMessage = "\n👉 Press [ENTER] to proceed to next website (or Ctrl+C to stop)... ",
+) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(promptMessage, () => {
+      rl.close();
+      resolve();
+    });
+  });
+}
 
-// Import all 13 dedicated scrapers directly
+const {
+  fetchGoogleLinksForIsbn,
+  normalizeUrl,
+} = require("./google-links/google-links-isbn");
 const { scrapeFlipkart } = require("./flipkart/flipkart-isbn");
 const { scrapeSapnaOnline } = require("./sapnaonline/sapnaonline-isbn");
 const { scrapeBookswagon } = require("./bookswagon/bookswagon-isbn");
 const { scrapeBookChor } = require("./bookchor/bookchor-isbn");
-const { scrapeMyPustak } = require("./mypustak/mypustak-isbn");
-const { scrapeAtlanticBooks } = require("./atlanticbooks/atlanticbooks-isbn");
+const { scrapeMyPustakBook } = require("./mypustak/scraper");
+const { scrapeAtlanticBook } = require("./atlanticbooks/scraper");
 const { scrapeBestBookMart } = require("./bestbookmart/bestbookmart-isbn");
-const { scrapeAmazon } = require("./amazon-isbn/amazon-isbn");
-const { scrapeAbeBooks } = require("./abebooks/abebooks-isbn");
-const { scrapeAgapea } = require("./agapea/agapea-isbn");
+const { scrapeAmazonBook } = require("./amazon-isbn/scraper");
+const { scrapeAbeBooksBook } = require("./abebooks/scraper");
+const { scrapeAgapeaBook } = require("./agapea/scraper");
 
-// Group A: 13 Dedicated Stores
 const DEDICATED_DOMAINS = [
-  { match: "flipkart.com", platform: "Flipkart", method: "scraper/flipkart", scraper: scrapeFlipkart },
-  { match: "sapnaonline.com", platform: "SapnaOnline", method: "scraper/sapnaonline", scraper: scrapeSapnaOnline },
-  { match: "bookswagon.com", platform: "Bookswagon", method: "scraper/bookswagon", scraper: scrapeBookswagon },
-  { match: "bookchor.com", platform: "BookChor", method: "scraper/bookchor", scraper: scrapeBookChor },
-  { match: "mypustak.com", platform: "MyPustak", method: "scraper/mypustak", scraper: scrapeMyPustak },
-  { match: "atlanticbooks.com", platform: "Atlantic Books", method: "scraper/atlanticbooks", scraper: scrapeAtlanticBooks },
-  { match: "bestbookmart.com", platform: "BestBookMart", method: "scraper/bestbookmart", scraper: scrapeBestBookMart },
-  { match: "amazon.in", platform: "Amazon.in", method: "scraper/amazon-isbn", scraper: scrapeAmazon },
-  { match: "amazon.co.uk", platform: "Amazon.co.uk", method: "scraper/amazon-isbn", scraper: scrapeAmazon },
-  { match: "amazon.com", platform: "Amazon.com", method: "scraper/amazon-isbn", scraper: scrapeAmazon },
-  { match: "abebooks.co.uk", platform: "AbeBooks UK", method: "scraper/abebooks", scraper: scrapeAbeBooks },
-  { match: "abebooks.com", platform: "AbeBooks", method: "scraper/abebooks", scraper: scrapeAbeBooks },
-  { match: "agapea.com", platform: "Agapea", method: "scraper/agapea", scraper: scrapeAgapea },
+  {
+    match: "flipkart.com",
+    platform: "Flipkart",
+    method: "scraper/flipkart",
+    scraper: scrapeFlipkart,
+  },
+  {
+    match: "sapnaonline.com",
+    platform: "SapnaOnline",
+    method: "scraper/sapnaonline",
+    scraper: scrapeSapnaOnline,
+  },
+  {
+    match: "bookswagon.com",
+    platform: "Bookswagon",
+    method: "scraper/bookswagon",
+    scraper: scrapeBookswagon,
+  },
+  {
+    match: "bookchor.com",
+    platform: "BookChor",
+    method: "scraper/bookchor",
+    scraper: scrapeBookChor,
+  },
+  {
+    match: "mypustak.com",
+    platform: "MyPustak",
+    method: "scraper/mypustak",
+    scraper: (page, url, isbn) =>
+      scrapeMyPustakBook(page, { directUrl: url, isbn }),
+  },
+  {
+    match: "atlanticbooks.com",
+    platform: "Atlantic Books",
+    method: "scraper/atlanticbooks",
+    scraper: (page, url, isbn) =>
+      scrapeAtlanticBook(page, { directUrl: url, isbn }),
+  },
+  {
+    match: "bestbookmart.com",
+    platform: "BestBookMart",
+    method: "scraper/bestbookmart",
+    scraper: scrapeBestBookMart,
+  },
+  {
+    match: "amazon.in",
+    platform: "Amazon.in",
+    method: "scraper/amazon-isbn",
+    scraper: (page, url, isbn) =>
+      scrapeAmazonBook(page, { directUrl: url, isbn }),
+  },
+  {
+    match: "amazon.co.uk",
+    platform: "Amazon.co.uk",
+    method: "scraper/amazon-isbn",
+    scraper: (page, url, isbn) =>
+      scrapeAmazonBook(page, { directUrl: url, isbn }),
+  },
+  {
+    match: "amazon.com",
+    platform: "Amazon.com",
+    method: "scraper/amazon-isbn",
+    scraper: (page, url, isbn) =>
+      scrapeAmazonBook(page, { directUrl: url, isbn }),
+  },
+  {
+    match: "abebooks.co.uk",
+    platform: "AbeBooks UK",
+    method: "scraper/abebooks",
+    scraper: (page, url, isbn) =>
+      scrapeAbeBooksBook(page, { directUrl: url, isbn }),
+  },
+  {
+    match: "abebooks.com",
+    platform: "AbeBooks",
+    method: "scraper/abebooks",
+    scraper: (page, url, isbn) =>
+      scrapeAbeBooksBook(page, { directUrl: url, isbn }),
+  },
+  {
+    match: "agapea.com",
+    platform: "Agapea",
+    method: "scraper/agapea",
+    scraper: (page, url, isbn) =>
+      scrapeAgapeaBook(page, { directUrl: url, isbn }),
+  },
 ];
 
-// Group B: 14 Image-Eligible Stores (Gemini 2.5 Flash)
 const IMAGE_ELIGIBLE_DOMAINS = [
   { match: "bol.com", platform: "Bol.com" },
   { match: "ebay.co.uk", platform: "eBay UK" },
@@ -54,21 +142,44 @@ const IMAGE_ELIGIBLE_DOMAINS = [
   { match: "sterlingbookhouse.com", platform: "Sterling Book House" },
   { match: "thebookishowl.in", platform: "The Bookish Owl" },
   { match: "casadellibro.com", platform: "Casa del Libro" },
+  { match: "adityaprakashan.com", platform: "Aditya Prakashan" },
+  { match: "ajayonlinestall.com", platform: "Ajay Online Stall" },
+  { match: "bestbookcentre.com", platform: "Best Book Centre" },
 ];
 
 function classifyUrl(urlStr) {
   if (!urlStr) return null;
   const u = urlStr.toLowerCase();
 
+  if (
+    u.includes("/live/video/") ||
+    u.includes("/help/") ||
+    u.includes("/gp/help/") ||
+    u.includes("/customer-service") ||
+    u.includes("/terms") ||
+    u.includes("/privacy")
+  ) {
+    return null;
+  }
+
   for (const d of DEDICATED_DOMAINS) {
     if (u.includes(d.match)) {
-      return { type: "dedicated", platform: d.platform, method: d.method, scraper: d.scraper };
+      return {
+        type: "dedicated",
+        platform: d.platform,
+        method: d.method,
+        scraper: d.scraper,
+      };
     }
   }
 
   for (const img of IMAGE_ELIGIBLE_DOMAINS) {
     if (u.includes(img.match)) {
-      return { type: "image", platform: img.platform, method: "gemini_2.5_flash_vision" };
+      return {
+        type: "image",
+        platform: img.platform,
+        method: "gemini_2.5_flash_vision",
+      };
     }
   }
 
@@ -127,19 +238,33 @@ function appendCsvRow(csvPath, data) {
   const useGeminiVision =
     process.argv.includes("--gemini-vision") || !!process.env.GEMINI_API_KEY;
 
+  const isDebugMode =
+    process.argv.includes("--debug") ||
+    process.argv.includes("-debug") ||
+    process.argv.includes("-d");
+
+  const effectiveHeadless = process.argv.includes("--headless")
+    ? true
+    : isDebugMode
+      ? false
+      : isHeadless;
+
+  const modelName = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
   console.log(
-    `\n🚀 Starting Master Book Scraper (Google Links + Whitelist Router + Gemini 2.5 Flash):`,
+    `\n🚀 Starting Master Book Scraper (Google Links + Whitelist Router + Gemini Vision):`,
   );
   console.log(`📂 Input File:    ${inputFile}`);
   console.log(`📁 JSON Output:   ${outputFilePath}`);
   console.log(`📊 CSV Output:    ${csvPath}`);
   console.log(
-    `🤖 Gemini Vision: ${useGeminiVision ? "🟢 Enabled (For 14 Image Stores)" : "⚪ Disabled (Set GEMINI_API_KEY to enable)"}\n`,
+    `🤖 Gemini Vision: ${useGeminiVision ? `🟢 Enabled (${modelName} - Lowest Cost Tier)` : "⚪ Disabled (Set GEMINI_API_KEY to enable)"}`,
+  );
+  console.log(
+    `🐛 Debug Mode:   ${isDebugMode ? "🟢 Enabled (Interactive step-by-step with [ENTER])" : "⚪ Disabled (Pass --debug to step through each site)"}\n`,
   );
 
   const isbns = readSearchTerms(inputFile);
 
-  // Resume tracking
   const completedIsbns = new Set();
   if (fs.existsSync(outputFilePath)) {
     const lines = fs
@@ -158,7 +283,7 @@ function appendCsvRow(csvPath, data) {
   }
 
   const { context, page } = await initBrowser(
-    isHeadless,
+    effectiveHeadless,
     "master_browser_profile",
   );
 
@@ -190,18 +315,69 @@ function appendCsvRow(csvPath, data) {
       stopSpinner(`Google search error: ${gErr.message}`, "warn");
     }
 
-    // 2. Strict 27-Domain Whitelist Filter
+    // 2. Strict Whitelist Filter & De-duplication
+    const seenTargetKeys = new Set();
     const targetLinks = [];
     for (const link of rawLinks) {
-      const classification = classifyUrl(link);
+      const normalizedLink = normalizeUrl(link);
+      const classification = classifyUrl(normalizedLink);
       if (classification) {
-        targetLinks.push({ url: link, ...classification });
+        const key = `${classification.platform}:${normalizedLink}`;
+        if (!seenTargetKeys.has(key)) {
+          seenTargetKeys.add(key);
+          targetLinks.push({ url: normalizedLink, ...classification });
+        }
+
+        // Smart Amazon Regional Expansion:
+        // If Google indexed an international Amazon link (e.g. amazon.com/dp/8132232607) for an Indian ISBN (97881... / 97893...),
+        // also include the Amazon.in product page (https://www.amazon.in/dp/8132232607).
+        const asinMatch = normalizedLink.match(
+          /\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i,
+        );
+        if (
+          asinMatch &&
+          (isbn.startsWith("97881") || isbn.startsWith("97893"))
+        ) {
+          const inUrl = `https://www.amazon.in/dp/${asinMatch[1]}`;
+          const inClassification = classifyUrl(inUrl);
+          if (inClassification) {
+            const inKey = `${inClassification.platform}:${inUrl}`;
+            if (!seenTargetKeys.has(inKey)) {
+              seenTargetKeys.add(inKey);
+              targetLinks.push({ url: inUrl, ...inClassification });
+            }
+          }
+        }
       }
     }
 
     console.log(
       `🎯 Matched ${targetLinks.length} whitelisted target store(s) for ISBN ${isbn}`,
     );
+
+    if (isDebugMode) {
+      console.log(
+        `\n  ┌─────────────────────────────────────────────────────────────┐`,
+      );
+      console.log(`  │ 🌐 [DEBUG] Google Page 1 SERP Loaded for ISBN: ${isbn}`);
+      console.log(`  │ ℹ️  Total Organic Links: ${rawLinks.length}`);
+      console.log(`  │ 🎯 Whitelisted Stores Matched: ${targetLinks.length}`);
+      targetLinks.forEach((t, idx) => {
+        console.log(`  │    ${idx + 1}. [${t.platform}] ${t.url}`);
+      });
+      console.log(
+        `  └─────────────────────────────────────────────────────────────┘`,
+      );
+      if (targetLinks.length > 0) {
+        await waitForEnter(
+          `  👉 Press [ENTER] to open & scrape [1/${targetLinks.length}] ${targetLinks[0].platform}... `,
+        );
+      } else {
+        await waitForEnter(
+          `  👉 No whitelisted stores found for this ISBN. Press [ENTER] to continue... `,
+        );
+      }
+    }
 
     const extractedListings = [];
 
@@ -210,7 +386,9 @@ function appendCsvRow(csvPath, data) {
       const target = targetLinks[j];
       const { url, type, platform, method, scraper } = target;
 
-      startSpinner(`[${j + 1}/${targetLinks.length}] Scraping ${platform} (${method})...`);
+      startSpinner(
+        `[${j + 1}/${targetLinks.length}] Scraping ${platform} (${method})...`,
+      );
 
       let data = null;
 
@@ -219,15 +397,23 @@ function appendCsvRow(csvPath, data) {
           // Direct Dedicated Scraper Execution
           data = await scraper(page, url, isbn);
         } else if (type === "image" && useGeminiVision) {
-          // Gemini 2.5 Flash Vision Screenshot
+          // Gemini Vision Screenshot with 67% zoom to capture full buybox & out-of-stock banners
+          await page.setViewportSize({ width: 1440, height: 1080 });
           await page.goto(url, {
             waitUntil: "domcontentloaded",
             timeout: 30000,
           });
           await page.waitForTimeout(2000);
 
+          await page
+            .evaluate(() => {
+              document.body.style.zoom = "0.67";
+            })
+            .catch(() => {});
+          await page.waitForTimeout(1000);
+
           startSpinner(
-            `[${j + 1}/${targetLinks.length}] 📸 Snapping screenshot for Gemini 2.5 Flash...`,
+            `[${j + 1}/${targetLinks.length}] 📸 Snapping 67% zoomed screenshot for Gemini Vision...`,
           );
           const screenshotBuffer = await page.screenshot({ fullPage: false });
           const visionData = await extractBookDataWithGemini(screenshotBuffer);
@@ -259,6 +445,8 @@ function appendCsvRow(csvPath, data) {
             in_stock: data.in_stock !== undefined ? data.in_stock : true,
             stock_status: data.stock_status || "In Stock",
             seller: data.seller || platform,
+            seller_address: data.seller_address || null,
+            shipping: data.shipping || null,
             publisher: data.publisher || null,
             binding: data.binding || null,
           };
@@ -289,10 +477,49 @@ function appendCsvRow(csvPath, data) {
         );
       }
 
-      await page.waitForTimeout(getRandomDelay(1000, 2000));
+      if (isDebugMode) {
+        console.log(
+          `\n  ┌─────────────────────────────────────────────────────────────┐`,
+        );
+        console.log(
+          `  │ 🔍 [DEBUG] Extracted details for [${j + 1}/${targetLinks.length}]: ${platform}`,
+        );
+        console.log(`  │ 🌐 URL: ${url}`);
+        if (data && (data.title || data.price)) {
+          console.log(`  │ 📖 Title:  ${data.title || "N/A"}`);
+          console.log(`  │ 👤 Author: ${data.author || "N/A"}`);
+          console.log(
+            `  │ 💰 Price:  ${data.currency || "INR"} ${data.price !== undefined && data.price !== null ? data.price : "N/A"} (MRP: ${data.mrp || "N/A"})`,
+          );
+          console.log(
+            `  │ 📦 Stock:  ${data.in_stock ? "🟢 In Stock" : "🔴 Out of Stock"} (${data.stock_status || "N/A"})`,
+          );
+          console.log(`  │ 🏪 Seller: ${data.seller || "N/A"}`);
+          if (data.seller_address && data.seller_address !== "N/A") {
+            console.log(`  │ 📍 Shipping: ${data.seller_address}`);
+          }
+        } else {
+          console.log(`  │ ❌ Result: Listing not found / out of stock`);
+        }
+        console.log(
+          `  └─────────────────────────────────────────────────────────────┘`,
+        );
+        if (j + 1 < targetLinks.length) {
+          await waitForEnter(
+            `  👉 Press [ENTER] to open & scrape [${j + 2}/${targetLinks.length}] ${targetLinks[j + 1].platform}... `,
+          );
+        } else {
+          await waitForEnter(
+            `  👉 Finished all ${targetLinks.length} store(s) for ISBN ${isbn}. Press [ENTER] to finalize & proceed... `,
+          );
+        }
+      }
+
+      if (!page.isClosed()) {
+        await page.waitForTimeout(getRandomDelay(1000, 2000)).catch(() => {});
+      }
     }
 
-    // 4. Determine Best Price & Consolidate
     let bestPriceInr = null;
     let bestPlatform = null;
     let canonicalTitle = null;
@@ -324,6 +551,7 @@ function appendCsvRow(csvPath, data) {
       best_platform: bestPlatform,
       in_stock_count: inStockCount,
       total_whitelisted_links: targetLinks.length,
+      links_found: rawLinks,
       listings: extractedListings,
       scraped_at: new Date().toISOString(),
     };

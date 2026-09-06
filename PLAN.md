@@ -50,3 +50,6 @@ https://ompublications.in
 https://sterlingbookhouse.com
 https://thebookishowl.in
 https://www.casadellibro.com/
+https://www.adityaprakashan.com/
+https://www.ajayonlinestall.com/
+https://www.bestbookcentre.com/

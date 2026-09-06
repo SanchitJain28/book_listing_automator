@@ -1,4 +1,6 @@
 const fs = require("fs");
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
 /**
  * Extracts structured book listing metadata from a screenshot using Google Gemini 2.5 Flash Vision API.
@@ -11,7 +13,8 @@ async function extractBookDataWithGemini(imageInput, options = {}) {
   const apiKey =
     options.apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
-  const model = options.model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model =
+    options.model || process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
 
   if (!apiKey) {
     throw new Error(
@@ -37,7 +40,12 @@ async function extractBookDataWithGemini(imageInput, options = {}) {
   }
 
   const prompt = `You are a professional e-commerce book listing data extractor.
-Analyze this webpage screenshot of a book listing and extract all key product, pricing, and stock details according to the schema.`;
+Analyze this webpage screenshot of a book listing and extract all key product, pricing, and stock details according to the schema.
+
+CRITICAL INSTRUCTIONS FOR STOCK STATUS & BUTTONS:
+1. Carefully inspect the buttons and status text near the price, quantity selector, and buy box.
+2. If you see "Out of Stock", "This product is currently out of stock", "Currently Unavailable", "Sold Out", "Agotado", "No disponible", or a disabled/greyed-out "Out of Stock" button (even if a price is displayed), you MUST set in_stock: false and stock_status: "Out of Stock".
+3. Only set in_stock: true if there is an active "Buy Now" or "Add to Cart" button without out-of-stock warnings.`;
 
   // Official Gemini 2.5 Flash JSON Schema specification
   const bookSchema = {

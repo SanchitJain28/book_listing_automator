@@ -84,7 +84,7 @@ async function openBatchSequentially(
     const url = urls[i];
     const query = queries[i];
     process.stdout.write(
-      `  [${i + 1}/${urls.length}] 🌐 Opening tab in Right Window: ${query}`,
+      `  [${i + 1}/${urls.length}] 📦 Opening Amazon Tab: ${query}`,
     );
 
     openTabInRightWindow(url, targetSide);
@@ -104,7 +104,7 @@ async function main() {
     "╔════════════════════════════════════════════════════════════════╗",
   );
   console.log(
-    "║   🚀 Chrome Split-Screen Tab Opener (Targets Right Window)     ║",
+    "║   🛒 Amazon.in Tab Opener (Split-Screen Right Window)          ║",
   );
   console.log(
     "╚════════════════════════════════════════════════════════════════╝\n",
@@ -137,19 +137,13 @@ async function main() {
 
   // Default input file if none given
   if (!inputFile) {
-    inputFile = path.join(process.cwd(), "queries.txt");
+    inputFile = path.join(process.cwd(), "queries-2.txt");
   } else if (!path.isAbsolute(inputFile)) {
     inputFile = path.join(process.cwd(), inputFile);
   }
 
   if (!fs.existsSync(inputFile)) {
     console.log(`ℹ️ File "${inputFile}" not found.`);
-    const sample = `Harry Potter\nAtomic Habits\n9780143455585\n`;
-    fs.writeFileSync(inputFile, sample, "utf8");
-    console.log(`Created sample input file at: ${inputFile}`);
-    console.log(
-      `👉 Please paste your search queries (one per line) into "${inputFile}" and re-run.\n`,
-    );
     return;
   }
 
@@ -167,11 +161,16 @@ async function main() {
   console.log(`📁 Input File: ${inputFile}`);
   console.log(`📊 Total Queries: ${queries.length.toLocaleString()}`);
   console.log(`📦 Batch Size: ${batchSize} tabs`);
+  console.log(`🔍 Target Site: Amazon.in (https://www.amazon.in/s?k=...)`);
   console.log(`🖥️ Target Window: RIGHT-HAND Chrome Window`);
   console.log(`⏱️ Speed: ${delayMs / 1000}s per tab\n`);
 
   // Progress state file
-  const progressFile = path.join(__dirname, ".open-tabs-progress.json");
+  const baseName = path.basename(inputFile, path.extname(inputFile));
+  const progressFile = path.join(
+    __dirname,
+    `.open-tabs-progress-amazon-${baseName}.json`,
+  );
   let currentIndex = 0;
 
   if (fs.existsSync(progressFile) && !isReset) {
@@ -213,14 +212,14 @@ async function main() {
       if (q.startsWith("http://") || q.startsWith("https://")) {
         return q;
       }
-      return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+      return `https://www.amazon.in/s?k=${encodeURIComponent(q)}`;
     });
 
     console.log(
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
     );
     console.log(
-      `🚀 [Batch ${batchNumber}/${totalBatches}] Opening ${currentBatch.length} tabs (#${currentIndex + 1} to #${end}) in the RIGHT Chrome window...`,
+      `🚀 [Batch ${batchNumber}/${totalBatches}] Opening ${currentBatch.length} Amazon tabs (#${currentIndex + 1} to #${end}) in the RIGHT Chrome window...`,
     );
     console.log(
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
@@ -229,11 +228,11 @@ async function main() {
     await openBatchSequentially(urls, currentBatch, delayMs, targetSide);
 
     console.log(
-      `\n✅ ${currentBatch.length} tabs opened in your RIGHT Chrome window.`,
+      `\n✅ ${currentBatch.length} Amazon tabs opened in your RIGHT Chrome window.`,
     );
     console.log(`\nOptions:`);
     console.log(
-      `  👉 Press [ENTER]       : Open NEXT ${batchSize} tabs in right window`,
+      `  👉 Press [ENTER]       : Open NEXT ${batchSize} Amazon tabs`,
     );
     console.log(`  👉 Type 'r' + [ENTER] : Re-open current batch`);
     console.log(`  👉 Type 'p' + [ENTER] : Go BACK to previous batch`);
@@ -254,7 +253,7 @@ async function main() {
       saveProgress(currentIndex);
       continue;
     } else {
-      // Default: Enter pressed -> proceed to next batch in right window
+      // Default: Enter pressed -> proceed to next batch
       currentIndex = end;
       saveProgress(currentIndex);
     }
