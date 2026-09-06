@@ -8,17 +8,17 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-// Helper to recursively find files
+// Helper to recursively find executable scraper files
 function findFiles(dir, extList, fileList = []) {
   if (!fs.existsSync(dir)) return fileList;
   const files = fs.readdirSync(dir);
   for (const file of files) {
-    if (file === 'node_modules' || file === '.git' || file === 'export') continue;
+    if (file === 'node_modules' || file === '.git' || file === 'export' || file === 'core') continue;
     const filePath = path.join(dir, file);
     if (fs.statSync(filePath).isDirectory()) {
       findFiles(filePath, extList, fileList);
     } else {
-      if (extList.includes(path.extname(filePath))) {
+      if (extList.includes(path.extname(filePath)) && file !== 'scraper.js') {
         fileList.push(filePath);
       }
     }
@@ -141,7 +141,7 @@ async function main() {
   // 2. Find and select Scraper
   console.log("\n🤖 Available Scrapers:");
   const scrapersDir = path.join(__dirname, 'scrapers');
-  const allScrapers = findFiles(scrapersDir, ['.js']);
+  const allScrapers = findFiles(scrapersDir, ['.js']).sort((a, b) => a.localeCompare(b));
   
   allScrapers.forEach((file, index) => {
     const relativePath = path.relative(__dirname, file);

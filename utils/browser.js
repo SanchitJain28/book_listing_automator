@@ -7,7 +7,7 @@ chromium.use(stealth);
 async function initBrowser(
   headless = true,
   profileName = "amazon_search_profile",
-  blockResources = false,
+  blockResources = true,
 ) {
   const userDataDir = path.join(__dirname, "..", "..", "..", profileName);
   const context = await chromium.launchPersistentContext(userDataDir, {
