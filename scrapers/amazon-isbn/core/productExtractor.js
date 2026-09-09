@@ -91,11 +91,20 @@ async function extractProductData(page) {
       "N/A";
 
     const usedLink = Array.from(document.querySelectorAll("a, span")).find(
-      (el) =>
-        el.innerText &&
-        (el.innerText.toLowerCase().includes("used from") ||
-          el.innerText.toLowerCase().includes("new & used") ||
-          el.innerText.toLowerCase().includes("used & new")),
+      (el) => {
+        const t = (el.innerText || el.getAttribute("aria-label") || "").toLowerCase();
+        return (
+          t.includes("used from") ||
+          t.includes("new & used") ||
+          t.includes("used & new") ||
+          t.includes("other new") ||
+          t.includes("other used") ||
+          t.includes("see all buying") ||
+          t.includes("buying choices") ||
+          el.id === "mediaMatrixGridAODPopover" ||
+          (el.classList && el.classList.contains("aod-popover-caret-link"))
+        );
+      },
     );
     if (usedLink) result.hasUsedOptions = true;
 

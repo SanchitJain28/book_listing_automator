@@ -42,7 +42,10 @@ const { scrapeAmazonBook } = require("./scraper");
     }
   }
 
-  let { context, page } = await initBrowser(isHeadless);
+  const profileSuffix = path.basename(inputFile, path.extname(inputFile)).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const profileName = `amazon_isbn_profile_${profileSuffix}`;
+
+  let { context, page } = await initBrowser(isHeadless, profileName);
 
   // Set delivery location to Gurgaon (122101)
   startSpinner("Checking Amazon delivery location (Gurgaon 122101)...");
@@ -73,7 +76,7 @@ const { scrapeAmazonBook } = require("./scraper");
     if (i > 0 && i % 500 === 0) {
       stopSpinner(`Flushing browser memory after ${i} items...`, "info");
       await context.close();
-      const newBrowser = await initBrowser(isHeadless);
+      const newBrowser = await initBrowser(isHeadless, profileName);
       context = newBrowser.context;
       page = newBrowser.page;
       await setAmazonLocation(page, "122101");

@@ -9,3 +9,5 @@ node_modules
 /chrome_profile
 /debug
 .env
+logs/
+*.log
