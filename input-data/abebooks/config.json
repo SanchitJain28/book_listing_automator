@@ -1,0 +1,4 @@
+{
+  "platform": "abebooks",
+  "recommended_scraper": "scrapers/abebooks/abebooks-isbn.js"
+}

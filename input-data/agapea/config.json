@@ -1,0 +1,4 @@
+{
+  "platform": "agapea",
+  "recommended_scraper": "scrapers/agapea/agapea-isbn.js"
+}

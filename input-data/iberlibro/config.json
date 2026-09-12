@@ -1,0 +1,4 @@
+{
+  "platform": "iberlibro",
+  "recommended_scraper": "scrapers/iberlibro/iberlibro-isbn.js"
+}

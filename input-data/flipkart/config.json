@@ -1,0 +1,4 @@
+{
+  "platform": "flipkart",
+  "recommended_scraper": "scrapers/flipkart/flipkart-isbn.js"
+}

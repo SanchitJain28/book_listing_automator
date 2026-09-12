@@ -1,0 +1,4 @@
+{
+  "platform": "amazon-ca",
+  "recommended_scraper": "scrapers/amazon-ca-isbn/amazon-ca-isbn.js"
+}

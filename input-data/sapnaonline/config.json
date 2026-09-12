@@ -1,0 +1,4 @@
+{
+  "platform": "sapnaonline",
+  "recommended_scraper": "scrapers/sapnaonline/sapnaonline-isbn.js"
+}

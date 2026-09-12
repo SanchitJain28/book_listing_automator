@@ -1,0 +1,4 @@
+{
+  "platform": "mypustak",
+  "recommended_scraper": "scrapers/mypustak/mypustak-isbn.js"
+}

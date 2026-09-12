@@ -1,0 +1,4 @@
+{
+  "platform": "amazon-india",
+  "recommended_scraper": "scrapers/amazon-isbn/amazon-isbn.js"
+}

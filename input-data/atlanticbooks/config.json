@@ -1,0 +1,4 @@
+{
+  "platform": "atlanticbooks",
+  "recommended_scraper": "scrapers/atlanticbooks/atlanticbooks-isbn.js"
+}

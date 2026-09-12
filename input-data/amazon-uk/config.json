@@ -1,0 +1,4 @@
+{
+  "platform": "amazon-uk",
+  "recommended_scraper": "scrapers/amazon-uk-isbn/amazon-uk-isbn.js"
+}

@@ -1,0 +1,4 @@
+{
+  "platform": "google-links",
+  "recommended_scraper": "scrapers/google-links/google-links-isbn.js"
+}
