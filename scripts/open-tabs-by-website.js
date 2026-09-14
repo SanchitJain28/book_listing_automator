@@ -116,7 +116,11 @@ async function main() {
   }
 
   if (!inputFile) {
-    inputFile = path.join(process.cwd(), "links-2.txt");
+    if (fs.existsSync(path.join(process.cwd(), "links.txt"))) {
+      inputFile = path.join(process.cwd(), "links.txt");
+    } else {
+      inputFile = path.join(process.cwd(), "links-2.txt");
+    }
   } else if (!path.isAbsolute(inputFile)) {
     inputFile = path.join(process.cwd(), inputFile);
   }
@@ -137,30 +141,170 @@ async function main() {
   }
 
   // Group URLs by domain
-  const domainMap = {};
+  const rawDomainMap = {};
   urls.forEach((urlStr) => {
     try {
       const u = new URL(urlStr);
       let host = u.hostname.replace(/^www\./, "");
-      if (!domainMap[host]) domainMap[host] = [];
-      domainMap[host].push(urlStr);
+      if (!rawDomainMap[host]) rawDomainMap[host] = [];
+      rawDomainMap[host].push(urlStr);
     } catch (e) {}
   });
 
+  // Exclude pattern parsing
+  const excludePatterns = [];
+  args.forEach((arg) => {
+    if (
+      arg.startsWith("--exclude=") ||
+      arg.startsWith("-exclude=") ||
+      arg.startsWith("--ignore=") ||
+      arg.startsWith("-ignore=")
+    ) {
+      const val = arg.replace(/^--?(exclude|ignore)=/, "").replace(/^["']|["']$/g, "");
+      const parts = val
+        .split(/[,&]|\band\b|\s+/i)
+        .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+        .filter(Boolean);
+      excludePatterns.push(...parts);
+    }
+  });
+
+  function wildcardToRegex(pattern) {
+    const clean = pattern.trim().toLowerCase();
+    const escaped = clean.split(".").map((part) => part.replace(/\*/g, ".*")).join("\\.");
+    return new RegExp("^" + escaped + "$", "i");
+  }
+
+  function matchesExclude(domain, patterns) {
+    if (!patterns || patterns.length === 0) return false;
+    return patterns.some((p) => {
+      const cleanP = p.trim().toLowerCase();
+      if (cleanP.includes("*")) {
+        const re = wildcardToRegex(cleanP);
+        return re.test(domain);
+      }
+      return domain.toLowerCase().includes(cleanP);
+    });
+  }
+
+  // Quantity / Min Links Filter parser
+  function parseQuantityFilter(cliArgs) {
+    const qArg = cliArgs.find(
+      (a) =>
+        a.startsWith("--quantity=") ||
+        a.startsWith("-quantity=") ||
+        a.startsWith("--min=") ||
+        a.startsWith("-min=") ||
+        a.startsWith("--min-count=") ||
+        a.startsWith("-min-count=") ||
+        a.startsWith("--min-links=") ||
+        a.startsWith("-min-links=") ||
+        a.startsWith("--count=") ||
+        a.startsWith("-count="),
+    );
+    if (!qArg) return null;
+
+    const val = qArg
+      .replace(/^--?(quantity|min|min-count|min-links|count)=/, "")
+      .replace(/^["']|["']$/g, "")
+      .trim();
+
+    const match = val.match(/^([><]=?|==|!=)?\s*(\d+)(\+)?$/);
+    if (!match) return null;
+
+    const op = match[1] || (match[3] === "+" ? ">=" : ">=");
+    const num = parseInt(match[2], 10);
+
+    return {
+      raw: val,
+      op,
+      num,
+      test: (count) => {
+        switch (op) {
+          case ">":
+            return count > num;
+          case ">=":
+            return count >= num;
+          case "<":
+            return count < num;
+          case "<=":
+            return count <= num;
+          case "==":
+            return count === num;
+          case "!=":
+            return count !== num;
+          default:
+            return count >= num;
+        }
+      },
+    };
+  }
+
+  const quantityFilter = parseQuantityFilter(args);
+
+  const domainMap = {};
+  const excludedMap = {};
+  const quantitySkippedMap = {};
+
+  Object.keys(rawDomainMap)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((d) => {
+      const linkCount = rawDomainMap[d].length;
+      if (matchesExclude(d, excludePatterns)) {
+        excludedMap[d] = rawDomainMap[d];
+      } else if (quantityFilter && !quantityFilter.test(linkCount)) {
+        quantitySkippedMap[d] = rawDomainMap[d];
+      } else {
+        domainMap[d] = rawDomainMap[d];
+      }
+    });
+
   const domains = Object.keys(domainMap);
+  const excludedDomains = Object.keys(excludedMap);
+  const quantitySkippedDomains = Object.keys(quantitySkippedMap);
+
+  const siteArg = args.find((a) => a.startsWith("--site="));
+
+  let singleSiteFilter = null;
+  if (siteArg) {
+    singleSiteFilter = siteArg.split("=")[1].toLowerCase().trim();
+  }
+
+  const activeLinksCount = domains.reduce((sum, d) => sum + domainMap[d].length, 0);
+  const excludedLinksCount = excludedDomains.reduce((sum, d) => sum + excludedMap[d].length, 0);
+  const quantitySkippedLinksCount = quantitySkippedDomains.reduce((sum, d) => sum + quantitySkippedMap[d].length, 0);
 
   console.log(`📁 Input File:      ${inputFile}`);
-  console.log(`📊 Total Links:     ${urls.length}`);
-  console.log(`🏢 Total Websites:  ${domains.length}`);
+  console.log(`📊 Active Links:    ${activeLinksCount} (${domains.length} websites)`);
+  if (excludePatterns.length > 0) {
+    console.log(`🚫 Excluded:        ${excludedLinksCount} links (${excludedDomains.length} websites matching: ${excludePatterns.join(", ")})`);
+  }
+  if (quantityFilter) {
+    console.log(`🔢 Quantity Filter: Filtered by [count ${quantityFilter.op} ${quantityFilter.num}] -> Skipped ${quantitySkippedLinksCount} links (${quantitySkippedDomains.length} websites)`);
+  }
   console.log(`🖥️ Target Window:   ${targetSide.toUpperCase()} Chrome Window`);
   console.log(`⏱️ Tab Delay:       ${delayMs / 1000}s\n`);
 
-  console.log("📋 Website Breakdown:");
+  if (excludedDomains.length > 0) {
+    console.log("🚫 Excluded Websites List (Patterns):");
+    excludedDomains.forEach((d) => {
+      console.log(`  • ${d.padEnd(28)} : ${excludedMap[d].length} link(s) (Excluded)`);
+    });
+    console.log("");
+  }
+
+  if (quantitySkippedDomains.length > 0) {
+    console.log(`⏭️ Skipped Websites by Quantity Filter (${quantitySkippedDomains.length} websites):`);
+    quantitySkippedDomains.forEach((d) => {
+      console.log(`  • ${d.padEnd(28)} : ${quantitySkippedMap[d].length} link(s) (Skipped)`);
+    });
+    console.log("");
+  }
+
+  console.log("📋 Active Websites Breakdown:");
   domains.forEach((d, idx) => {
-    console.log(`  [${idx + 1}] ${d.padEnd(28)} : ${domainMap[d].length} link(s)`);
+    console.log(`  [${String(idx + 1).padStart(2, " ")}] ${d.padEnd(28)} : ${domainMap[d].length} link(s)`);
   });
-  console.log("\nPress [ENTER] to begin opening tabs website-by-website...");
-  await askQuestion("");
 
   // Tracking progress file
   const progressFile = path.join(
@@ -169,7 +313,20 @@ async function main() {
   );
 
   let currentDomainIndex = 0;
-  if (!isReset && fs.existsSync(progressFile)) {
+
+  if (singleSiteFilter) {
+    const matchedIdx = !isNaN(singleSiteFilter)
+      ? parseInt(singleSiteFilter, 10) - 1
+      : domains.findIndex((d) => d.toLowerCase().includes(singleSiteFilter));
+
+    if (matchedIdx >= 0 && matchedIdx < domains.length) {
+      currentDomainIndex = matchedIdx;
+      console.log(`\n🎯 Filtered to website: ${domains[currentDomainIndex]}`);
+    } else {
+      console.log(`\n❌ Website '${singleSiteFilter}' not found in breakdown.`);
+      return;
+    }
+  } else if (!isReset && fs.existsSync(progressFile)) {
     try {
       const saved = JSON.parse(fs.readFileSync(progressFile, "utf8"));
       if (typeof saved.currentDomainIndex === "number" && saved.currentDomainIndex < domains.length) {
@@ -179,6 +336,20 @@ async function main() {
         }
       }
     } catch (e) {}
+  }
+
+  if (!singleSiteFilter) {
+    console.log("\nPress [ENTER] to start, or type a Website # (1-" + domains.length + ") to jump directly...");
+    const initialChoice = await askQuestion("Your choice (or press [ENTER]): ");
+    if (initialChoice) {
+      const parsedNum = parseInt(initialChoice, 10);
+      if (!isNaN(parsedNum) && parsedNum >= 1 && parsedNum <= domains.length) {
+        currentDomainIndex = parsedNum - 1;
+      } else {
+        const found = domains.findIndex((d) => d.toLowerCase().includes(initialChoice.toLowerCase()));
+        if (found !== -1) currentDomainIndex = found;
+      }
+    }
   }
 
   while (currentDomainIndex < domains.length) {
@@ -192,6 +363,11 @@ async function main() {
     console.log("━".repeat(70));
 
     await openWebsiteTabs(domainUrls, domain, delayMs, targetSide);
+
+    if (singleSiteFilter) {
+      console.log("\n✅ Completed opening tabs for " + domain + "!\n");
+      break;
+    }
 
     // Save progress
     fs.writeFileSync(
@@ -214,10 +390,11 @@ async function main() {
 
     console.log(`\n✅ ${domainUrls.length} tab(s) opened for ${domain}.`);
     console.log("\nOptions:");
-    console.log(`  👉 Press [ENTER]       : Open NEXT website (${nextDomain} - ${nextCount} tabs)`);
-    console.log(`  👉 Type 'r' + [ENTER] : Re-open current website (${domain})`);
-    console.log(`  👉 Type 'p' + [ENTER] : Go BACK to previous website`);
-    console.log(`  👉 Type 'q' + [ENTER] : Quit`);
+    console.log(`  👉 Press [ENTER]            : Open NEXT website (${nextDomain} - ${nextCount} tabs)`);
+    console.log(`  👉 Type Website # (1-${domains.length})     : Jump to specific website`);
+    console.log(`  👉 Type 'r' + [ENTER]      : Re-open current website (${domain})`);
+    console.log(`  👉 Type 'p' + [ENTER]      : Go BACK to previous website`);
+    console.log(`  👉 Type 'q' + [ENTER]      : Quit`);
 
     const answer = await askQuestion("\nYour choice: ");
 
@@ -233,8 +410,17 @@ async function main() {
       } else {
         console.log("\n⚠️ Already at the first website.");
       }
+    } else if (!isNaN(parseInt(answer, 10)) && parseInt(answer, 10) >= 1 && parseInt(answer, 10) <= domains.length) {
+      currentDomainIndex = parseInt(answer, 10) - 1;
+      console.log(`\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`);
     } else {
-      currentDomainIndex++;
+      const foundIdx = domains.findIndex((d) => d.toLowerCase().includes(answer.toLowerCase()));
+      if (answer && foundIdx !== -1) {
+        currentDomainIndex = foundIdx;
+        console.log(`\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`);
+      } else {
+        currentDomainIndex++;
+      }
     }
   }
 }

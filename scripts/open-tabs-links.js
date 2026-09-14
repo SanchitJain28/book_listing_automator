@@ -172,6 +172,133 @@ async function main() {
     .map((l) => l.trim())
     .filter((l) => l && (l.startsWith("http://") || l.startsWith("https://")));
 
+  // Exclude pattern parsing
+  const excludePatterns = [];
+  args.forEach((arg) => {
+    if (
+      arg.startsWith("--exclude=") ||
+      arg.startsWith("-exclude=") ||
+      arg.startsWith("--ignore=") ||
+      arg.startsWith("-ignore=")
+    ) {
+      const val = arg.replace(/^--?(exclude|ignore)=/, "").replace(/^["']|["']$/g, "");
+      const parts = val
+        .split(/[,&]|\band\b|\s+/i)
+        .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+        .filter(Boolean);
+      excludePatterns.push(...parts);
+    }
+  });
+
+  function wildcardToRegex(pattern) {
+    const clean = pattern.trim().toLowerCase();
+    const escaped = clean.split(".").map((part) => part.replace(/\*/g, ".*")).join("\\.");
+    return new RegExp("^" + escaped + "$", "i");
+  }
+
+  function matchesExclude(domain, patterns) {
+    if (!patterns || patterns.length === 0) return false;
+    return patterns.some((p) => {
+      const cleanP = p.trim().toLowerCase();
+      if (cleanP.includes("*")) {
+        const re = wildcardToRegex(cleanP);
+        return re.test(domain);
+      }
+      return domain.toLowerCase().includes(cleanP);
+    });
+  }
+
+  if (excludePatterns.length > 0) {
+    const beforeCount = urls.length;
+    urls = urls.filter((u) => {
+      try {
+        const host = new URL(u).hostname.replace(/^www\./, "");
+        return !matchesExclude(host, excludePatterns);
+      } catch (e) {
+        return true;
+      }
+    });
+    console.log(`🚫 Excluded ${beforeCount - urls.length} links matching: ${excludePatterns.join(", ")}`);
+  }
+
+  // Quantity / Min Links Filter parser
+  function parseQuantityFilter(cliArgs) {
+    const qArg = cliArgs.find(
+      (a) =>
+        a.startsWith("--quantity=") ||
+        a.startsWith("-quantity=") ||
+        a.startsWith("--min=") ||
+        a.startsWith("-min=") ||
+        a.startsWith("--min-count=") ||
+        a.startsWith("-min-count=") ||
+        a.startsWith("--min-links=") ||
+        a.startsWith("-min-links=") ||
+        a.startsWith("--count=") ||
+        a.startsWith("-count="),
+    );
+    if (!qArg) return null;
+
+    const val = qArg
+      .replace(/^--?(quantity|min|min-count|min-links|count)=/, "")
+      .replace(/^["']|["']$/g, "")
+      .trim();
+
+    const match = val.match(/^([><]=?|==|!=)?\s*(\d+)(\+)?$/);
+    if (!match) return null;
+
+    const op = match[1] || (match[3] === "+" ? ">=" : ">=");
+    const num = parseInt(match[2], 10);
+
+    return {
+      raw: val,
+      op,
+      num,
+      test: (count) => {
+        switch (op) {
+          case ">":
+            return count > num;
+          case ">=":
+            return count >= num;
+          case "<":
+            return count < num;
+          case "<=":
+            return count <= num;
+          case "==":
+            return count === num;
+          case "!=":
+            return count !== num;
+          default:
+            return count >= num;
+        }
+      },
+    };
+  }
+
+  const quantityFilter = parseQuantityFilter(args);
+  if (quantityFilter) {
+    // Count occurrences per domain in current list
+    const domainCounts = {};
+    urls.forEach((u) => {
+      try {
+        const host = new URL(u).hostname.replace(/^www\./, "");
+        domainCounts[host] = (domainCounts[host] || 0) + 1;
+      } catch (e) {}
+    });
+
+    const beforeCount = urls.length;
+    urls = urls.filter((u) => {
+      try {
+        const host = new URL(u).hostname.replace(/^www\./, "");
+        return quantityFilter.test(domainCounts[host] || 0);
+      } catch (e) {
+        return true;
+      }
+    });
+    console.log(
+      `🔢 Quantity Filter: Filtered by [count ${quantityFilter.op} ${quantityFilter.num}] -> Skipped ${beforeCount - urls.length} link(s)`,
+    );
+  }
+
   if (targetDomain) {
     if (isExact) {
       urls = urls.filter((u) => {
