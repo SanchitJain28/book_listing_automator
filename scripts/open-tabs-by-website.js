@@ -74,7 +74,12 @@ function openTabInRightWindow(url, targetSide = "right") {
 }
 
 // Sequentially open tabs for a specific website
-async function openWebsiteTabs(urls, domain, delayMs = 1000, targetSide = "right") {
+async function openWebsiteTabs(
+  urls,
+  domain,
+  delayMs = 1000,
+  targetSide = "right",
+) {
   for (let i = 0; i < urls.length; i++) {
     const url = urls[i];
     process.stdout.write(
@@ -94,9 +99,15 @@ async function openWebsiteTabs(urls, domain, delayMs = 1000, targetSide = "right
 
 async function main() {
   console.clear();
-  console.log("╔════════════════════════════════════════════════════════════════╗");
-  console.log("║   🌐 Website-by-Website Tab Opener (Right Chrome Window)       ║");
-  console.log("╚════════════════════════════════════════════════════════════════╝\n");
+  console.log(
+    "╔════════════════════════════════════════════════════════════════╗",
+  );
+  console.log(
+    "║   🌐 Website-by-Website Tab Opener (Right Chrome Window)       ║",
+  );
+  console.log(
+    "╚════════════════════════════════════════════════════════════════╝\n",
+  );
 
   const args = process.argv.slice(2);
   let inputFile = args.find((a) => !a.startsWith("--"));
@@ -112,7 +123,8 @@ async function main() {
 
   let targetSide = "right";
   if (sideArg) {
-    targetSide = sideArg.split("=")[1].toLowerCase() === "left" ? "left" : "right";
+    targetSide =
+      sideArg.split("=")[1].toLowerCase() === "left" ? "left" : "right";
   }
 
   if (!inputFile) {
@@ -153,6 +165,7 @@ async function main() {
 
   // Exclude pattern parsing
   const excludePatterns = [];
+  const includePatterns = [];
   args.forEach((arg) => {
     if (
       arg.startsWith("--exclude=") ||
@@ -160,22 +173,42 @@ async function main() {
       arg.startsWith("--ignore=") ||
       arg.startsWith("-ignore=")
     ) {
-      const val = arg.replace(/^--?(exclude|ignore)=/, "").replace(/^["']|["']$/g, "");
+      const val = arg
+        .replace(/^--?(exclude|ignore)=/, "")
+        .replace(/^["']|["']$/g, "");
       const parts = val
         .split(/[,&]|\band\b|\s+/i)
         .map((s) => s.trim().replace(/^["']|["']$/g, ""))
         .filter(Boolean);
       excludePatterns.push(...parts);
     }
+    if (
+      arg.startsWith("--include=") ||
+      arg.startsWith("-include=") ||
+      arg.startsWith("--only=") ||
+      arg.startsWith("-only=")
+    ) {
+      const val = arg
+        .replace(/^--?(include|only)=/, "")
+        .replace(/^["']|["']$/g, "");
+      const parts = val
+        .split(/[,&]|\band\b|\s+/i)
+        .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+        .filter(Boolean);
+      includePatterns.push(...parts);
+    }
   });
 
   function wildcardToRegex(pattern) {
     const clean = pattern.trim().toLowerCase();
-    const escaped = clean.split(".").map((part) => part.replace(/\*/g, ".*")).join("\\.");
+    const escaped = clean
+      .split(".")
+      .map((part) => part.replace(/\*/g, ".*"))
+      .join("\\.");
     return new RegExp("^" + escaped + "$", "i");
   }
 
-  function matchesExclude(domain, patterns) {
+  function matchesPattern(domain, patterns) {
     if (!patterns || patterns.length === 0) return false;
     return patterns.some((p) => {
       const cleanP = p.trim().toLowerCase();
@@ -185,6 +218,15 @@ async function main() {
       }
       return domain.toLowerCase().includes(cleanP);
     });
+  }
+
+  function matchesExclude(domain, patterns) {
+    return matchesPattern(domain, patterns);
+  }
+
+  function matchesInclude(domain, patterns) {
+    if (!patterns || patterns.length === 0) return true;
+    return matchesPattern(domain, patterns);
   }
 
   // Quantity / Min Links Filter parser
@@ -244,13 +286,16 @@ async function main() {
 
   const domainMap = {};
   const excludedMap = {};
+  const notIncludedMap = {};
   const quantitySkippedMap = {};
 
   Object.keys(rawDomainMap)
     .sort((a, b) => a.localeCompare(b))
     .forEach((d) => {
       const linkCount = rawDomainMap[d].length;
-      if (matchesExclude(d, excludePatterns)) {
+      if (includePatterns.length > 0 && !matchesInclude(d, includePatterns)) {
+        notIncludedMap[d] = rawDomainMap[d];
+      } else if (matchesExclude(d, excludePatterns)) {
         excludedMap[d] = rawDomainMap[d];
       } else if (quantityFilter && !quantityFilter.test(linkCount)) {
         quantitySkippedMap[d] = rawDomainMap[d];
@@ -261,6 +306,7 @@ async function main() {
 
   const domains = Object.keys(domainMap);
   const excludedDomains = Object.keys(excludedMap);
+  const notIncludedDomains = Object.keys(notIncludedMap);
   const quantitySkippedDomains = Object.keys(quantitySkippedMap);
 
   const siteArg = args.find((a) => a.startsWith("--site="));
@@ -270,17 +316,41 @@ async function main() {
     singleSiteFilter = siteArg.split("=")[1].toLowerCase().trim();
   }
 
-  const activeLinksCount = domains.reduce((sum, d) => sum + domainMap[d].length, 0);
-  const excludedLinksCount = excludedDomains.reduce((sum, d) => sum + excludedMap[d].length, 0);
-  const quantitySkippedLinksCount = quantitySkippedDomains.reduce((sum, d) => sum + quantitySkippedMap[d].length, 0);
+  const activeLinksCount = domains.reduce(
+    (sum, d) => sum + domainMap[d].length,
+    0,
+  );
+  const excludedLinksCount = excludedDomains.reduce(
+    (sum, d) => sum + excludedMap[d].length,
+    0,
+  );
+  const notIncludedLinksCount = notIncludedDomains.reduce(
+    (sum, d) => sum + notIncludedMap[d].length,
+    0,
+  );
+  const quantitySkippedLinksCount = quantitySkippedDomains.reduce(
+    (sum, d) => sum + quantitySkippedMap[d].length,
+    0,
+  );
 
   console.log(`📁 Input File:      ${inputFile}`);
-  console.log(`📊 Active Links:    ${activeLinksCount} (${domains.length} websites)`);
+  console.log(
+    `📊 Active Links:    ${activeLinksCount} (${domains.length} websites)`,
+  );
+  if (includePatterns.length > 0) {
+    console.log(
+      `🎯 Included Only:   ${activeLinksCount} links (${domains.length} websites matching: ${includePatterns.join(", ")})`,
+    );
+  }
   if (excludePatterns.length > 0) {
-    console.log(`🚫 Excluded:        ${excludedLinksCount} links (${excludedDomains.length} websites matching: ${excludePatterns.join(", ")})`);
+    console.log(
+      `🚫 Excluded:        ${excludedLinksCount} links (${excludedDomains.length} websites matching: ${excludePatterns.join(", ")})`,
+    );
   }
   if (quantityFilter) {
-    console.log(`🔢 Quantity Filter: Filtered by [count ${quantityFilter.op} ${quantityFilter.num}] -> Skipped ${quantitySkippedLinksCount} links (${quantitySkippedDomains.length} websites)`);
+    console.log(
+      `🔢 Quantity Filter: Filtered by [count ${quantityFilter.op} ${quantityFilter.num}] -> Skipped ${quantitySkippedLinksCount} links (${quantitySkippedDomains.length} websites)`,
+    );
   }
   console.log(`🖥️ Target Window:   ${targetSide.toUpperCase()} Chrome Window`);
   console.log(`⏱️ Tab Delay:       ${delayMs / 1000}s\n`);
@@ -288,22 +358,30 @@ async function main() {
   if (excludedDomains.length > 0) {
     console.log("🚫 Excluded Websites List (Patterns):");
     excludedDomains.forEach((d) => {
-      console.log(`  • ${d.padEnd(28)} : ${excludedMap[d].length} link(s) (Excluded)`);
+      console.log(
+        `  • ${d.padEnd(28)} : ${excludedMap[d].length} link(s) (Excluded)`,
+      );
     });
     console.log("");
   }
 
   if (quantitySkippedDomains.length > 0) {
-    console.log(`⏭️ Skipped Websites by Quantity Filter (${quantitySkippedDomains.length} websites):`);
+    console.log(
+      `⏭️ Skipped Websites by Quantity Filter (${quantitySkippedDomains.length} websites):`,
+    );
     quantitySkippedDomains.forEach((d) => {
-      console.log(`  • ${d.padEnd(28)} : ${quantitySkippedMap[d].length} link(s) (Skipped)`);
+      console.log(
+        `  • ${d.padEnd(28)} : ${quantitySkippedMap[d].length} link(s) (Skipped)`,
+      );
     });
     console.log("");
   }
 
   console.log("📋 Active Websites Breakdown:");
   domains.forEach((d, idx) => {
-    console.log(`  [${String(idx + 1).padStart(2, " ")}] ${d.padEnd(28)} : ${domainMap[d].length} link(s)`);
+    console.log(
+      `  [${String(idx + 1).padStart(2, " ")}] ${d.padEnd(28)} : ${domainMap[d].length} link(s)`,
+    );
   });
 
   // Tracking progress file
@@ -329,24 +407,35 @@ async function main() {
   } else if (!isReset && fs.existsSync(progressFile)) {
     try {
       const saved = JSON.parse(fs.readFileSync(progressFile, "utf8"));
-      if (typeof saved.currentDomainIndex === "number" && saved.currentDomainIndex < domains.length) {
+      if (
+        typeof saved.currentDomainIndex === "number" &&
+        saved.currentDomainIndex < domains.length
+      ) {
         currentDomainIndex = saved.currentDomainIndex;
         if (currentDomainIndex > 0) {
-          console.log(`\n▶ Resuming from Website #${currentDomainIndex + 1}: ${domains[currentDomainIndex]}`);
+          console.log(
+            `\n▶ Resuming from Website #${currentDomainIndex + 1}: ${domains[currentDomainIndex]}`,
+          );
         }
       }
     } catch (e) {}
   }
 
   if (!singleSiteFilter) {
-    console.log("\nPress [ENTER] to start, or type a Website # (1-" + domains.length + ") to jump directly...");
+    console.log(
+      "\nPress [ENTER] to start, or type a Website # (1-" +
+        domains.length +
+        ") to jump directly...",
+    );
     const initialChoice = await askQuestion("Your choice (or press [ENTER]): ");
     if (initialChoice) {
       const parsedNum = parseInt(initialChoice, 10);
       if (!isNaN(parsedNum) && parsedNum >= 1 && parsedNum <= domains.length) {
         currentDomainIndex = parsedNum - 1;
       } else {
-        const found = domains.findIndex((d) => d.toLowerCase().includes(initialChoice.toLowerCase()));
+        const found = domains.findIndex((d) =>
+          d.toLowerCase().includes(initialChoice.toLowerCase()),
+        );
         if (found !== -1) currentDomainIndex = found;
       }
     }
@@ -358,7 +447,7 @@ async function main() {
 
     console.log("\n" + "━".repeat(70));
     console.log(
-      `🚀 [Website ${currentDomainIndex + 1}/${domains.length}] Opening ${domainUrls.length} tab(s) for: ${domain}`
+      `🚀 [Website ${currentDomainIndex + 1}/${domains.length}] Opening ${domainUrls.length} tab(s) for: ${domain}`,
     );
     console.log("━".repeat(70));
 
@@ -372,7 +461,15 @@ async function main() {
     // Save progress
     fs.writeFileSync(
       progressFile,
-      JSON.stringify({ currentDomainIndex, lastDomain: domain, timestamp: new Date().toISOString() }, null, 2),
+      JSON.stringify(
+        {
+          currentDomainIndex,
+          lastDomain: domain,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
     );
 
     if (currentDomainIndex === domains.length - 1) {
@@ -390,16 +487,24 @@ async function main() {
 
     console.log(`\n✅ ${domainUrls.length} tab(s) opened for ${domain}.`);
     console.log("\nOptions:");
-    console.log(`  👉 Press [ENTER]            : Open NEXT website (${nextDomain} - ${nextCount} tabs)`);
-    console.log(`  👉 Type Website # (1-${domains.length})     : Jump to specific website`);
-    console.log(`  👉 Type 'r' + [ENTER]      : Re-open current website (${domain})`);
+    console.log(
+      `  👉 Press [ENTER]            : Open NEXT website (${nextDomain} - ${nextCount} tabs)`,
+    );
+    console.log(
+      `  👉 Type Website # (1-${domains.length})     : Jump to specific website`,
+    );
+    console.log(
+      `  👉 Type 'r' + [ENTER]      : Re-open current website (${domain})`,
+    );
     console.log(`  👉 Type 'p' + [ENTER]      : Go BACK to previous website`);
     console.log(`  👉 Type 'q' + [ENTER]      : Quit`);
 
     const answer = await askQuestion("\nYour choice: ");
 
     if (answer.toLowerCase() === "q") {
-      console.log("\n👋 Exited. Progress saved. Run again anytime to resume!\n");
+      console.log(
+        "\n👋 Exited. Progress saved. Run again anytime to resume!\n",
+      );
       break;
     } else if (answer.toLowerCase() === "r") {
       console.log(`\n🔄 Re-opening ${domain}...`);
@@ -410,14 +515,24 @@ async function main() {
       } else {
         console.log("\n⚠️ Already at the first website.");
       }
-    } else if (!isNaN(parseInt(answer, 10)) && parseInt(answer, 10) >= 1 && parseInt(answer, 10) <= domains.length) {
+    } else if (
+      !isNaN(parseInt(answer, 10)) &&
+      parseInt(answer, 10) >= 1 &&
+      parseInt(answer, 10) <= domains.length
+    ) {
       currentDomainIndex = parseInt(answer, 10) - 1;
-      console.log(`\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`);
+      console.log(
+        `\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`,
+      );
     } else {
-      const foundIdx = domains.findIndex((d) => d.toLowerCase().includes(answer.toLowerCase()));
+      const foundIdx = domains.findIndex((d) =>
+        d.toLowerCase().includes(answer.toLowerCase()),
+      );
       if (answer && foundIdx !== -1) {
         currentDomainIndex = foundIdx;
-        console.log(`\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`);
+        console.log(
+          `\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`,
+        );
       } else {
         currentDomainIndex++;
       }

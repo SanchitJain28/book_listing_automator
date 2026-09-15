@@ -4,7 +4,7 @@ PASS="Sanchit@282930"
 DEST="output/amazon-india/search-term/stage-2/2026-08-10/chunks"
 mkdir -p "$DEST"
 
-IPS=("162.35.163.93" "153.75.235.165" "163.245.196.45" "153.75.235.158" "163.245.196.35")
+IPS=("216.219.85.173" "69.164.249.174" "69.164.244.21" "162.35.176.48" "69.169.103.19")
 
 for ip in "${IPS[@]}"; do
   echo "📥 Fetching from $ip..."

@@ -172,8 +172,9 @@ async function main() {
     .map((l) => l.trim())
     .filter((l) => l && (l.startsWith("http://") || l.startsWith("https://")));
 
-  // Exclude pattern parsing
+  // Include & Exclude pattern parsing
   const excludePatterns = [];
+  const includePatterns = [];
   args.forEach((arg) => {
     if (
       arg.startsWith("--exclude=") ||
@@ -188,6 +189,19 @@ async function main() {
         .filter(Boolean);
       excludePatterns.push(...parts);
     }
+    if (
+      arg.startsWith("--include=") ||
+      arg.startsWith("-include=") ||
+      arg.startsWith("--only=") ||
+      arg.startsWith("-only=")
+    ) {
+      const val = arg.replace(/^--?(include|only)=/, "").replace(/^["']|["']$/g, "");
+      const parts = val
+        .split(/[,&]|\band\b|\s+/i)
+        .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+        .filter(Boolean);
+      includePatterns.push(...parts);
+    }
   });
 
   function wildcardToRegex(pattern) {
@@ -196,7 +210,7 @@ async function main() {
     return new RegExp("^" + escaped + "$", "i");
   }
 
-  function matchesExclude(domain, patterns) {
+  function matchesPattern(domain, patterns) {
     if (!patterns || patterns.length === 0) return false;
     return patterns.some((p) => {
       const cleanP = p.trim().toLowerCase();
@@ -206,6 +220,28 @@ async function main() {
       }
       return domain.toLowerCase().includes(cleanP);
     });
+  }
+
+  function matchesExclude(domain, patterns) {
+    return matchesPattern(domain, patterns);
+  }
+
+  function matchesInclude(domain, patterns) {
+    if (!patterns || patterns.length === 0) return true;
+    return matchesPattern(domain, patterns);
+  }
+
+  if (includePatterns.length > 0) {
+    const beforeCount = urls.length;
+    urls = urls.filter((u) => {
+      try {
+        const host = new URL(u).hostname.replace(/^www\./, "");
+        return matchesInclude(host, includePatterns);
+      } catch (e) {
+        return false;
+      }
+    });
+    console.log(`🎯 Included Only: ${urls.length} links matching: ${includePatterns.join(", ")} (Filtered out ${beforeCount - urls.length})`);
   }
 
   if (excludePatterns.length > 0) {
