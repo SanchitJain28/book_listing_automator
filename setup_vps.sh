@@ -32,7 +32,7 @@ if command -v apt-get >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y
     apt-get install -y \
-      curl git unzip wget build-essential \
+      curl git unzip wget build-essential tmux \
       libasound2t64 libatk-bridge2.0-0t64 libatk1.0-0t64 libatspi2.0-0t64 \
       libcairo2 libcups2t64 libdbus-1-3 libdrm2 libgbm1 libglib2.0-0t64 \
       libnspr4 libnss3 libpango-1.0-0 libx11-6 libxcb1 libxcomposite1 \
@@ -49,7 +49,7 @@ elif command -v dnf >/dev/null 2>&1; then
     echo "📦 Installing system packages & Chromium shared libraries via dnf..."
     dnf install -y epel-release || true
     dnf install -y \
-      curl git unzip wget tar make gcc gcc-c++ \
+      curl git unzip wget tar make gcc gcc-c++ tmux \
       alsa-lib atk at-spi2-atk at-spi2-core cairo cups-libs dbus-libs \
       libdrm mesa-libgbm glib2 nspr nss nss-util pango \
       libX11 libX11-xcb libxcb libXcomposite libXdamage libXext libXfixes \
