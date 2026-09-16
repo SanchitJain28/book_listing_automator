@@ -3,19 +3,19 @@ const path = require("path");
 const fs = require("fs");
 
 const VPS_LIST = [
-  { id: 1, ip: "216.219.85.173" },
-  { id: 2, ip: "69.164.249.174" },
-  { id: 3, ip: "69.164.244.21" },
-  { id: 4, ip: "162.35.176.48" },
-  { id: 5, ip: "69.169.103.19" },
+  { id: 1, ip: "216.219.85.173", pass: "Sanchit@282930" },
+  { id: 2, ip: "69.164.249.174", pass: "Sanchit@282930" },
+  { id: 3, ip: "69.164.244.21",  pass: "Sanchit@282930" },
+  { id: 4, ip: "162.35.176.48",  pass: "Sanchit@282930" },
+  { id: 5, ip: "69.169.103.19",  pass: "Sanchit@282930" },
+  { id: 6, ip: "200.234.32.63",  pass: "+ww8T@@Eythd/2QM" },
 ];
 
-const PASS = "Sanchit@282930";
 const ROOT_DIR = path.resolve(__dirname, "..");
 const SETUP_SCRIPT = path.join(ROOT_DIR, "setup_vps.sh");
 const ENV_FILE = path.join(ROOT_DIR, ".env");
 
-// Parse command line arguments: e.g. "node scripts/setup-all-vps.js --vps=1" or all
+// Parse command line arguments: e.g. "node scripts/setup-all-vps.js --vps=6" or all
 const targetArg = process.argv.find(
   (a) => a.startsWith("--vps=") || a.startsWith("-vps="),
 );
@@ -25,7 +25,7 @@ if (targetArg) {
   const vpsId = parseInt(targetArg.replace(/^--?vps=/, ""), 10);
   targets = VPS_LIST.filter((v) => v.id === vpsId);
   if (targets.length === 0) {
-    console.error(`❌ Invalid VPS ID: ${vpsId}. Valid IDs are 1 to 5.`);
+    console.error(`❌ Invalid VPS ID: ${vpsId}. Valid IDs are 1 to ${VPS_LIST.length}.`);
     process.exit(1);
   }
 }
@@ -45,12 +45,13 @@ async function setupVPS(vps) {
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
   const sshOpts = "-o StrictHostKeyChecking=no -o ConnectTimeout=15";
+  const pass = vps.pass;
 
   // Step 1: Upload setup_vps.sh
   console.log(`📤 [VPS ${vps.id}] Uploading setup_vps.sh...`);
   try {
     execSync(
-      `sshpass -p "${PASS}" scp ${sshOpts} "${SETUP_SCRIPT}" "root@${vps.ip}:/root/setup_vps.sh"`,
+      `sshpass -p "${pass}" scp ${sshOpts} "${SETUP_SCRIPT}" "root@${vps.ip}:/root/setup_vps.sh"`,
       { stdio: "inherit" },
     );
   } catch (err) {
@@ -64,7 +65,7 @@ async function setupVPS(vps) {
   );
   try {
     execSync(
-      `sshpass -p "${PASS}" ssh ${sshOpts} root@${vps.ip} "chmod +x /root/setup_vps.sh && /root/setup_vps.sh"`,
+      `sshpass -p "${pass}" ssh ${sshOpts} root@${vps.ip} "chmod +x /root/setup_vps.sh && /root/setup_vps.sh"`,
       { stdio: "inherit" },
     );
   } catch (err) {
@@ -79,7 +80,7 @@ async function setupVPS(vps) {
     );
     try {
       execSync(
-        `sshpass -p "${PASS}" scp ${sshOpts} "${ENV_FILE}" "root@${vps.ip}:/root/book_listing_automator/.env"`,
+        `sshpass -p "${pass}" scp ${sshOpts} "${ENV_FILE}" "root@${vps.ip}:/root/book_listing_automator/.env"`,
         { stdio: "inherit" },
       );
       console.log(`✅ [VPS ${vps.id}] .env synced successfully.`);

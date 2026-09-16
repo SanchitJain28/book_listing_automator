@@ -24,3 +24,8 @@
 
 - IP : 69.169.103.19
 - PASSWORD : Sanchit@282930
+
+## VPS 6
+
+- IP : 200.234.32.63
+- PASSWORD : +ww8T@@Eythd/2QM
