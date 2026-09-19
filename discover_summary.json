@@ -1,0 +1,14 @@
+{
+  "scope": "offers",
+  "runMinutes": 30,
+  "grandTotal": 15807800,
+  "asinsWritten": 97302,
+  "bucketsDone": 15,
+  "queued": 9,
+  "probes": 41,
+  "harvests": 15,
+  "tokensSpent": 1582,
+  "tokensPer1000": 16.26,
+  "unresolvable": [],
+  "complete": false
+}

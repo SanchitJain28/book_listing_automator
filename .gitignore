@@ -11,3 +11,4 @@ node_modules
 .env
 logs/
 *.log
+/amazon_cart_bot_profile

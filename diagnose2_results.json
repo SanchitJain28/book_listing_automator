@@ -1,0 +1,299 @@
+{
+  "nowKeepa": 8266426,
+  "results": {
+    "G. Was the no-rank figure real, or just my 20M ceiling?": [
+      {
+        "label": "baseline: productType 0, all time",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0
+        },
+        "total": 45456800
+      },
+      {
+        "label": "rank 1 - 20,000,000 (round 1 probe)",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "current_SALES_gte": 1,
+          "current_SALES_lte": 20000000
+        },
+        "total": 1568700
+      },
+      {
+        "label": "rank 20,000,000 - 99,000,000",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "current_SALES_gte": 20000000,
+          "current_SALES_lte": 99000000
+        },
+        "total": 0
+      },
+      {
+        "label": "rank 1 - 999,000,000 (no ceiling)",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "current_SALES_gte": 1,
+          "current_SALES_lte": 999000000
+        },
+        "total": 1568700
+      }
+    ],
+    "H. What is in the 3.38M binding gap?": [
+      {
+        "label": "productType 0 (the 45.45M baseline)",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0
+        },
+        "total": 45456800
+      },
+      {
+        "label": "round-1 physical binding list",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "binding": [
+            "Paperback",
+            "Hardcover",
+            "Mass Market Paperback",
+            "Board book",
+            "Spiral-bound",
+            "Library Binding",
+            "Loose Leaf"
+          ]
+        },
+        "total": 42075200
+      },
+      {
+        "label": "NO binding value at all",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "exists": {
+            "binding": false
+          }
+        },
+        "total": 158200
+      },
+      {
+        "label": "HAS some binding value",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "exists": {
+            "binding": true
+          }
+        },
+        "total": 45298100
+      },
+      {
+        "label": "extra physical bindings",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "binding": [
+            "Perfect Paperback",
+            "Flexibound",
+            "Unknown Binding",
+            "Product Bundle",
+            "Pamphlet",
+            "Textbook Binding",
+            "Ring-bound",
+            "Leather Bound",
+            "Staple Bound",
+            "Sheet music",
+            "Paperback Bunko",
+            "Tankobon Hardcover"
+          ]
+        },
+        "total": 75600
+      },
+      {
+        "label": "non-book bindings (should be excluded)",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "binding": [
+            "Audio CD",
+            "MP3 CD",
+            "Audible Audiobook",
+            "Kindle Edition",
+            "Calendar",
+            "Diary",
+            "Cards",
+            "Map",
+            "Poster",
+            "DVD"
+          ]
+        },
+        "total": 411500
+      },
+      {
+        "label": "widened list: round-1 + extras",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "binding": [
+            "Paperback",
+            "Hardcover",
+            "Mass Market Paperback",
+            "Board book",
+            "Spiral-bound",
+            "Library Binding",
+            "Loose Leaf",
+            "Perfect Paperback",
+            "Flexibound",
+            "Unknown Binding",
+            "Product Bundle",
+            "Pamphlet",
+            "Textbook Binding",
+            "Ring-bound",
+            "Leather Bound",
+            "Staple Bound",
+            "Sheet music",
+            "Paperback Bunko",
+            "Tankobon Hardcover"
+          ]
+        },
+        "total": 42150600
+      }
+    ],
+    "I. Is trackingSince usable as the split axis?": [
+      {
+        "label": "baseline: no trackingSince filter",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0
+        },
+        "total": 45456300
+      },
+      {
+        "label": "trackingSince_gte: 0 (everything)",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "trackingSince_gte": 0
+        },
+        "total": 45456300
+      },
+      {
+        "label": "tracked before 2017",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "trackingSince_lte": 3156480
+        },
+        "total": 1400600
+      },
+      {
+        "label": "tracked 2017 - 2020",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "trackingSince_gte": 3156480,
+          "trackingSince_lte": 4733280
+        },
+        "total": 1506300
+      },
+      {
+        "label": "tracked 2020 - 2023",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "trackingSince_gte": 4733280,
+          "trackingSince_lte": 6311520
+        },
+        "total": 13944200
+      },
+      {
+        "label": "tracked 2023 - now",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "trackingSince_gte": 6311520,
+          "trackingSince_lte": 8266426
+        },
+        "total": 28605200
+      }
+    ],
+    "J. Scope decision: what does requiring an offer cost?": [
+      {
+        "label": "all physical books, all time",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "binding": [
+            "Paperback",
+            "Hardcover",
+            "Mass Market Paperback",
+            "Board book",
+            "Spiral-bound",
+            "Library Binding",
+            "Loose Leaf"
+          ]
+        },
+        "total": 42075000
+      },
+      {
+        "label": "with a live New offer",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "binding": [
+            "Paperback",
+            "Hardcover",
+            "Mass Market Paperback",
+            "Board book",
+            "Spiral-bound",
+            "Library Binding",
+            "Loose Leaf"
+          ],
+          "current_NEW_gte": 1
+        },
+        "total": 15797100
+      },
+      {
+        "label": "with any current price (Buy Box)",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "productType": 0,
+          "binding": [
+            "Paperback",
+            "Hardcover",
+            "Mass Market Paperback",
+            "Board book",
+            "Spiral-bound",
+            "Library Binding",
+            "Loose Leaf"
+          ],
+          "current_BUY_BOX_SHIPPING_gte": 1
+        },
+        "total": 15296100
+      }
+    ]
+  },
+  "tokensSpent": 219,
+  "lastTokensLeft": 925
+}

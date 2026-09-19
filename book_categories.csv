@@ -1,0 +1,36 @@
+﻿catId,name,depth,parent,n_children,is_leaf,productCount,websiteDisplayGroup,path
+976389031,Books,0,0,2,false,43804186,book_display_on_website,Books
+976390031,Categories,1,976389031,32,false,7693354,,Books > Categories
+976391031,Special Features,1,976389031,0,true,0,,Books > Special Features
+1318158031,Action & Adventure,2,976390031,0,true,652983,,Books > Categories > Action & Adventure
+1318052031,"Arts, Film & Photography",2,976390031,13,false,1800227,,"Books > Categories > Arts, Film & Photography"
+1318064031,"Biographies, Diaries & True Accounts",2,976390031,3,false,2325855,,"Books > Categories > Biographies, Diaries & True Accounts"
+1318068031,Business & Economics,2,976390031,5,false,2159333,,Books > Categories > Business & Economics
+64619755031,Children's Books,2,976390031,34,false,1886934,,Books > Categories > Children's Books
+1318104031,Comics & Mangas,2,976390031,2,false,335549,,Books > Categories > Comics & Mangas
+1318105031,Computers & Internet,2,976390031,11,false,553047,,Books > Categories > Computers & Internet
+1318118031,"Crafts, Hobbies & Home",2,976390031,9,false,1894989,,"Books > Categories > Crafts, Hobbies & Home"
+1318161031,"Crime, Thriller & Mystery",2,976390031,3,false,920131,,"Books > Categories > Crime, Thriller & Mystery"
+22960344031,Engineering,2,976390031,8,false,76615,,Books > Categories > Engineering
+4149751031,Exam Preparation,2,976390031,15,false,217208,,Books > Categories > Exam Preparation
+1318128031,"Health, Family & Personal Development",2,976390031,4,false,2248924,,"Books > Categories > Health, Family & Personal Development"
+23033693031,"Health, Fitness & Nutrition",2,976390031,1,false,784001,,"Books > Categories > Health, Fitness & Nutrition"
+4149418031,Higher Education Textbooks,2,976390031,10,false,1722039,,Books > Categories > Higher Education Textbooks
+1318164031,Historical Fiction,2,976390031,1,false,569964,,Books > Categories > Historical Fiction
+4149493031,History,2,976390031,6,false,6165252,,Books > Categories > History
+1318143031,Humour,2,976390031,0,true,331676,,Books > Categories > Humour
+1318144031,"Language, Linguistics & Writing",2,976390031,6,false,1037431,,"Books > Categories > Language, Linguistics & Writing"
+1318157031,Literature & Fiction,2,976390031,12,false,5168013,,Books > Categories > Literature & Fiction
+1318298031,Maps & Atlases,2,976390031,0,true,85056,,Books > Categories > Maps & Atlases
+1318176031,Politics,2,976390031,7,false,870674,,Books > Categories > Politics
+1318185031,Reference,2,976390031,5,false,1244374,,Books > Categories > Reference
+1318188031,Religion & Spirituality,2,976390031,14,false,1922524,,Books > Categories > Religion & Spirituality
+1318168031,Romance,2,976390031,37,false,947779,,Books > Categories > Romance
+4149807031,School Books,2,976390031,8,false,146337,,Books > Categories > School Books
+1402038031,Science Fiction & Fantasy,2,976390031,3,false,704767,,Books > Categories > Science Fiction & Fantasy
+1318203031,"Sciences, Technology & Medicine",2,976390031,10,false,1503970,,"Books > Categories > Sciences, Technology & Medicine"
+1318216031,Society & Social Sciences,2,976390031,6,false,1582381,,Books > Categories > Society & Social Sciences
+1318224031,Sports,2,976390031,37,false,310958,,Books > Categories > Sports
+64619754031,Teen & Young Adult,2,976390031,18,false,633117,,Books > Categories > Teen & Young Adult
+15417300031,Textbooks & Study Guides,2,976390031,1,false,95414,,Books > Categories > Textbooks & Study Guides
+1318295031,Travel & Tourism,2,976390031,6,false,368570,,Books > Categories > Travel & Tourism

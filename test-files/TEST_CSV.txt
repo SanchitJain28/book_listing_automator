@@ -1,0 +1,52 @@
+ISBN	Amazon Price (INR)	ISBN Matched?	Title	PO Price (USD)	PO Price (INR)
+9789352291533	215.00	Yes	Nahin, Kahin Kuchh Bhi Nahin... (Hindi Edition)	3.00	285.45
+9788181930651	250.00	Yes	Sex - Your Questions Answered	3.36	319.70
+9789387593879	120.00	Yes	MACHINE DESIGN DATA BOOK 2ND EDITION	1.98	188.40
+9788121504843	149.00	Yes	Mongolia Between China and the USSR	2.28	216.94
+9788185860770	413.00	Yes	GLIMPSE ON TERMINOLOGY OF AGRICULTURAL ENTOMOLOGY	5.05	480.51
+9788194215820	110.00	Yes	Siddhartha | Hermann Hesse | International Bestseller Paperback Book	1.86	176.98
+9788173713347	150.00	Yes	Writing Job Descriptions	2.28	216.94
+9788122411270	230.00	Yes	Statistical Theory of Communication	3.12	296.87
+9781493976249	899.00	Yes	Ramanujans Lost Notebook Part 2 [Paperback] [Jan 01, 2018] Andrews G E	10.15	965.77
+9788170162131	162.00	Yes	Dus Pratinidhi Kahaniyan : Upendranath Ashq	2.40	228.36
+9789380009230	140.00	Yes	Green Fairy - the Magic Swan and Other Stories	2.16	205.52
+9788188717125	123.00	Yes	Sarthak Shiksha Ki Bunavat	1.98	188.40
+9788189904340	380.00	Yes	Elements of Mining Technology Vol. 2	4.68	445.30
+9788190208673	380.00	Yes	Economic Analysis of Fertilizer Use for Major Crops ; Tamil Nadu [Hardcover] [Jan 01, 2006] Kayarkanni, S.	4.68	445.30
+9788189904357	380.00	Yes	Elements of Mining Technology Vol. 3	4.68	445.30
+9788189547288	700.00	Yes	Rural Technologies Changing Lives	8.04	765.01
+9788186270622	301.00	Yes	PHARMACEUTICAL MANAGEMENT	3.84	365.38
+9788120731394	130.00	Yes	Introduction To Educational Technology	2.04	194.11
+9798902313182	245.00	Yes	मेरे बाद भी (Hindi Edition)	3.24	308.29
+9789381438497	120.00	Yes	Oliver Twist (Immortal Illustrated Classics)	1.92	182.69
+9789388750127	600.00	Yes	Computer Applications In Business (B.Com.Hons)	6.96	662.24
+9780230525160	189.00	Yes	Case Book Series: King Lear	2.64	251.20
+9788122417548	189.00	Yes	Comprehensive Business Mathematics	2.64	251.20
+9788121923552	395.00	Yes	ISC Art of Effective English Writing	4.80	456.72
+9789351210238	224.00	Yes	Collection of Ghost Stories	3.00	285.45
+9780190135782	190.00	Yes	READING PORTAL PRINT_GRADE 6_THE WIZARD OF OZ	2.64	251.20
+9788120750890	190.00	Yes	Napoleon Hill's Magic Seeds for Success	2.64	251.20
+9788125939399	350.00	Yes	Data Structures And Object Oriented Programming With C++ [Anna]	4.32	411.05
+9789325968929	350.00	Yes	Mathematics-I (JNTU) [Paperback] [Jan 01, 2017] Bikas Chandra Bhui	4.32	411.05
+9788122430271	213.00	Yes	Textbook of Engineering Mathematics	2.88	274.03
+9789350000809	225.00	Yes	Karbala	3.00	285.45
+9788120777170	225.00	Yes	A Whole Summer Long	3.00	285.45
+9788122421200	225.00	Yes	Computer Programming (As per Anna University Syllabus)	3.00	285.45
+9788122440539	225.00	Yes	Object Oriented Programming with C++	3.00	285.45
+9788177000238	385.00	Yes	Course In Mechanical Measurements And Instrumentation, 1/E	4.68	445.30
+9788122417142	191.00	Yes	Small Worlds	2.64	251.20
+9789381714171	324.00	Yes	Pathology: With Cd Atlas To Normal And Pathological Images (Pb)	4.03	383.45
+9788171565146	226.00	Yes	Shakespeare's Julius Caesar	3.00	285.45
+9788187586203	2,601.00	Yes	Self, Society and Science: Theoretical and History Perspectives (History of Indian Science, Philosophy and Culture in Indian Civilization, Vol. XI, pt. 2)	27.96	2,660.39
+9788183631334	130.00	Yes	The Quick & Easy Way To Effective Speaking	1.99	189.35
+9788171854677	386.00	Yes	Kale Rahasya (Marathi Edition)	4.68	445.30
+9789391924034	95.00	Yes	Mental Maths - Mathematics Activity Book 2	1.62	154.14
+9789394668652	95.00	Yes	Mental Maths - Mathematics Activity Book 5 for class 5+, Age 9+ Years	1.62	154.14
+9789350338490	95.00	Yes	Jataka Tales (Illustrated) (Hindi)	1.62	154.14
+9789389643084	95.00	Yes	Hanuman (Hindi) (Illustrated)	1.62	154.14
+9789350339107	95.00	Yes	Panchatantra Tales (Illustrated) (Hindi)	1.62	154.14
+9789380828015	158.00	Yes	Computer Fundamental MS Office: Including Internet & Web Technology	2.28	216.94
+9788126913237	158.00	Yes	Wole Soyinka	2.28	216.94
+9788121219150	101.00	Yes	Gyan Publishing House The Birth and Evolution of the Soul	1.68	159.85
+9788188458424	320.00	Yes	Digital Signal Processing	3.96	376.79
+9789386561350	320.00	Yes	Class 5: Learning English for Smarter Life	3.96	376.79

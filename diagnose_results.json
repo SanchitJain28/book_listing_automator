@@ -1,0 +1,201 @@
+{
+  "results": {
+    "A. Does productType work?": [
+      {
+        "label": "no productType filter at all",
+        "selection": {
+          "rootCategory": 976389031
+        },
+        "total": 43800200,
+        "returned": 50
+      },
+      {
+        "label": "productType: 0   (integer, per docs)",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0
+        },
+        "total": 34931600,
+        "returned": 50
+      },
+      {
+        "label": "productType: [0] (array, your script)",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": [
+            0
+          ]
+        },
+        "total": 34931600,
+        "returned": 50
+      },
+      {
+        "label": "productType: 2   (EBOOK - should be small or 0)",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 2
+        },
+        "total": 8314800,
+        "returned": 50
+      }
+    ],
+    "B. Where do the 36M unclassified books live?": [
+      {
+        "label": "rootCategory: Books",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0
+        },
+        "total": 34931600,
+        "returned": 50
+      },
+      {
+        "label": "categories_include: Categories",
+        "selection": {
+          "categories_include": [
+            976390031
+          ],
+          "productType": 0
+        },
+        "total": 7479000,
+        "returned": 50
+      },
+      {
+        "label": "rootCategory Books, excl. Categories",
+        "selection": {
+          "rootCategory": 976389031,
+          "categories_exclude": [
+            976390031
+          ],
+          "productType": 0
+        },
+        "total": 27457400,
+        "returned": 50
+      }
+    ],
+    "C. What is the 6-month lastUpdate default hiding?": [
+      {
+        "label": "default (last 6 months only)",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0
+        },
+        "total": 34931600,
+        "returned": 50
+      },
+      {
+        "label": "lastUpdate_gte: 0 (all time)",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0,
+          "lastUpdate_gte": 0
+        },
+        "total": 45455000,
+        "returned": 50
+      }
+    ],
+    "D. Cost of requiring a live New offer": [
+      {
+        "label": "no offer requirement",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0,
+          "lastUpdate_gte": 0
+        },
+        "total": 45455000,
+        "returned": 50
+      },
+      {
+        "label": "current_NEW_gte: 1 (your script)",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0,
+          "lastUpdate_gte": 0,
+          "current_NEW_gte": 1
+        },
+        "total": 16204500,
+        "returned": 50
+      }
+    ],
+    "E. Does binding agree with productType?": [
+      {
+        "label": "physical bindings only",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "binding": [
+            "Paperback",
+            "Hardcover",
+            "Mass Market Paperback",
+            "Board book",
+            "Spiral-bound",
+            "Library Binding",
+            "Loose Leaf"
+          ]
+        },
+        "total": 42074100,
+        "returned": 50
+      },
+      {
+        "label": "exclude digital bindings",
+        "selection": {
+          "rootCategory": 976389031,
+          "lastUpdate_gte": 0,
+          "binding": [
+            "✜Kindle Edition",
+            "✜Audible Audiobook",
+            "✜Audio CD",
+            "✜MP3 CD"
+          ]
+        },
+        "total": 54560000,
+        "returned": 50
+      },
+      {
+        "label": "productType 0 AND physical bindings",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0,
+          "lastUpdate_gte": 0,
+          "binding": [
+            "Paperback",
+            "Hardcover",
+            "Mass Market Paperback",
+            "Board book",
+            "Spiral-bound",
+            "Library Binding",
+            "Loose Leaf"
+          ]
+        },
+        "total": 42074100,
+        "returned": 50
+      }
+    ],
+    "F. Does a sales rank exist? (what rank-slicing can reach)": [
+      {
+        "label": "all physical books",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0,
+          "lastUpdate_gte": 0
+        },
+        "total": 45455000,
+        "returned": 50
+      },
+      {
+        "label": "with any sales rank",
+        "selection": {
+          "rootCategory": 976389031,
+          "productType": 0,
+          "lastUpdate_gte": 0,
+          "current_SALES_gte": 1,
+          "current_SALES_lte": 20000000
+        },
+        "total": 1568400,
+        "returned": 50
+      }
+    ]
+  },
+  "tokensSpent": 176,
+  "lastTokensLeft": 1024
+}

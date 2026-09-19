@@ -1,0 +1,19 @@
+{
+  "domain": 10,
+  "rootId": 976389031,
+  "rootName": "Books",
+  "totalCategories": 35,
+  "leafCategories": 4,
+  "unreadableNodes": 0,
+  "maxDepth": 2,
+  "byDepth": {
+    "0": 1,
+    "1": 2,
+    "2": 32
+  },
+  "rootProductCount": 43804186,
+  "requestsMade": 7,
+  "tokensSpent": 7,
+  "lastTokensLeft": 1194,
+  "runMinutes": 0.03
+}
