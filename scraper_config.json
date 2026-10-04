@@ -1,0 +1,47 @@
+{
+  "marginRules": {
+    "minMarginBufferINR": 50,
+    "description": "If raw Amazon price > Compare Price, book qualifies if (Sell Price - raw Amazon Price) >= this value"
+  },
+  "deliveryRules": {
+    "maxDeliveryDays": 40,
+    "gracePeriodDays": 10,
+    "tiers": [
+      {
+        "name": "Tier 1",
+        "startDay": 11,
+        "endDay": 20,
+        "startPenalty": 3.0,
+        "dailyIncrement": 0.8
+      },
+      {
+        "name": "Tier 2",
+        "startDay": 21,
+        "endDay": 30,
+        "startPenalty": 5.0,
+        "dailyIncrement": 1.2
+      },
+      {
+        "name": "Tier 3",
+        "startDay": 31,
+        "endDay": 40,
+        "startPenalty": 7.5,
+        "dailyIncrement": 1.5
+      }
+    ]
+  },
+  "automation": {
+    "minPacingSecondsPerIsbn": 30,
+    "cartBatchLimit": 50,
+    "deliveryPincode": "122101",
+    "headless": false
+  },
+  "networkMonitor": {
+    "pollIntervalMs": 3000,
+    "primaryDnsHost": "google.com",
+    "secondaryDnsHost": "amazon.in",
+    "fallbackPingUrl": "https://1.1.1.1",
+    "pingTimeoutMs": 2000,
+    "maxSheetUpdateRetries": 3
+  }
+}

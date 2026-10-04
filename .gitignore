@@ -1,14 +1,40 @@
-/node_modules
-/dist
-node_modules
-/agapea_chrome_profile
-/cdl_chrome_profile
-/agapea_chrome_profile_2
-/formatted
-/output
-/chrome_profile
-/debug
-.env
+# Node / Build artifacts
+node_modules/
+/dist/
+package-lock.json
+
+# Chrome browser profiles & temp session data
+/agapea_chrome_profile/
+/cdl_chrome_profile/
+/agapea_chrome_profile_2/
+/chrome_profile/
+/amazon_cart_bot_profile/
+profiles/
+
+# Outputs & debug
+/formatted/
+/output/
+/debug/
 logs/
 *.log
-/amazon_cart_bot_profile
+
+# Environment & Sensitive Credentials
+.env
+.env.*
+credentials.json
+
+# Large CSV & Data Dumps
+books.csv
+books_used.csv
+books_used.csv.dedup
+books_used_sample.csv
+*.csv.dedup
+discovered_asins.txt
+
+# Checkpoint and Summary dumps
+.*_checkpoint*.json
+*.backup.json
+collect_summary.json
+collect_used_summary.json
+filtered_count.json
+.progress_website_*.json

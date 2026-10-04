@@ -143,25 +143,76 @@ async function main() {
   }
 
   const rawLines = fs.readFileSync(inputFile, "utf8").split("\n");
-  const urls = rawLines
-    .map((l) => l.trim())
-    .filter((l) => l && (l.startsWith("http://") || l.startsWith("https://")));
+  
+  // Helper to extract domain & URL from line
+  function parseLineToItem(rawLine) {
+    const l = rawLine.trim();
+    if (!l || l.toLowerCase() === "links" || l.toLowerCase() === "not found low price") return null;
 
-  if (urls.length === 0) {
-    console.log("❌ No valid URLs found in file.");
-    return;
+    if (l.startsWith("http://") || l.startsWith("https://")) {
+      try {
+        const u = new URL(l);
+        let host = u.hostname.replace(/^www\./, "").toLowerCase();
+        return { host, url: l, query: l };
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Classify text queries
+    const s = l.toLowerCase();
+    let host = "google.com";
+    if (s.includes("bestbookmart.com") || s.startsWith("best book mart")) host = "bestbookmart.com";
+    else if (s.includes("flipkart.com") || s.includes("flipkart")) host = "flipkart.com";
+    else if (s.includes("amazon.in") || s.includes("amazon.com") || s.includes("amazon.ca") || s.includes("amazon.co.uk") || s.includes("amazon.com.au") || s.includes("amazon")) host = "amazon.in";
+    else if (s.includes("abebooks.com") || s.includes("abebooks")) host = "abebooks.com";
+    else if (s.includes("sapnaonline.com") || s.includes("sapnaonline")) host = "sapnaonline.com";
+    else if (s.includes("jupiterbooks.in") || s.includes("jupiter books")) host = "jupiterbooks.in";
+    else if (s.includes("ebay.co.uk") || s.includes("ebay.com") || s.includes("ebay")) host = "ebay.com";
+    else if (s.includes("mypustak.com") || s.includes("mypustak")) host = "mypustak.com";
+    else if (s.includes("bookchor.com") || s.includes("bookchor")) host = "bookchor.com";
+    else if (s.includes("ahujabooks.com")) host = "ahujabooks.com";
+    else if (s.includes("medioks.com")) host = "medioks.com";
+    else if (s.includes("basi6direct.com")) host = "basi6direct.com";
+    else if (s.includes("ibpbooks.in")) host = "ibpbooks.in";
+    else if (s.includes("atithibooks.com")) host = "atithibooks.com";
+    else if (s.includes("collegebookstore.in")) host = "collegebookstore.in";
+    else if (s.includes("atlanticbooks.com")) host = "atlanticbooks.com";
+    else if (s.includes("pragationline.com")) host = "pragationline.com";
+    else if (s.includes("vikaspublishing.com")) host = "vikaspublishing.com";
+    else if (s.includes("retailmaharaj.com")) host = "retailmaharaj.com";
+    else if (s.includes("ajayonlinestall.com")) host = "ajayonlinestall.com";
+    else if (s.includes("prithvibooks.com")) host = "prithvibooks.com";
+    else if (s.includes("bharatiyabookcorporation.com")) host = "bharatiyabookcorporation.com";
+    else if (s.includes("booksbp.com")) host = "booksbp.com";
+    else if (s.includes("medtree.co.in") || s.includes("medtree")) host = "medtree.co.in";
+    else if (s.includes("jain book agency")) host = "jainbookagency.com";
+    else if (s.includes("webuybooks")) host = "webuybooks.co.uk";
+    else if (s.includes("jaypee brothers")) host = "jaypeebrothers.com";
+
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(l)}`;
+    return { host, url: searchUrl, query: l };
   }
 
-  // Group URLs by domain
+  // Group items by domain in order of appearance
   const rawDomainMap = {};
-  urls.forEach((urlStr) => {
-    try {
-      const u = new URL(urlStr);
-      let host = u.hostname.replace(/^www\./, "");
-      if (!rawDomainMap[host]) rawDomainMap[host] = [];
-      rawDomainMap[host].push(urlStr);
-    } catch (e) {}
+  const domainOrder = [];
+
+  rawLines.forEach((rawLine) => {
+    const item = parseLineToItem(rawLine);
+    if (!item) return;
+
+    if (!rawDomainMap[item.host]) {
+      rawDomainMap[item.host] = [];
+      domainOrder.push(item.host);
+    }
+    rawDomainMap[item.host].push(item.url);
   });
+
+  if (domainOrder.length === 0) {
+    console.log("❌ No valid URLs or queries found in file.");
+    return;
+  }
 
   // Exclude pattern parsing
   const excludePatterns = [];
@@ -289,20 +340,22 @@ async function main() {
   const notIncludedMap = {};
   const quantitySkippedMap = {};
 
-  Object.keys(rawDomainMap)
-    .sort((a, b) => a.localeCompare(b))
-    .forEach((d) => {
-      const linkCount = rawDomainMap[d].length;
-      if (includePatterns.length > 0 && !matchesInclude(d, includePatterns)) {
-        notIncludedMap[d] = rawDomainMap[d];
-      } else if (matchesExclude(d, excludePatterns)) {
-        excludedMap[d] = rawDomainMap[d];
-      } else if (quantityFilter && !quantityFilter.test(linkCount)) {
-        quantitySkippedMap[d] = rawDomainMap[d];
-      } else {
-        domainMap[d] = rawDomainMap[d];
-      }
-    });
+  // Sort order: if --sort=alpha sort alphabetically, otherwise preserve exact input file order
+  const isAlphaSort = args.includes("--sort=alpha") || args.includes("-sort=alpha");
+  const orderedDomainKeys = isAlphaSort ? [...domainOrder].sort((a, b) => a.localeCompare(b)) : domainOrder;
+
+  orderedDomainKeys.forEach((d) => {
+    const linkCount = rawDomainMap[d].length;
+    if (includePatterns.length > 0 && !matchesInclude(d, includePatterns)) {
+      notIncludedMap[d] = rawDomainMap[d];
+    } else if (matchesExclude(d, excludePatterns)) {
+      excludedMap[d] = rawDomainMap[d];
+    } else if (quantityFilter && !quantityFilter.test(linkCount)) {
+      quantitySkippedMap[d] = rawDomainMap[d];
+    } else {
+      domainMap[d] = rawDomainMap[d];
+    }
+  });
 
   const domains = Object.keys(domainMap);
   const excludedDomains = Object.keys(excludedMap);

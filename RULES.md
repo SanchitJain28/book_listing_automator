@@ -111,21 +111,36 @@ Was that 4 terms for Day 11, or should Day 12 include the 5th term `+20`? (Our p
 # ========================================================
 
 ## 1. Mandatory Filter Rules (Before Scoring)
-- **Rule 1 (Price Ceiling):** `itemPrice <= targetPrice` (Purely item price; `shippingFee` has 0 contribution). If exceeded -> Disqualified (`HIGH PRICE`).
-- **Rule 2 (Delivery Limit):** `deliveryDays <= 14 days`. If exceeded -> Disqualified (`DELIVERY DATE`).
+- **Rule 1 (Price Ceiling & Margin Buffer):**
+  - Path A (Standard): `itemPrice <= targetPrice`
+  - Path B (Margin Buffer): If `itemPrice > targetPrice`, eligible if `sellPrice - itemPrice >= ₹50` (using raw Amazon item price; configurable via `scraper_config.json`).
+  - If neither -> Disqualified (`HIGH PRICE`).
+- **Rule 2 (Delivery Limit):** `deliveryDays <= 40 days`. If exceeded -> Disqualified (`DELIVERY DATE`).
 - **Stock Check:** If out of stock -> Disqualified (`UNAVAILABLE`).
 - **ISBN Check:** If ISBN mismatch -> Disqualified (`ISBN NOT MATCHED`).
 
-## 2. Progressive Delivery Penalty Table
-- Days 1 to 7: **Rs 0 Penalty** (relative 7-day grace period for 14-day max window).
-- Days 8 to 14: Starts at **Rs 7.5** on Day 8, increasing by **+Rs 2.5** each progressive day:
-  - Day 8 (extra 1): Rs 7.5 -> Total Penalty = **Rs 7.5**
-  - Day 9 (extra 2): Rs 7.5 + Rs 10.0 -> Total Penalty = **Rs 17.5**
-  - Day 10 (extra 3): Rs 17.5 + Rs 12.5 -> Total Penalty = **Rs 30.0**
-  - Day 11 (extra 4): Rs 30.0 + Rs 15.0 -> Total Penalty = **Rs 45.0**
-  - Day 12 (extra 5): Rs 45.0 + Rs 17.5 -> Total Penalty = **Rs 62.5**
-  - Day 13 (extra 6): Rs 62.5 + Rs 20.0 -> Total Penalty = **Rs 82.5**
-  - Day 14 (extra 7): Rs 82.5 + Rs 22.5 -> Total Penalty = **Rs 105.0**
+## 2. Progressive Delivery Penalty Table (40-Day Window)
+- **Tier 0 (Days 1 to 10):** **₹0 Penalty** (10-day penalty-free grace period).
+- **Tier 1 (Days 11 to 20):** Starts at **₹3.0** on Day 11, adding **+₹0.8** each progressive day:
+  - Day 11: +₹3.0 -> Total = **₹3.0**
+  - Day 12: +₹3.8 -> Total = **₹6.8**
+  - Day 13: +₹4.6 -> Total = **₹11.4**
+  - Day 14: +₹5.4 -> Total = **₹16.8**
+  - Day 15: +₹6.2 -> Total = **₹23.0**
+  - Day 16: +₹7.0 -> Total = **₹30.0**
+  - Day 17: +₹7.8 -> Total = **₹37.8**
+  - Day 18: +₹8.6 -> Total = **₹46.4**
+  - Day 19: +₹9.4 -> Total = **₹55.8**
+  - Day 20: +₹10.2 -> Total = **₹66.0**
+- **Tier 2 (Days 21 to 30):** Starts at **₹5.0** on Day 21, adding **+₹1.2** each progressive day:
+  - Day 21: +₹5.0 -> Total = **₹71.0**
+  - Day 25: +₹9.8 -> Total = **₹103.0**
+  - Day 30: +₹15.8 -> Total = **₹170.0**
+- **Tier 3 (Days 31 to 40):** Starts at **₹7.5** on Day 31, adding **+₹1.5** each progressive day:
+  - Day 31: +₹7.5 -> Total = **₹177.5**
+  - Day 35: +₹13.5 -> Total = **₹222.5**
+  - Day 40: +₹21.0 -> Total = **₹312.5**
+- **Days > 40:** Disqualified (`DELIVERY DATE`).
 
 $$\text{Effective Price} = \text{itemPrice} + \text{Total Penalty}$$
 

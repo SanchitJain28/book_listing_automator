@@ -1,16 +1,21 @@
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
+const EventEmitter = require("node:events");
+const dns = require("node:dns/promises");
 const { chromium } = require("playwright-extra");
 const stealth = require("puppeteer-extra-plugin-stealth")();
+const { generateConfig } = require("./generate-sheet-config");
 
 chromium.use(stealth);
 
-// ---------------------------------------------------------
-// CONFIGURATION & CONSTANTS
-// ---------------------------------------------------------
 const USER_DATA_DIR = path.join(__dirname, "..", "amazon_cart_bot_profile");
-const DEFAULT_CSV_PATH = path.join(__dirname, "..", "test-files", "TEST_CSV.txt");
+const DEFAULT_CSV_PATH = path.join(
+  __dirname,
+  "..",
+  "test-files",
+  "TEST_CSV.txt",
+);
 const DEFAULT_ISBN_PATH = path.join(
   __dirname,
   "..",
@@ -27,9 +32,257 @@ if (!fs.existsSync(FEEDBACK_LOG_DIR)) {
   fs.mkdirSync(FEEDBACK_LOG_DIR, { recursive: true });
 }
 
-// ---------------------------------------------------------
-// CLI INPUT PROMPT HELPER
-// ---------------------------------------------------------
+// -------------------------------------------------------------
+// CENTRALIZED SCRAPER CONFIG LOADER (scraper_config.json)
+// -------------------------------------------------------------
+const DEFAULT_SCRAPER_CONFIG = {
+  marginRules: {
+    minMarginBufferINR: 50,
+  },
+  deliveryRules: {
+    maxDeliveryDays: 40,
+    gracePeriodDays: 10,
+    tiers: [
+      { name: "Tier 1", startDay: 11, endDay: 20, startPenalty: 3.0, dailyIncrement: 0.8 },
+      { name: "Tier 2", startDay: 21, endDay: 30, startPenalty: 5.0, dailyIncrement: 1.2 },
+      { name: "Tier 3", startDay: 31, endDay: 40, startPenalty: 7.5, dailyIncrement: 1.5 },
+    ],
+  },
+  automation: {
+    minPacingSecondsPerIsbn: 30,
+    cartBatchLimit: 50,
+    deliveryPincode: "122101",
+    headless: false,
+  },
+  networkMonitor: {
+    pollIntervalMs: 3000,
+    primaryDnsHost: "google.com",
+    secondaryDnsHost: "amazon.in",
+    fallbackPingUrl: "https://1.1.1.1",
+    pingTimeoutMs: 2000,
+    maxSheetUpdateRetries: 3,
+  },
+};
+
+function loadScraperConfig(customPath = null) {
+  const filePath =
+    customPath || path.join(__dirname, "..", "scraper_config.json");
+  if (!fs.existsSync(filePath)) {
+    return DEFAULT_SCRAPER_CONFIG;
+  }
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      marginRules: {
+        ...DEFAULT_SCRAPER_CONFIG.marginRules,
+        ...(parsed.marginRules || {}),
+      },
+      deliveryRules: {
+        ...DEFAULT_SCRAPER_CONFIG.deliveryRules,
+        ...(parsed.deliveryRules || {}),
+        tiers:
+          Array.isArray(parsed.deliveryRules?.tiers) &&
+          parsed.deliveryRules.tiers.length > 0
+            ? parsed.deliveryRules.tiers
+            : DEFAULT_SCRAPER_CONFIG.deliveryRules.tiers,
+      },
+      automation: {
+        ...DEFAULT_SCRAPER_CONFIG.automation,
+        ...(parsed.automation || {}),
+      },
+      networkMonitor: {
+        ...DEFAULT_SCRAPER_CONFIG.networkMonitor,
+        ...(parsed.networkMonitor || {}),
+      },
+    };
+  } catch (err) {
+    console.warn(
+      `⚠️ Could not parse scraper_config.json: ${err.message}. Using defaults.`,
+    );
+    return DEFAULT_SCRAPER_CONFIG;
+  }
+}
+
+const scraperConfig = loadScraperConfig();
+
+function isNetworkError(err) {
+  if (!err) return false;
+  const msg = (err.message || "").toLowerCase();
+  return (
+    msg.includes("net::err_") ||
+    msg.includes("enotfound") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("econnrefused") ||
+    msg.includes("eai_again") ||
+    msg.includes("network error") ||
+    msg.includes("internet disconnected") ||
+    msg.includes("name not resolved")
+  );
+}
+
+class NetworkMonitor extends EventEmitter {
+  constructor(pollIntervalMs = 3000, netConfig = {}) {
+    super();
+    this.pollIntervalMs = pollIntervalMs;
+    this.primaryDnsHost = netConfig.primaryDnsHost || "google.com";
+    this.secondaryDnsHost = netConfig.secondaryDnsHost || "amazon.in";
+    this.fallbackPingUrl = netConfig.fallbackPingUrl || "https://1.1.1.1";
+    this.pingTimeoutMs = netConfig.pingTimeoutMs || 2000;
+    this.isOnline = true;
+    this.pollTimer = null;
+    this.checking = false;
+  }
+
+  async check() {
+    try {
+      await dns.lookup(this.primaryDnsHost);
+      return true;
+    } catch {
+      try {
+        await dns.lookup(this.secondaryDnsHost);
+        return true;
+      } catch {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(
+            () => controller.abort(),
+            this.pingTimeoutMs,
+          );
+          await fetch(this.fallbackPingUrl, {
+            signal: controller.signal,
+            method: "HEAD",
+          });
+          clearTimeout(timeout);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    }
+  }
+
+  start() {
+    if (this.pollTimer) return;
+    this.pollTimer = setInterval(async () => {
+      if (this.checking) return;
+      this.checking = true;
+      try {
+        const online = await this.check();
+        if (!online && this.isOnline) {
+          this.isOnline = false;
+          this.emit("offline");
+          this.emit("internet-off");
+        } else if (online && !this.isOnline) {
+          this.isOnline = true;
+          this.emit("online");
+          this.emit("internet-on");
+        }
+      } finally {
+        this.checking = false;
+      }
+    }, this.pollIntervalMs);
+  }
+
+  stop() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  async waitUntilOnline(contextMessage = "Operation") {
+    const isNowOnline = await this.check();
+    if (isNowOnline) {
+      this.isOnline = true;
+      return true;
+    }
+
+    this.isOnline = false;
+    this.emit("offline");
+    this.emit("internet-off");
+    console.log(
+      `\n📡 \x1b[1;31m[NETWORK MONITOR] 🔴 INTERNET CONNECTION LOST!\x1b[0m`,
+    );
+    console.log(
+      `   ⏸️  Pausing ${contextMessage}... Waiting for internet to reconnect.`,
+    );
+    console.log(`   ⏳ Checking connectivity every 3 seconds...\n`);
+
+    while (true) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const restored = await this.check();
+      if (restored) {
+        this.isOnline = true;
+        this.emit("online");
+        this.emit("internet-on");
+        console.log(
+          `\n📡 \x1b[1;32m[NETWORK MONITOR] 🟢 INTERNET RESTORED!\x1b[0m`,
+        );
+        console.log(`   ▶️  Resuming operations seamlessly...\n`);
+        await new Promise((r) => setTimeout(r, 2000));
+        return true;
+      }
+    }
+  }
+}
+
+const networkMonitor = new NetworkMonitor(
+  scraperConfig.networkMonitor?.pollIntervalMs || 3000,
+  scraperConfig.networkMonitor,
+);
+networkMonitor.on("internet-off", () => {
+  console.log(
+    `\n📡 \x1b[1;31m[EVENT: internet-off] Network connection lost at ${new Date().toLocaleTimeString()}.\x1b[0m`,
+  );
+});
+networkMonitor.on("internet-on", () => {
+  console.log(
+    `\n📡 \x1b[1;32m[EVENT: internet-on] Network connection restored at ${new Date().toLocaleTimeString()}.\x1b[0m`,
+  );
+});
+networkMonitor.start();
+
+async function updateGoogleSheetCell(spreadsheetId, cellRange, value, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const credPath = path.join(__dirname, "..", "credentials.json");
+      if (!fs.existsSync(credPath)) return false;
+      const { google } = require("googleapis");
+      const auth = new google.auth.GoogleAuth({
+        keyFile: credPath,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      });
+      const sheets = google.sheets({ version: "v4", auth });
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: cellRange,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[value]],
+        },
+      });
+      console.log(`📝 Live Sheet Updated: Cell ${cellRange} -> "${value}"`);
+      return true;
+    } catch (err) {
+      if (isNetworkError(err) && attempt < maxRetries) {
+        console.warn(
+          `⚠️ Network drop during Google Sheet update (${cellRange}). Waiting for reconnection...`,
+        );
+        await networkMonitor.waitUntilOnline(`Google Sheet Cell Update (${cellRange})`);
+        continue;
+      }
+      console.error(
+        `⚠️ Could not update Google Sheet (${cellRange}):`,
+        err.message,
+      );
+      return false;
+    }
+  }
+  return false;
+}
+
 function ask(query) {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -43,9 +296,6 @@ function ask(query) {
   );
 }
 
-// ---------------------------------------------------------
-// ISBN CONVERSION & NORMALIZATION
-// ---------------------------------------------------------
 function isbn13To10(isbn13) {
   if (!isbn13 || typeof isbn13 !== "string") return null;
   const clean = isbn13.replace(/[^\dX]/gi, "");
@@ -60,9 +310,6 @@ function isbn13To10(isbn13) {
   return core + check;
 }
 
-// ---------------------------------------------------------
-// DELIVERY DATE PARSER (RULE 2: <= 14 DAYS)
-// ---------------------------------------------------------
 function parseDeliveryDays(deliveryText, referenceDate = new Date()) {
   if (!deliveryText || typeof deliveryText !== "string") {
     return { days: null, dateStr: "N/A", valid: false };
@@ -76,36 +323,47 @@ function parseDeliveryDays(deliveryText, referenceDate = new Date()) {
     return { days: 1, dateStr: "Tomorrow", valid: true };
   }
 
-  // Regex for "in X days" or "within X days"
-  const inDaysMatch = text.match(/(?:in|within)\s+(\d+)(?:\s+to\s+\d+)?\s+days?/i);
+  const inDaysMatch = text.match(
+    /(?:in|within)\s+(\d+)(?:\s+to\s+\d+)?\s+days?/i,
+  );
   if (inDaysMatch) {
     const d = parseInt(inDaysMatch[1], 10);
     return { days: d, dateStr: `${d} days`, valid: true };
   }
 
   const monthMap = {
-    jan: 0, january: 0,
-    feb: 1, february: 1,
-    mar: 2, march: 2,
-    apr: 3, april: 3,
+    jan: 0,
+    january: 0,
+    feb: 1,
+    february: 1,
+    mar: 2,
+    march: 2,
+    apr: 3,
+    april: 3,
     may: 4,
-    jun: 5, june: 5,
-    jul: 6, july: 6,
-    aug: 7, august: 7,
-    sep: 8, sept: 8, september: 8,
-    oct: 9, october: 9,
-    nov: 10, november: 10,
-    dec: 11, december: 11,
+    jun: 5,
+    june: 5,
+    jul: 6,
+    july: 6,
+    aug: 7,
+    august: 7,
+    sep: 8,
+    sept: 8,
+    september: 8,
+    oct: 9,
+    october: 9,
+    nov: 10,
+    november: 10,
+    dec: 11,
+    december: 11,
   };
 
   const monthsPattern =
     "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
 
-  // Pattern 1: Day followed by Month (e.g. "20 September", "20th Sept", "Sun, 20 Sep")
   const p1 = text.match(
     new RegExp(`(\\b\\d{1,2})(?:st|nd|rd|th)?\\s+(${monthsPattern})\\b`, "i"),
   );
-  // Pattern 2: Month followed by Day (e.g. "September 20", "Sept 20th")
   const p2 = text.match(
     new RegExp(`\\b(${monthsPattern})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "i"),
   );
@@ -126,7 +384,6 @@ function parseDeliveryDays(deliveryText, referenceDate = new Date()) {
     let year = referenceDate.getFullYear();
     let targetDate = new Date(year, month, day);
 
-    // If date is more than 180 days in past, assume next calendar year
     if (targetDate.getTime() - referenceDate.getTime() < -180 * 86400000) {
       targetDate.setFullYear(year + 1);
     }
@@ -145,9 +402,6 @@ function parseDeliveryDays(deliveryText, referenceDate = new Date()) {
   return { days: null, dateStr: deliveryText.trim(), valid: false };
 }
 
-// ---------------------------------------------------------
-// DATA PARSING (TEST_CSV.txt & TEST_INPUT_AMAZON_CART_SCRIPT.TXT)
-// ---------------------------------------------------------
 function loadTargetData(csvPath = DEFAULT_CSV_PATH) {
   const map = new Map();
   if (!fs.existsSync(csvPath)) return map;
@@ -205,15 +459,15 @@ function loadIsbnQueue(
   return isbns;
 }
 
-// ---------------------------------------------------------
-// BROWSER INITIALIZATION & PROFILE WARMING
-// ---------------------------------------------------------
-async function initAmazonBrowser() {
+async function initAmazonBrowser(config = scraperConfig) {
+  const isHeadless = config.automation?.headless ?? false;
+  const pincode = config.automation?.deliveryPincode || "122101";
+
   console.log("🌐 Launching Playwright browser with persistent profile...");
   console.log(`📁 Profile location: ${USER_DATA_DIR}`);
 
   const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
-    headless: false, // Visible for login and visual debugging
+    headless: isHeadless, // Config-driven
     viewport: { width: 1440, height: 900 },
     locale: "en-IN",
     timezoneId: "Asia/Kolkata",
@@ -240,29 +494,31 @@ async function initAmazonBrowser() {
     timeout: 45000,
   });
 
-  // Verify / Set delivery location to Gurgaon (122101) for accurate domestic shipping
+  // Verify / Set delivery location for accurate domestic shipping
   try {
     const currLoc = await page
       .textContent("#glow-ingress-line2", { timeout: 4000 })
       .catch(() => "");
-    if (!currLoc || !currLoc.includes("122101")) {
-      console.log("📍 Setting delivery pincode to 122101 (Gurugram)...");
+    if (!currLoc || !currLoc.includes(pincode)) {
+      console.log(`📍 Setting delivery pincode to ${pincode}...`);
       const btn = await page.$(
         "#nav-global-location-popover-link, #glow-ingress-block",
       );
       if (btn) {
-        await btn.click();
+        await btn.click({ timeout: 5000 }).catch(() => {});
         await page.waitForSelector("#GLUXZipUpdateInput", {
           state: "visible",
           timeout: 6000,
         });
-        await page.fill("#GLUXZipUpdateInput", "122101");
+        await page.fill("#GLUXZipUpdateInput", pincode);
         await page.waitForTimeout(400);
         await page.evaluate(() => {
           const apply =
             document.querySelector("#GLUXZipUpdate input[type='submit']") ||
             document.querySelector("#GLUXZipUpdate .a-button-input") ||
-            document.querySelector('[data-action="GLUXPostalInputAction"] input');
+            document.querySelector(
+              '[data-action="GLUXPostalInputAction"] input',
+            );
           if (apply) apply.click();
         });
         await page.waitForTimeout(2000);
@@ -278,9 +534,6 @@ async function initAmazonBrowser() {
   return { context, page };
 }
 
-// ---------------------------------------------------------
-// STEP 1 & 2: SEARCH FOR ISBN & PICK TOP NON-SPONSORED RESULT
-// ---------------------------------------------------------
 async function searchTopNonSponsoredBook(page, isbn) {
   const searchUrl = `https://www.amazon.in/s?k=${encodeURIComponent(isbn)}`;
   await page.goto(searchUrl, {
@@ -319,7 +572,10 @@ async function searchTopNonSponsoredBook(page, isbn) {
       const isSponsored =
         el.getAttribute("data-component-type") === "sp-sponsored-result" ||
         el.querySelector(".puis-sponsored-label-text") !== null ||
-        el.querySelector("span.a-color-secondary")?.innerText.toLowerCase().includes("sponsored") ||
+        el
+          .querySelector("span.a-color-secondary")
+          ?.innerText.toLowerCase()
+          .includes("sponsored") ||
         el.innerText.toLowerCase().includes("sponsored");
 
       if (isSponsored) continue;
@@ -354,9 +610,6 @@ async function searchTopNonSponsoredBook(page, isbn) {
   return topResult;
 }
 
-// ---------------------------------------------------------
-// STEP 3: VERIFY ISBN ON PRODUCT PAGE (RULE 5)
-// ---------------------------------------------------------
 async function checkProductPageIsbn(page, searchedIsbn) {
   const isbn10 = isbn13To10(searchedIsbn);
 
@@ -446,9 +699,6 @@ async function checkProductPageIsbn(page, searchedIsbn) {
   );
 }
 
-// ---------------------------------------------------------
-// STEP 4: OPEN SIDEBAR / ALL OFFERS DISPLAY (AOD)
-// ---------------------------------------------------------
 async function openAllOffersSidebar(page) {
   // Check if offers are already loaded
   const alreadyLoaded = await page.evaluate(() => {
@@ -569,9 +819,6 @@ async function openAllOffersSidebar(page) {
   return finalCount > 0;
 }
 
-// ---------------------------------------------------------
-// STEP 5: EXTRACT ALL OFFERS FROM SIDEBAR & BUYBOX
-// ---------------------------------------------------------
 async function extractAllOffers(page) {
   return await page.evaluate(() => {
     const offers = [];
@@ -601,7 +848,9 @@ async function extractAllOffers(page) {
       }
 
       // 3. Aria-label on the Add to Cart submit input button
-      const atcInput = container.querySelector("input[name='submit.addToCart']");
+      const atcInput = container.querySelector(
+        "input[name='submit.addToCart']",
+      );
       if (atcInput) {
         const aria = atcInput.getAttribute("aria-label") || "";
         const m = aria.match(/price\s*₹?\s*([\d,]+(?:\.\d+)?)/i);
@@ -728,7 +977,9 @@ async function extractAllOffers(page) {
 
     // 3. Fallback to Primary Buy Box on product page if no sidebar offers extracted
     if (offers.length === 0) {
-      const buybox = document.querySelector("#desktop_buybox, #qualifiedBuybox");
+      const buybox = document.querySelector(
+        "#desktop_buybox, #qualifiedBuybox",
+      );
       if (buybox) {
         const p = getPriceFromElement(buybox);
         const { deliveryText, shippingFee } = getDeliveryInfo(buybox);
@@ -769,25 +1020,55 @@ async function extractAllOffers(page) {
   });
 }
 
-// ---------------------------------------------------------
-// STEP 6: EVALUATE OFFERS AGAINST THE 5 RULES & SCORE SYSTEM
-// ---------------------------------------------------------
-function calculateDeliveryPenalty(deliveryDays, maxWindow = 14) {
-  const graceDays = Math.floor(maxWindow / 2); // 7 days grace period for 14d window
-  if (deliveryDays === null || deliveryDays === undefined || deliveryDays <= graceDays) {
-    return 0;
+function calculateDeliveryPenalty(
+  deliveryDays,
+  deliveryRules = scraperConfig.deliveryRules,
+) {
+  const graceDays = deliveryRules.gracePeriodDays ?? 10;
+  const maxWindow = deliveryRules.maxDeliveryDays ?? 40;
+
+  if (
+    deliveryDays === null ||
+    deliveryDays === undefined ||
+    deliveryDays <= graceDays
+  ) {
+    return 0; // Tier 0: Days 1-graceDays are 100% penalty-free
   }
-  const extraDays = deliveryDays - graceDays;
-  // Day 8 (extra 1): Rs 7.5
-  // Each progressive day adds +Rs 2.5 (7.5, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5)
+  if (deliveryDays > maxWindow) {
+    return 0; // Exceeded max window, handled by passRule2
+  }
+
   let totalPenalty = 0;
-  for (let i = 1; i <= extraDays; i++) {
-    totalPenalty += 7.5 + (i - 1) * 2.5;
+  const tiers = deliveryRules.tiers || [];
+
+  for (const tier of tiers) {
+    if (deliveryDays >= tier.startDay) {
+      const tierDays =
+        Math.min(deliveryDays, tier.endDay) - (tier.startDay - 1);
+      for (let i = 1; i <= tierDays; i++) {
+        totalPenalty += tier.startPenalty + (i - 1) * tier.dailyIncrement;
+      }
+    }
   }
-  return totalPenalty;
+
+  return parseFloat(totalPenalty.toFixed(1));
 }
 
-function evaluateOffers(rawOffers, targetPrice, isbnMatched, availabilityNotice = null) {
+function evaluateOffers(
+  rawOffers,
+  targetPrice,
+  isbnMatched,
+  availabilityNotice = null,
+  sellPrice = 0,
+  customConfig = null,
+) {
+  const activeConfig = customConfig || scraperConfig;
+  const minMarginBuffer =
+    activeConfig?.marginRules?.minMarginBufferINR ?? 50;
+  const deliveryRules =
+    activeConfig?.deliveryRules ?? DEFAULT_SCRAPER_CONFIG.deliveryRules;
+  const maxDeliveryDays = deliveryRules.maxDeliveryDays ?? 40;
+
   if (!isbnMatched) {
     return {
       status: "REJECTED",
@@ -813,18 +1094,25 @@ function evaluateOffers(rawOffers, targetPrice, isbnMatched, availabilityNotice 
   // 1. Evaluate Rule 1 & Rule 2 for each offer
   const evaluatedOffers = rawOffers.map((offer) => {
     const deliveryEval = parseDeliveryDays(offer.deliveryText);
-    const passRule1 = offer.itemPrice <= targetPrice; // Rule 1: Item Price <= given price (ignore shipping)
+    // Rule 1: Item Price <= given target price OR Margin (Sell Price - raw Item Price) >= minMarginBuffer
+    const margin = sellPrice > 0 ? (sellPrice - offer.itemPrice) : null;
+    const passStandardPrice = offer.itemPrice <= targetPrice;
+    const passMarginBuffer = margin !== null && margin >= minMarginBuffer;
+    const passRule1 = passStandardPrice || passMarginBuffer;
+
     const passRule2 =
       deliveryEval.valid && deliveryEval.days !== null
-        ? deliveryEval.days <= 14
-        : true; // Rule 2: Delivery <= 14 days (or valid default)
+        ? deliveryEval.days <= maxDeliveryDays
+        : true; // Rule 2: Delivery <= maxDeliveryDays (or valid default)
 
     let failureReason = null;
     if (!passRule1) failureReason = "HIGH PRICE";
     else if (!passRule2) failureReason = "DELIVERY DATE";
 
     const deliveryDays = deliveryEval.days;
-    const deliveryPenalty = passRule2 ? calculateDeliveryPenalty(deliveryDays, 14) : 0;
+    const deliveryPenalty = passRule2
+      ? calculateDeliveryPenalty(deliveryDays, deliveryRules)
+      : 0;
     const effectivePrice = offer.itemPrice + deliveryPenalty;
 
     return {
@@ -837,6 +1125,9 @@ function evaluateOffers(rawOffers, targetPrice, isbnMatched, availabilityNotice 
       passRule2,
       isQualified: passRule1 && passRule2,
       failureReason,
+      margin,
+      minMarginBuffer,
+      passedByMargin: !passStandardPrice && passMarginBuffer,
       score: 0,
     };
   });
@@ -846,7 +1137,9 @@ function evaluateOffers(rawOffers, targetPrice, isbnMatched, availabilityNotice 
 
   if (qualifiedOffers.length > 0) {
     // Find lowest effective price among qualified offers
-    const bestEffectivePrice = Math.min(...qualifiedOffers.map((o) => o.effectivePrice));
+    const bestEffectivePrice = Math.min(
+      ...qualifiedOffers.map((o) => o.effectivePrice),
+    );
 
     qualifiedOffers.forEach((o) => {
       // Relative cost-efficiency: best / current
@@ -870,8 +1163,14 @@ function evaluateOffers(rawOffers, targetPrice, isbnMatched, availabilityNotice 
         return a.itemPrice - b.itemPrice;
       }
       // Tie-breaker 2: Earliest delivery date (lowest deliveryDays)
-      const aDays = a.deliveryDays !== null && a.deliveryDays !== undefined ? a.deliveryDays : 999;
-      const bDays = b.deliveryDays !== null && b.deliveryDays !== undefined ? b.deliveryDays : 999;
+      const aDays =
+        a.deliveryDays !== null && a.deliveryDays !== undefined
+          ? a.deliveryDays
+          : 999;
+      const bDays =
+        b.deliveryDays !== null && b.deliveryDays !== undefined
+          ? b.deliveryDays
+          : 999;
       if (aDays !== bDays) {
         return aDays - bDays;
       }
@@ -915,13 +1214,12 @@ function evaluateOffers(rawOffers, targetPrice, isbnMatched, availabilityNotice 
   };
 }
 
-// ---------------------------------------------------------
-// STEP 7: ADD TO CART EXECUTION
-// ---------------------------------------------------------
 async function executeAddToCart(page, chosenOffer) {
   if (!chosenOffer) return false;
 
-  console.log(`\n🛒 Executing Add-to-Cart for chosen offer (${chosenOffer.source})...`);
+  console.log(
+    `\n🛒 Executing Add-to-Cart for chosen offer (${chosenOffer.source})...`,
+  );
 
   try {
     let clicked = false;
@@ -999,90 +1297,416 @@ async function executeAddToCart(page, chosenOffer) {
   }
 }
 
-// ---------------------------------------------------------
-// MAIN CONTROLLER & INTERACTIVE DEBUG LOOP
-// ---------------------------------------------------------
 async function main() {
-  console.log("================================================================");
+  console.log(
+    "================================================================",
+  );
   console.log("🚀 AMAZON AUTOMATED CART CONTROLLER & DEBUG SYSTEM");
-  console.log("   (Top Result • Sidebar AOD • Price & 14-Day Delivery Rules)");
-  console.log("================================================================\n");
+  console.log("   (Top Result • Sidebar AOD • Price & 40-Day Delivery Rules)");
+  console.log(
+    "================================================================\n",
+  );
 
-  const targetMap = loadTargetData();
-  const isbnQueue = loadIsbnQueue(DEFAULT_ISBN_PATH, targetMap);
+  const scraperConfigPath = path.join(__dirname, "..", "scraper_config.json");
+  const hasCustomConfig = fs.existsSync(scraperConfigPath);
+  console.log(
+    `⚙️  Loaded Scraper Config: ${hasCustomConfig ? "scraper_config.json" : "default values"}`
+  );
+  console.log(
+    `   • Min Margin Gap: ₹${scraperConfig.marginRules?.minMarginBufferINR || 50} (Sell - Amazon >= ₹${scraperConfig.marginRules?.minMarginBufferINR || 50})`
+  );
+  console.log(
+    `   • Delivery Window: Max ${scraperConfig.deliveryRules?.maxDeliveryDays || 40} days (Grace: ${scraperConfig.deliveryRules?.gracePeriodDays || 10} days penalty-free)`
+  );
+  console.log(
+    `   • Batch Size: ${scraperConfig.automation?.cartBatchLimit || 50} books | Pacing: ${scraperConfig.automation?.minPacingSecondsPerIsbn || 30}s per ISBN\n`
+  );
 
-  console.log(`📄 Loaded ${targetMap.size} reference items from TEST_CSV.txt`);
+  const configPath =
+    process.argv[2] && process.argv[2].endsWith(".json")
+      ? path.isAbsolute(process.argv[2])
+        ? process.argv[2]
+        : path.join(process.cwd(), process.argv[2])
+      : path.join(__dirname, "..", "sheet_config.json");
+
+  let sheetConfig = null;
+  let targetMap = new Map();
+  let isbnQueue = [];
+
+  if (fs.existsSync(configPath)) {
+    try {
+      sheetConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      console.log(
+        `📊 Loaded Google Sheet Config for tab "${sheetConfig.tabName}" (${sheetConfig.totalItems} items)`,
+      );
+      if (sheetConfig.whiteItemsCount !== undefined) {
+        console.log(
+          `   ⚪ White rows (Profitable & Exact ISBN): ${sheetConfig.whiteItemsCount} (queued 1st)`,
+        );
+        console.log(
+          `   🟡 Yellow rows (Profitable & Different edition): ${sheetConfig.yellowItemsCount} (queued 2nd)`,
+        );
+        if (sheetConfig.redItemsCount !== undefined) {
+          console.log(
+            `   🔴 Red rows (Accepted loss): ${sheetConfig.redItemsCount} (queued 3rd)`,
+          );
+        }
+      }
+      console.log(
+        `   📌 Reason column: Column ${sheetConfig.columns.reasonColLetter || "D"} ("${sheetConfig.columns.reasonName}")`,
+      );
+
+      for (const item of sheetConfig.items) {
+        targetMap.set(item.isbn, {
+          isbn: item.isbn,
+          targetPrice: item.targetPrice,
+          sellPrice: item.sellPrice || 0,
+          title: item.title,
+          group: item.group || "",
+          sheetRowNumber: item.sheetRowNumber,
+          status: item.status,
+          existingReason: item.existingReason,
+          rowColor: item.rowColor || "white",
+          matchType: item.matchType || "Exact ISBN",
+        });
+        isbnQueue.push(item.isbn);
+      }
+    } catch (e) {
+      console.warn(`Could not parse ${configPath}:`, e.message);
+    }
+  }
+
+  if (isbnQueue.length === 0) {
+    const customIsbnFile = process.argv[2]
+      ? path.isAbsolute(process.argv[2])
+        ? process.argv[2]
+        : path.join(process.cwd(), process.argv[2])
+      : DEFAULT_ISBN_PATH;
+
+    const customCsvFile = process.argv[3]
+      ? path.isAbsolute(process.argv[3])
+        ? process.argv[3]
+        : path.join(process.cwd(), process.argv[3])
+      : DEFAULT_CSV_PATH;
+
+    targetMap = loadTargetData(customCsvFile);
+    isbnQueue = loadIsbnQueue(customIsbnFile, targetMap);
+
+    console.log(
+      `📁 Input ISBN File: ${path.relative(process.cwd(), customIsbnFile)}`,
+    );
+    console.log(`📄 Loaded ${targetMap.size} reference items from target CSV`);
+  }
+
   console.log(`📋 Total ISBNs in queue: ${isbnQueue.length}\n`);
+
+  // Parse CLI flags like --cursor=2, --cursor 2, --batch=2, --auto, -a
+  let requestedCursor = null;
+  let isAutoMode = false;
+  for (let a = 2; a < process.argv.length; a++) {
+    const arg = process.argv[a];
+    if (arg === "--auto" || arg === "-a") {
+      isAutoMode = true;
+    } else if (arg.startsWith("--cursor=")) {
+      requestedCursor = arg.split("=")[1].trim();
+    } else if (arg === "--cursor" && process.argv[a + 1]) {
+      requestedCursor = process.argv[a + 1].trim();
+      a++;
+    } else if (arg.startsWith("--batch=")) {
+      requestedCursor = arg.split("=")[1].trim();
+    } else if (arg === "--batch" && process.argv[a + 1]) {
+      requestedCursor = process.argv[a + 1].trim();
+      a++;
+    }
+  }
+
+  if (isAutoMode) {
+    console.log(
+      "----------------------------------------------------------------",
+    );
+    console.log("\x1b[1;36m🤖 AUTO MODE ACTIVATED (--auto):\x1b[0m");
+    console.log("   • Hands-free: Automatically adds qualified offers to cart");
+    console.log(
+      "   • Automatic Google Sheet sync: Records rejection reasons to Column D",
+    );
+    console.log(
+      `   • ⏱️  Pacing Enforcement: Minimum ${scraperConfig.automation?.minPacingSecondsPerIsbn || 30}s per ISBN to avoid rate limits`,
+    );
+    console.log(
+      `   • 🛑 Pauses ONLY at ${scraperConfig.automation?.cartBatchLimit || 50}-item Amazon cart limit for checkout`,
+    );
+    console.log(
+      "----------------------------------------------------------------\n",
+    );
+  }
+
+  let cursorRow = null;
+  let cursorBatch = 0;
+  let defaultStartIndex = 0;
+
+  if (requestedCursor) {
+    console.log(
+      `🔍 Searching for requested cursor: "CURSOR - ${requestedCursor}"...`,
+    );
+    // First search in loaded sheetConfig
+    let matchedItem = sheetConfig?.items?.find((it) => {
+      if (!it.existingCursor) return false;
+      const c = it.existingCursor.toLowerCase();
+      return (
+        c === `cursor - ${requestedCursor}`.toLowerCase() ||
+        c === `cursor-${requestedCursor}`.toLowerCase() ||
+        c.includes(`cursor - ${requestedCursor}`) ||
+        c.endsWith(` ${requestedCursor}`)
+      );
+    });
+
+    // If not found locally in sheetConfig, refresh live from Google Sheet
+    if (!matchedItem && sheetConfig?.spreadsheetId && sheetConfig?.tabName) {
+      console.log(
+        `   🔄 Not found in local config. Checking live Google Sheet for "CURSOR - ${requestedCursor}"...`,
+      );
+      try {
+        const freshConfig = await generateConfig(
+          sheetConfig.spreadsheetId,
+          sheetConfig.tabName,
+        );
+        if (freshConfig) {
+          sheetConfig = freshConfig;
+          matchedItem = sheetConfig.items.find((it) => {
+            if (!it.existingCursor) return false;
+            const c = it.existingCursor.toLowerCase();
+            return (
+              c === `cursor - ${requestedCursor}`.toLowerCase() ||
+              c === `cursor-${requestedCursor}`.toLowerCase() ||
+              c.includes(`cursor - ${requestedCursor}`) ||
+              c.endsWith(` ${requestedCursor}`)
+            );
+          });
+        }
+      } catch (err) {
+        console.warn(
+          `   ⚠️ Could not refresh live Google Sheet: ${err.message}`,
+        );
+      }
+    }
+
+    if (matchedItem) {
+      cursorRow = matchedItem.sheetRowNumber;
+      cursorBatch = parseInt(requestedCursor, 10) || 1;
+      const foundIdx = isbnQueue.findIndex((isbn) => {
+        const info = targetMap.get(isbn);
+        return info && info.sheetRowNumber === cursorRow;
+      });
+      if (foundIdx !== -1) {
+        defaultStartIndex = foundIdx;
+        console.log(
+          `\x1b[1;32m🎯 Flag --cursor=${requestedCursor} matched successfully!\x1b[0m`,
+        );
+        console.log(
+          `   📍 Found "${matchedItem.existingCursor}" at Sheet Row #${cursorRow} (Queue Item ${foundIdx + 1}/${isbnQueue.length}, ISBN: ${matchedItem.isbn})`,
+        );
+        console.log(
+          `   📦 Starting Batch ${cursorBatch + 1} from Row #${cursorRow}\n`,
+        );
+      }
+    } else {
+      console.log(
+        `\x1b[1;33m⚠️ Could not find "CURSOR - ${requestedCursor}" in the Google Sheet.\x1b[0m`,
+      );
+      const available = sheetConfig?.items
+        ?.filter((it) => it.existingCursor)
+        ?.map((it) => `"${it.existingCursor}" at Row #${it.sheetRowNumber}`);
+      if (available && available.length > 0) {
+        console.log(
+          `   💡 Available cursors in sheet: ${available.join(", ")}`,
+        );
+      }
+    }
+  }
+
+  // If no specific cursor requested or not found, fall back to auto-detecting latestCursor
+  if (!cursorRow && sheetConfig?.latestCursor) {
+    cursorRow = sheetConfig.latestCursor.sheetRowNumber;
+    cursorBatch = sheetConfig.latestCursor.batchNumber || 0;
+    const foundIdx = isbnQueue.findIndex((isbn) => {
+      const info = targetMap.get(isbn);
+      return info && info.sheetRowNumber === cursorRow;
+    });
+    if (foundIdx !== -1) {
+      defaultStartIndex = foundIdx;
+      console.log(
+        `\x1b[1;32m🚩 Existing Cursor detected:\x1b[0m "${sheetConfig.latestCursor.cursorText}" at Sheet Row #${cursorRow} (Queue Item ${foundIdx + 1}/${isbnQueue.length})`,
+      );
+      console.log(
+        `   📦 Next Batch (Batch ${cursorBatch + 1}) will automatically start from Row #${cursorRow}\n`,
+      );
+    }
+  }
 
   const { context, page } = await initAmazonBrowser();
 
   // Command Menu loop
   let isRunning = true;
-  let currentIndex = 0;
+  let currentIndex = defaultStartIndex;
+  const CART_BATCH_LIMIT = scraperConfig.automation?.cartBatchLimit || 50;
+  let cartItemsThisBatch = 0;
+  let currentBatchNumber = cursorBatch + 1;
 
   while (isRunning) {
-    console.log("\n----------------------------------------------------------------");
+    console.log(
+      "\n----------------------------------------------------------------",
+    );
     console.log("📋 MAIN COMMAND MENU:");
-    console.log("   [START]       -> Begin processing ISBNs step-by-step");
+    if (defaultStartIndex > 0) {
+      console.log(
+        `   [START]       -> Begin processing from Cursor (Sheet Row #${cursorRow}, Item ${defaultStartIndex + 1})`,
+      );
+      console.log(
+        `   [RESET]       -> Start over from beginning of sheet (Row #13, Item 1)`,
+      );
+    } else {
+      console.log("   [START]       -> Begin processing ISBNs step-by-step");
+    }
     console.log("   [LOGIN]       -> Open Amazon for manual account sign-in");
-    console.log("   [GOTO <isbn>] -> Jump to a specific ISBN or index number");
+    console.log(
+      "   [GOTO <isbn>] -> Jump to a specific ISBN or Sheet Row number (e.g. GOTO 66)",
+    );
     console.log("   [QUIT]        -> Close browser and exit");
-    console.log("----------------------------------------------------------------");
+    console.log(
+      "----------------------------------------------------------------",
+    );
 
-    const cmd = (await ask("👉 Enter command [default: START]: ")).toUpperCase();
+    let cmd = "START";
+    if (!isAutoMode) {
+      cmd = (
+        await ask("👉 Enter command [default: START]: ")
+      ).toUpperCase();
+    } else {
+      console.log(
+        "⚡ [Auto Mode] Automatically starting processing in 2 seconds...",
+      );
+      await new Promise((r) => setTimeout(r, 2000));
+    }
 
     if (cmd === "QUIT" || cmd === "Q" || cmd === "EXIT") {
       console.log("👋 Exiting script. Goodbye!");
       break;
     }
 
+    if (cmd === "RESET") {
+      currentIndex = 0;
+      cartItemsThisBatch = 0;
+      currentBatchNumber = 1;
+      console.log("🔄 Reset queue to very beginning: Row #13 (Item 1).");
+      continue;
+    }
+
     if (cmd === "LOGIN" || cmd === "L") {
       console.log("\n🌐 Navigating to Amazon sign-in page...");
-      await page.goto("https://www.amazon.in/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.in%2F&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=inflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0", {
-        waitUntil: "domcontentloaded",
-      });
+      await page.goto(
+        "https://www.amazon.in/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.in%2F&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=inflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0",
+        {
+          waitUntil: "domcontentloaded",
+        },
+      );
       console.log("🛑 SCRIPT PAUSED FOR USER SIGN-IN.");
-      console.log("👉 Please complete your login inside the opened browser window.");
-      await ask("✅ When you are successfully logged in, press [ENTER] here to continue... ");
+      console.log(
+        "👉 Please complete your login inside the opened browser window.",
+      );
+      await ask(
+        "✅ When you are successfully logged in, press [ENTER] here to continue... ",
+      );
       continue;
     }
 
     if (cmd.startsWith("GOTO")) {
-      const targetParam = cmd.replace("GOTO", "").trim();
+      const targetParam = cmd.replace("GOTO", "").replace("#", "").trim();
       const num = parseInt(targetParam, 10);
-      if (!isNaN(num) && num >= 1 && num <= isbnQueue.length) {
+
+      // Check if num matches a sheetRowNumber
+      let foundIdx = -1;
+      if (!isNaN(num)) {
+        foundIdx = isbnQueue.findIndex((isbn) => {
+          const info = targetMap.get(isbn);
+          return info && info.sheetRowNumber === num;
+        });
+      }
+
+      if (foundIdx !== -1) {
+        currentIndex = foundIdx;
+        console.log(
+          `🎯 Jumped to Sheet Row #${num} (Queue Item ${currentIndex + 1}/${isbnQueue.length}, ISBN: ${isbnQueue[currentIndex]})`,
+        );
+      } else if (!isNaN(num) && num >= 1 && num <= isbnQueue.length) {
         currentIndex = num - 1;
-        console.log(`🎯 Jumped to index ${num} (ISBN: ${isbnQueue[currentIndex]})`);
+        console.log(
+          `🎯 Jumped to Queue Index ${num} (ISBN: ${isbnQueue[currentIndex]})`,
+        );
       } else {
-        const foundIdx = isbnQueue.findIndex((i) => i.includes(targetParam));
+        foundIdx = isbnQueue.findIndex((i) => i.includes(targetParam));
         if (foundIdx !== -1) {
           currentIndex = foundIdx;
-          console.log(`🎯 Jumped to index ${foundIdx + 1} (ISBN: ${isbnQueue[currentIndex]})`);
+          console.log(
+            `🎯 Jumped to ISBN match (Item ${currentIndex + 1}/${isbnQueue.length}, ISBN: ${isbnQueue[currentIndex]})`,
+          );
         } else {
-          console.log(`❌ Could not find matching ISBN or index for '${targetParam}'`);
+          console.log(
+            `❌ Could not find matching ISBN, Sheet Row number, or index for '${targetParam}'`,
+          );
         }
       }
     }
 
     // Process ISBNs loop
-    console.log("\n🚀 Starting Step-by-Step Interactive Execution...\n");
+    console.log(
+      `\n🚀 Starting Batch ${currentBatchNumber} (${cartItemsThisBatch}/${CART_BATCH_LIMIT} in cart so far)...\n`,
+    );
 
     for (let i = currentIndex; i < isbnQueue.length; i++) {
       currentIndex = i;
       const isbn = isbnQueue[i];
+
+      // Pre-flight check: ensure internet connectivity before starting ISBN
+      await networkMonitor.waitUntilOnline(`ISBN ${isbn} processing`);
+
+      const isbnStartTime = Date.now();
       const targetInfo = targetMap.get(isbn) || {
         isbn,
         targetPrice: 0,
         title: "N/A",
       };
 
-      console.log("================================================================");
+      const isRed =
+        targetInfo.rowColor === "red" ||
+        (targetInfo.group && targetInfo.group.toLowerCase().includes("loss"));
+      const isYellow =
+        !isRed &&
+        (targetInfo.rowColor === "yellow" ||
+          (targetInfo.matchType &&
+            targetInfo.matchType.toLowerCase().includes("different")));
+      const colorBadge = isRed
+        ? "\x1b[1;31m🔴 [RED - Accepted Loss]\x1b[0m"
+        : isYellow
+          ? "\x1b[1;33m🟡 [YELLOW - Different Edition]\x1b[0m"
+          : "\x1b[1;37m⚪ [WHITE - Exact ISBN]\x1b[0m";
+
       console.log(
-        `📖 [${i + 1}/${isbnQueue.length}] Processing ISBN: \x1b[1;36m${isbn}\x1b[0m`,
+        "================================================================",
       );
+      console.log(
+        `📖 [${i + 1}/${isbnQueue.length}] Processing ISBN: \x1b[1;36m${isbn}\x1b[0m | ${colorBadge}`,
+      );
+      if (targetInfo.sheetRowNumber) {
+        console.log(`📄 Google Sheet Row: #${targetInfo.sheetRowNumber}`);
+      }
       console.log(`📚 Expected Title: ${targetInfo.title}`);
-      console.log(`🎯 Target Ceiling Price: \x1b[1;32m₹${targetInfo.targetPrice.toFixed(2)}\x1b[0m`);
-      console.log("================================================================");
+      const minMarginBuffer = scraperConfig.marginRules?.minMarginBufferINR ?? 50;
+      console.log(
+        `🎯 Compare Price: \x1b[1;32m₹${targetInfo.targetPrice.toFixed(2)}\x1b[0m | 💵 Sell Price: \x1b[1;36m₹${(targetInfo.sellPrice || 0).toFixed(2)}\x1b[0m (Min Margin: ₹${minMarginBuffer})`,
+      );
+      console.log(
+        "================================================================",
+      );
 
       let stepResult = {
         isbn,
@@ -1097,7 +1721,9 @@ async function main() {
         const searchResult = await searchTopNonSponsoredBook(page, isbn);
 
         if (!searchResult.found) {
-          console.log(`❌ No non-sponsored search results found for ISBN ${isbn}.`);
+          console.log(
+            `❌ No non-sponsored search results found for ISBN ${isbn}.`,
+          );
           stepResult.status = "REJECTED";
           stepResult.reason = "UNAVAILABLE";
         } else {
@@ -1124,18 +1750,22 @@ async function main() {
           );
 
           // Step 5: Extract All Offers
-          const { offers: rawOffers, availabilityNotice } = await extractAllOffers(page);
-          console.log(`   📦 Extracted ${rawOffers.length} offer(s) from page.`);
+          const { offers: rawOffers, availabilityNotice } =
+            await extractAllOffers(page);
+          console.log(
+            `   📦 Extracted ${rawOffers.length} offer(s) from page.`,
+          );
           if (rawOffers.length === 0 && availabilityNotice) {
             console.log(`   ℹ️ Amazon Notice: "${availabilityNotice}"`);
           }
 
-          // Step 6: Evaluate Rules
+          // Step 6: Evaluate Rules with Sell Price Margin Buffer
           const evaluation = evaluateOffers(
             rawOffers,
             targetInfo.targetPrice,
             isbnCheck.matched,
             availabilityNotice,
+            targetInfo.sellPrice || 0,
           );
 
           stepResult = {
@@ -1157,13 +1787,22 @@ async function main() {
           } else {
             evaluation.evaluatedOffers.forEach((o, idx) => {
               const priceStr = `Item: ₹${o.itemPrice.toFixed(2)}`;
-              const penStr = o.isQualified && o.deliveryPenalty > 0 ? ` (+₹${o.deliveryPenalty.toFixed(1)} pen)` : "";
+              const penStr =
+                o.isQualified && o.deliveryPenalty > 0
+                  ? ` (+₹${o.deliveryPenalty.toFixed(1)} pen)`
+                  : "";
               const delStr = `${o.deliveryDateFormatted} (${o.deliveryDays !== null ? `${o.deliveryDays}d` : "N/A"})${penStr}`;
-              const effStr = o.isQualified ? `Eff: ₹${o.effectivePrice.toFixed(1)}` : "";
-              const scoreStr = o.isQualified ? `Score: ${o.score.toFixed(2)}` : "";
+              const effStr = o.isQualified
+                ? `Eff: ₹${o.effectivePrice.toFixed(1)}`
+                : "";
+              const scoreStr = o.isQualified
+                ? `Score: ${o.score.toFixed(2)}`
+                : "";
               const statStr = o.isQualified
-                ? `\x1b[32m✔ [${scoreStr} | ${effStr}]\x1b[0m`
-                : `\x1b[31m✖ ${o.failureReason}\x1b[0m`;
+                ? o.passedByMargin
+                  ? `\x1b[32m✔ [${scoreStr} | ${effStr} | Margin: ₹${o.margin?.toFixed(0)}]\x1b[0m`
+                  : `\x1b[32m✔ [${scoreStr} | ${effStr}]\x1b[0m`
+                : `\x1b[31m✖ ${o.failureReason}${o.margin !== null ? ` (Margin: ₹${o.margin.toFixed(0)})` : ""}\x1b[0m`;
 
               console.log(
                 `   [${idx + 1}] ${priceStr.padEnd(16)} | Del: ${delStr.padEnd(30)} | ${o.seller.slice(0, 18).padEnd(18)} | ${statStr}`,
@@ -1171,51 +1810,109 @@ async function main() {
             });
           }
 
-          console.log("\n----------------------------------------------------------------");
+          console.log(
+            "\n----------------------------------------------------------------",
+          );
           if (evaluation.status === "QUALIFIED" && evaluation.chosenOffer) {
             const best = evaluation.chosenOffer;
-            console.log(`🏆 \x1b[1;32mSELECTED BEST OFFER (HIGHEST SCORE):\x1b[0m`);
-            console.log(`   🏪 Seller:          ${best.seller} (${best.condition || "New"})`);
-            console.log(`   💰 Item Price:      ₹${best.itemPrice.toFixed(2)} (Given Price: ₹${targetInfo.targetPrice.toFixed(2)})`);
-            console.log(`   🚚 Delivery:        ${best.deliveryDateFormatted} (${best.deliveryDays} days) [Penalty: ₹${best.deliveryPenalty.toFixed(1)}]`);
-            console.log(`   🏷️  Effective Price: ₹${best.effectivePrice.toFixed(1)}`);
-            console.log(`   ⭐ Score:           ${best.score.toFixed(2)} / 1.00`);
+            console.log(
+              `🏆 \x1b[1;32mSELECTED BEST OFFER (HIGHEST SCORE):\x1b[0m`,
+            );
+            console.log(
+              `   🏪 Seller:          ${best.seller} (${best.condition || "New"})`,
+            );
+            console.log(
+              `   💰 Item Price:      ₹${best.itemPrice.toFixed(2)} (Compare Price: ₹${targetInfo.targetPrice.toFixed(2)})`,
+            );
+            if (best.passedByMargin) {
+              console.log(
+                `   📈 \x1b[1;33mQualified via Margin Buffer:\x1b[0m ₹${best.margin.toFixed(0)} margin (Sell ₹${targetInfo.sellPrice.toFixed(0)} - Item ₹${best.itemPrice.toFixed(0)} >= ₹${best.minMarginBuffer || 50})`,
+              );
+            }
+            console.log(
+              `   🚚 Delivery:        ${best.deliveryDateFormatted} (${best.deliveryDays} days) [Penalty: ₹${best.deliveryPenalty.toFixed(1)}]`,
+            );
+            console.log(
+              `   🏷️  Effective Price: ₹${best.effectivePrice.toFixed(1)}`,
+            );
+            console.log(
+              `   ⭐ Score:           ${best.score.toFixed(2)} / 1.00`,
+            );
             console.log(`   ✅ STATUS:          RECOMMENDED TO ADD TO CART`);
           } else {
             console.log(`🛑 \x1b[1;31mDO NOT ADD TO CART\x1b[0m`);
             console.log(`   ❌ REASON: \x1b[1;31m${evaluation.reason}\x1b[0m`);
           }
-          console.log("----------------------------------------------------------------\n");
+          console.log(
+            "----------------------------------------------------------------\n",
+          );
         }
       } catch (err) {
+        if (isNetworkError(err) || !(await networkMonitor.check())) {
+          console.warn(
+            `\n⚠️  \x1b[1;33m[NETWORK ERROR DETECTED]:\x1b[0m ${err.message}`,
+          );
+          console.log(
+            `   ⏸️  Pausing operations. Waiting for internet connection to recover...`,
+          );
+          await networkMonitor.waitUntilOnline(`Retry for ISBN ${isbn}`);
+          console.log(
+            `   🔄 Internet restored! Refreshing Amazon session and retrying ISBN ${isbn}...\n`,
+          );
+          await page
+            .goto("https://www.amazon.in/", {
+              waitUntil: "domcontentloaded",
+              timeout: 45000,
+            })
+            .catch(() => {});
+          i--; // Decrement index so the loop retries this EXACT ISBN
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+
         console.error(`❌ Error during processing: ${err.message}`);
         stepResult.status = "ERROR";
         stepResult.error = err.message;
       }
 
       // ---------------------------------------------------------
-      // TWO INTERACTIVE INPUT FIELDS (USER SPECIFIED)
+      // DECISION & ADD TO CART (AUTO OR MANUAL MODE)
       // ---------------------------------------------------------
-      const feedback = await ask(
-        "📝 [FIELD 1] FEEDBACK (Type what is wrong/notes, or press ENTER to skip): ",
-      );
+      let feedback = null;
+      let shouldAddToCart = false;
 
-      const defaultAdd = stepResult.status === "QUALIFIED" ? "YES" : "NO";
-      const addChoice = (
-        await ask(
-          `🛒 [FIELD 2] ADD TO CART? (YES / NO) [default: ${defaultAdd}]: `,
-        )
-      ).toUpperCase();
+      if (isAutoMode) {
+        shouldAddToCart = stepResult.status === "QUALIFIED";
+        console.log(
+          `🤖 [Auto Mode Decision]: ${
+            shouldAddToCart
+              ? "\x1b[1;32m✔ Auto-adding highest score offer to cart\x1b[0m"
+              : `\x1b[1;31m✖ Rejecting: ${stepResult.reason || "Not qualified"}\x1b[0m`
+          }`,
+        );
+      } else {
+        feedback = await ask(
+          "📝 [FIELD 1] FEEDBACK (Type what is wrong/notes, or press ENTER to skip): ",
+        );
 
-      const shouldAddToCart =
-        addChoice === "YES" ||
-        addChoice === "Y" ||
-        (addChoice === "" && defaultAdd === "YES");
+        const defaultAdd = stepResult.status === "QUALIFIED" ? "YES" : "NO";
+        const addChoice = (
+          await ask(
+            `🛒 [FIELD 2] ADD TO CART? (YES / NO) [default: ${defaultAdd}]: `,
+          )
+        ).toUpperCase();
+
+        shouldAddToCart =
+          addChoice === "YES" ||
+          addChoice === "Y" ||
+          (addChoice === "" && defaultAdd === "YES");
+      }
 
       stepResult.userFeedback = feedback || null;
       stepResult.userConfirmedAddToCart = shouldAddToCart;
 
       if (shouldAddToCart && stepResult.chosenOffer) {
+        await networkMonitor.waitUntilOnline(`Add to Cart for ISBN ${isbn}`);
         const added = await executeAddToCart(page, stepResult.chosenOffer);
         stepResult.cartAddedSuccess = added;
       } else {
@@ -1223,28 +1920,143 @@ async function main() {
         console.log(`⏭️  Skipping Add-to-Cart for this item.`);
       }
 
+      // Live Google Sheets Update for "NO WITH REASON"
+      if (sheetConfig && targetInfo.sheetRowNumber) {
+        const reasonCol = sheetConfig.columns?.reasonColLetter || "D";
+        const cellRange = `'${sheetConfig.tabName}'!${reasonCol}${targetInfo.sheetRowNumber}`;
+
+        if (stepResult.cartAddedSuccess) {
+          cartItemsThisBatch++;
+          console.log(
+            `✨ Added to cart successfully: "${sheetConfig.columns?.reasonName || "NO WITH REASON"}" column left empty.`,
+          );
+          console.log(
+            `🛒 Batch ${currentBatchNumber} Progress: \x1b[1;32m${cartItemsThisBatch}/${CART_BATCH_LIMIT}\x1b[0m books added to cart.`,
+          );
+        } else {
+          const reasonText =
+            stepResult.userFeedback || stepResult.reason || "Rejected";
+          console.log(
+            `📝 Updating Google Sheet: Writing "${reasonText}" to cell ${cellRange}...`,
+          );
+          await updateGoogleSheetCell(
+            sheetConfig.spreadsheetId,
+            cellRange,
+            reasonText,
+          );
+        }
+      }
+
       // Append record & feedback to log file
       fs.appendFileSync(FEEDBACK_LOG_FILE, JSON.stringify(stepResult) + "\n");
-      console.log(`💾 Feedback & decision logged to ${path.basename(FEEDBACK_LOG_FILE)}`);
+      console.log(
+        `💾 Feedback & decision logged to ${path.basename(FEEDBACK_LOG_FILE)}`,
+      );
 
-      // Action for next step
-      const nextAction = (
-        await ask(
-          "\n👉 Press [ENTER] for next ISBN, or type 'SKIP', 'RETRY', 'MENU', 'QUIT': ",
-        )
-      ).toUpperCase();
+      // Check if 50-book Amazon cart limit reached!
+      if (cartItemsThisBatch >= CART_BATCH_LIMIT) {
+        const nextIdx = i + 1;
+        const nextIsbn = nextIdx < isbnQueue.length ? isbnQueue[nextIdx] : null;
+        const nextTarget = nextIsbn ? targetMap.get(nextIsbn) : null;
+        const nextRowNumber = nextTarget ? nextTarget.sheetRowNumber : null;
+        const cursorCol = sheetConfig.columns?.cursorColLetter || "E";
+        const cursorTag = `CURSOR - ${currentBatchNumber}`;
 
-      if (nextAction === "QUIT" || nextAction === "Q") {
-        isRunning = false;
-        break;
-      } else if (nextAction === "RETRY" || nextAction === "R") {
-        i--; // Repeat same item
-      } else if (nextAction === "MENU" || nextAction === "M") {
-        break; // Return to main command loop
+        console.log(
+          "\n================================================================",
+        );
+        console.log(
+          `🛑 \x1b[1;33mAMAZON CART LIMIT REACHED: 50/50 BOOKS ADDED (BATCH ${currentBatchNumber} COMPLETE)!\x1b[0m`,
+        );
+        console.log(
+          "================================================================",
+        );
+
+        if (nextRowNumber && sheetConfig) {
+          const cursorCell = `'${sheetConfig.tabName}'!${cursorCol}${nextRowNumber}`;
+          console.log(
+            `📝 Writing Cursor to Google Sheet: Cell ${cursorCell} -> "${cursorTag}"...`,
+          );
+          await updateGoogleSheetCell(
+            sheetConfig.spreadsheetId,
+            cursorCell,
+            cursorTag,
+          );
+          console.log(
+            `📍 Cursor successfully written to Row #${nextRowNumber} for Batch ${currentBatchNumber + 1}!`,
+          );
+        }
+
+        console.log(
+          "\n🛒 Your Amazon Cart now contains 50 items (maximum capacity).",
+        );
+        console.log(
+          "👉 Please go to your open Amazon browser tab, place the order / checkout, and empty your cart.",
+        );
+        console.log(
+          "================================================================\n",
+        );
+
+        const batchAction = (
+          await ask(
+            `👉 When cart is empty and you are ready for Batch ${currentBatchNumber + 1}, press [ENTER] (or type 'QUIT' to exit): `,
+          )
+        ).toUpperCase();
+
+        if (batchAction === "QUIT" || batchAction === "Q") {
+          isRunning = false;
+          break;
+        }
+
+        cartItemsThisBatch = 0;
+        currentBatchNumber++;
+        console.log(
+          `\n🚀 Starting Batch ${currentBatchNumber} from Row #${nextRowNumber || "next"}...\n`,
+        );
+        continue;
+      }
+
+      // ---------------------------------------------------------
+      // AUTO MODE PACING (>= 30 SECONDS PER ISBN) OR MANUAL PROMPT
+      // ---------------------------------------------------------
+      if (isAutoMode) {
+        const elapsedMs = Date.now() - isbnStartTime;
+        const pacingSeconds =
+          scraperConfig.automation?.minPacingSecondsPerIsbn || 30;
+        const minPacingMs = pacingSeconds * 1000;
+        if (elapsedMs < minPacingMs) {
+          const remainingMs = minPacingMs - elapsedMs;
+          const remainingSec = (remainingMs / 1000).toFixed(1);
+          console.log(
+            `\n⏱️  [Auto Pacing] ISBN completed in ${(elapsedMs / 1000).toFixed(1)}s. Waiting ${remainingSec}s to complete ${pacingSeconds}s rate-limit window...`,
+          );
+          await new Promise((r) => setTimeout(r, remainingMs));
+        } else {
+          console.log(
+            `\n⏱️  [Auto Pacing] ISBN took ${(elapsedMs / 1000).toFixed(1)}s (>= ${pacingSeconds}s threshold). Proceeding directly to next ISBN...`,
+          );
+        }
+      } else {
+        // Action for next step in manual mode
+        const nextAction = (
+          await ask(
+            "\n👉 Press [ENTER] for next ISBN, or type 'SKIP', 'RETRY', 'MENU', 'QUIT': ",
+          )
+        ).toUpperCase();
+
+        if (nextAction === "QUIT" || nextAction === "Q") {
+          isRunning = false;
+          break;
+        } else if (nextAction === "RETRY" || nextAction === "R") {
+          i--; // Repeat same item
+        } else if (nextAction === "MENU" || nextAction === "M") {
+          break; // Return to main command loop
+        }
       }
     }
   }
 
+  networkMonitor.stop();
   await context.close();
   console.log("\n🎉 Session ended cleanly. All data preserved in profile.");
 }
