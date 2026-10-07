@@ -9,7 +9,36 @@ const { generateConfig } = require("./generate-sheet-config");
 
 chromium.use(stealth);
 
-const USER_DATA_DIR = path.join(__dirname, "..", "amazon_cart_bot_profile");
+let USER_DATA_DIR = path.join(__dirname, "..", "amazon_cart_bot_profile");
+let ACTIVE_PROFILE_NAME = "Profile 1";
+
+function resolveProfileDir(profileArg) {
+  if (!profileArg || profileArg === "1" || profileArg === "default") {
+    return {
+      name: "Profile 1",
+      dir: path.join(__dirname, "..", "amazon_cart_bot_profile"),
+    };
+  }
+  if (profileArg === "2") {
+    return {
+      name: "Profile 2",
+      dir: path.join(__dirname, "..", "amazon_cart_bot_profile_2"),
+    };
+  }
+  if (/^\d+$/.test(profileArg)) {
+    return {
+      name: `Profile ${profileArg}`,
+      dir: path.join(__dirname, "..", `amazon_cart_bot_profile_${profileArg}`),
+    };
+  }
+  const dirPath = path.isAbsolute(profileArg)
+    ? profileArg
+    : path.join(__dirname, "..", profileArg);
+  return {
+    name: path.basename(dirPath),
+    dir: dirPath,
+  };
+}
 const DEFAULT_CSV_PATH = path.join(
   __dirname,
   "..",
@@ -37,15 +66,15 @@ if (!fs.existsSync(FEEDBACK_LOG_DIR)) {
 // -------------------------------------------------------------
 const DEFAULT_SCRAPER_CONFIG = {
   marginRules: {
-    minMarginBufferINR: 50,
+    minMarginBufferINR: 1,
   },
   deliveryRules: {
-    maxDeliveryDays: 40,
-    gracePeriodDays: 10,
+    maxDeliveryDays: 60,
+    gracePeriodDays: 15,
     tiers: [
-      { name: "Tier 1", startDay: 11, endDay: 20, startPenalty: 3.0, dailyIncrement: 0.8 },
-      { name: "Tier 2", startDay: 21, endDay: 30, startPenalty: 5.0, dailyIncrement: 1.2 },
-      { name: "Tier 3", startDay: 31, endDay: 40, startPenalty: 7.5, dailyIncrement: 1.5 },
+      { name: "Tier 1", startDay: 16, endDay: 30, startPenalty: 3.0, dailyIncrement: 0.8 },
+      { name: "Tier 2", startDay: 31, endDay: 45, startPenalty: 5.0, dailyIncrement: 1.2 },
+      { name: "Tier 3", startDay: 46, endDay: 60, startPenalty: 7.5, dailyIncrement: 1.5 },
     ],
   },
   automation: {
@@ -459,12 +488,15 @@ function loadIsbnQueue(
   return isbns;
 }
 
-async function initAmazonBrowser(config = scraperConfig) {
-  const isHeadless = config.automation?.headless ?? false;
+async function initAmazonBrowser(config = scraperConfig, forceHeadless = null) {
+  const isHeadless =
+    forceHeadless !== null ? forceHeadless : (config.automation?.headless ?? false);
   const pincode = config.automation?.deliveryPincode || "122101";
 
-  console.log("🌐 Launching Playwright browser with persistent profile...");
-  console.log(`📁 Profile location: ${USER_DATA_DIR}`);
+  console.log(
+    `🌐 Launching Playwright browser with persistent profile [\x1b[1;33m${ACTIVE_PROFILE_NAME}\x1b[0m]...`,
+  );
+  console.log(`📁 Profile directory: ${USER_DATA_DIR}`);
 
   const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
     headless: isHeadless, // Config-driven
@@ -529,6 +561,26 @@ async function initAmazonBrowser(config = scraperConfig) {
     }
   } catch (e) {
     console.log(`⚠️ Note on location setup: ${e.message}`);
+  }
+
+  // Verify account sign-in status on active profile
+  try {
+    const greetingText = await page
+      .textContent("#nav-link-accountList-nav-line-1", { timeout: 4000 })
+      .catch(() => "");
+    const isLoggedIn =
+      greetingText && !greetingText.toLowerCase().includes("sign in");
+    if (isLoggedIn) {
+      console.log(
+        `👤 Signed in on [\x1b[1;33m${ACTIVE_PROFILE_NAME}\x1b[0m]: \x1b[1;32m${greetingText.trim()}\x1b[0m`,
+      );
+    } else {
+      console.log(
+        `⚠️  [\x1b[1;33m${ACTIVE_PROFILE_NAME}\x1b[0m] Not signed in ("${greetingText ? greetingText.trim() : "Sign in needed"}").`,
+      );
+    }
+  } catch (e) {
+    // Non-blocking greeting check
   }
 
   return { context, page };
@@ -1024,8 +1076,8 @@ function calculateDeliveryPenalty(
   deliveryDays,
   deliveryRules = scraperConfig.deliveryRules,
 ) {
-  const graceDays = deliveryRules.gracePeriodDays ?? 10;
-  const maxWindow = deliveryRules.maxDeliveryDays ?? 40;
+  const graceDays = deliveryRules.gracePeriodDays ?? 15;
+  const maxWindow = deliveryRules.maxDeliveryDays ?? 60;
 
   if (
     deliveryDays === null ||
@@ -1064,10 +1116,10 @@ function evaluateOffers(
 ) {
   const activeConfig = customConfig || scraperConfig;
   const minMarginBuffer =
-    activeConfig?.marginRules?.minMarginBufferINR ?? 50;
+    activeConfig?.marginRules?.minMarginBufferINR ?? 1;
   const deliveryRules =
     activeConfig?.deliveryRules ?? DEFAULT_SCRAPER_CONFIG.deliveryRules;
-  const maxDeliveryDays = deliveryRules.maxDeliveryDays ?? 40;
+  const maxDeliveryDays = deliveryRules.maxDeliveryDays ?? 60;
 
   if (!isbnMatched) {
     return {
@@ -1302,7 +1354,7 @@ async function main() {
     "================================================================",
   );
   console.log("🚀 AMAZON AUTOMATED CART CONTROLLER & DEBUG SYSTEM");
-  console.log("   (Top Result • Sidebar AOD • Price & 40-Day Delivery Rules)");
+  console.log("   (Top Result • Sidebar AOD • Price & 60-Day Delivery Rules)");
   console.log(
     "================================================================\n",
   );
@@ -1313,21 +1365,183 @@ async function main() {
     `⚙️  Loaded Scraper Config: ${hasCustomConfig ? "scraper_config.json" : "default values"}`
   );
   console.log(
-    `   • Min Margin Gap: ₹${scraperConfig.marginRules?.minMarginBufferINR || 50} (Sell - Amazon >= ₹${scraperConfig.marginRules?.minMarginBufferINR || 50})`
+    `   • Min Margin Gap: ₹${scraperConfig.marginRules?.minMarginBufferINR ?? 1} (Sell - Amazon >= ₹${scraperConfig.marginRules?.minMarginBufferINR ?? 1})`
   );
   console.log(
-    `   • Delivery Window: Max ${scraperConfig.deliveryRules?.maxDeliveryDays || 40} days (Grace: ${scraperConfig.deliveryRules?.gracePeriodDays || 10} days penalty-free)`
+    `   • Delivery Window: Max ${scraperConfig.deliveryRules?.maxDeliveryDays || 60} days (Grace: ${scraperConfig.deliveryRules?.gracePeriodDays || 15} days penalty-free)`
   );
   console.log(
     `   • Batch Size: ${scraperConfig.automation?.cartBatchLimit || 50} books | Pacing: ${scraperConfig.automation?.minPacingSecondsPerIsbn || 30}s per ISBN\n`
   );
 
-  const configPath =
-    process.argv[2] && process.argv[2].endsWith(".json")
-      ? path.isAbsolute(process.argv[2])
-        ? process.argv[2]
-        : path.join(process.cwd(), process.argv[2])
-      : path.join(__dirname, "..", "sheet_config.json");
+  // Parse CLI flags like --tab=PREP_1_5TH_OCT_LESSTHEN3, --cursor=2, --batch=2, --auto, -a, --profile=2, --login, or a .json file
+  let requestedTab = null;
+  let requestedConfigFile = null;
+  let requestedCursor = null;
+  let isAutoMode = false;
+  let requestedProfile = "1";
+  let isLoginMode = false;
+
+  for (let a = 2; a < process.argv.length; a++) {
+    const arg = process.argv[a];
+    if (arg === "--auto" || arg === "-a") {
+      isAutoMode = true;
+    } else if (arg.startsWith("--profile=")) {
+      requestedProfile = arg.split("=")[1].trim();
+    } else if (arg === "--profile" && process.argv[a + 1]) {
+      requestedProfile = process.argv[a + 1].trim();
+      a++;
+    } else if (arg === "--login") {
+      isLoginMode = true;
+    } else if (arg.startsWith("--tab=")) {
+      requestedTab = arg.split("=")[1].trim();
+    } else if (arg === "--tab" && process.argv[a + 1]) {
+      requestedTab = process.argv[a + 1].trim();
+      a++;
+    } else if (arg.startsWith("--config=")) {
+      requestedConfigFile = arg.split("=")[1].trim();
+    } else if (arg === "--config" && process.argv[a + 1]) {
+      requestedConfigFile = process.argv[a + 1].trim();
+      a++;
+    } else if (arg.endsWith(".json")) {
+      requestedConfigFile = arg.trim();
+    } else if (arg.startsWith("--cursor=")) {
+      requestedCursor = arg.split("=")[1].trim();
+    } else if (arg === "--cursor" && process.argv[a + 1]) {
+      requestedCursor = process.argv[a + 1].trim();
+      a++;
+    } else if (arg.startsWith("--batch=")) {
+      requestedCursor = arg.split("=")[1].trim();
+    } else if (arg === "--batch" && process.argv[a + 1]) {
+      requestedCursor = process.argv[a + 1].trim();
+      a++;
+    }
+  }
+
+  const resolvedProfile = resolveProfileDir(requestedProfile);
+  USER_DATA_DIR = resolvedProfile.dir;
+  ACTIVE_PROFILE_NAME = resolvedProfile.name;
+
+  if (!fs.existsSync(USER_DATA_DIR)) {
+    fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+    console.log(`📁 Initialized profile directory: ${USER_DATA_DIR}`);
+  }
+
+  console.log(
+    `👤 Active Browser Profile: \x1b[1;33m${ACTIVE_PROFILE_NAME}\x1b[0m (${path.basename(USER_DATA_DIR)})\n`,
+  );
+
+  // Dedicated login mode handler
+  if (isLoginMode) {
+    console.log(
+      "================================================================",
+    );
+    console.log(`🔑 AMAZON LOGIN MODE: [\x1b[1;33m${ACTIVE_PROFILE_NAME}\x1b[0m]`);
+    console.log(
+      "================================================================",
+    );
+    console.log(`📁 Profile directory: ${USER_DATA_DIR}`);
+    console.log("🌐 Launching browser for sign-in...\n");
+
+    const { context, page } = await initAmazonBrowser(scraperConfig, false);
+
+    console.log("🌐 Navigating to Amazon sign-in page...");
+    await page
+      .goto(
+        "https://www.amazon.in/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.in%2F&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=inflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0",
+        { waitUntil: "domcontentloaded" },
+      )
+      .catch(() => {});
+
+    console.log(
+      "\n👉 Please sign in to your Amazon account in the opened browser window.",
+    );
+    console.log("   (Enter email, password, and OTP if prompted)");
+    await ask(
+      "\n✅ Once you are successfully logged in and see Amazon homepage, press [ENTER] here: ",
+    );
+
+    const greeting = await page
+      .textContent("#nav-link-accountList-nav-line-1", { timeout: 4000 })
+      .catch(() => "");
+    if (greeting && !greeting.toLowerCase().includes("sign in")) {
+      console.log(
+        `\n🎉 Success! Logged in as: \x1b[1;32m"${greeting.trim()}"\x1b[0m on ${ACTIVE_PROFILE_NAME}.`,
+      );
+    } else {
+      console.log(`\n✅ Session data saved for ${ACTIVE_PROFILE_NAME}.`);
+    }
+
+    await context.close();
+    console.log(
+      `👋 Browser closed cleanly. ${ACTIVE_PROFILE_NAME} is saved and ready for automation!`,
+    );
+    console.log(`👉 You can now run automation on this profile with:`);
+    console.log(
+      `   node scripts/amazon-cart-automator.js --profile=${requestedProfile || "2"} --tab=<TAB_NAME> --auto\n`,
+    );
+    process.exit(0);
+  }
+
+  if (isAutoMode) {
+    console.log(
+      "----------------------------------------------------------------",
+    );
+    console.log("\x1b[1;36m🤖 AUTO MODE ACTIVATED (--auto):\x1b[0m");
+    console.log("   • Hands-free: Automatically adds qualified offers to cart");
+    console.log(
+      "   • Automatic Google Sheet sync: Records rejection reasons to Google Sheet",
+    );
+    console.log(
+      `   • ⏱️  Pacing Enforcement: Minimum ${scraperConfig.automation?.minPacingSecondsPerIsbn || 30}s per ISBN to avoid rate limits`,
+    );
+    console.log(
+      `   • 🛑 Pauses ONLY at ${scraperConfig.automation?.cartBatchLimit || 50}-item Amazon cart limit for checkout`,
+    );
+    console.log(
+      "----------------------------------------------------------------\n",
+    );
+  }
+
+  // Determine configPath
+  let configPath = null;
+  if (requestedConfigFile) {
+    configPath = path.isAbsolute(requestedConfigFile)
+      ? requestedConfigFile
+      : path.join(process.cwd(), requestedConfigFile);
+  } else if (requestedTab) {
+    const safeTabName = requestedTab.replace(/[/\\?%*:|"<>]/g, "_").trim();
+    const candidatePath = path.join(
+      __dirname,
+      "..",
+      "sheet_configs",
+      `${safeTabName}.json`,
+    );
+    if (fs.existsSync(candidatePath)) {
+      configPath = candidatePath;
+    } else {
+      console.log(
+        `📥 Tab config "${requestedTab}" not found in sheet_configs/. Generating from Google Sheet...`,
+      );
+      try {
+        const { generateConfig } = require("./generate-sheet-config");
+        const defaultSpreadsheetId =
+          "1jNGgr6d5mOZzHTpHiVlEyVBSACBdwL81VYNcUrSSOZY";
+        await generateConfig(defaultSpreadsheetId, requestedTab);
+        configPath = candidatePath;
+      } catch (err) {
+        console.warn(
+          `⚠️ Could not auto-generate config for tab "${requestedTab}":`,
+          err.message,
+        );
+      }
+    }
+  }
+
+  if (!configPath || !fs.existsSync(configPath)) {
+    // Default fallback to active sheet_config.json
+    configPath = path.join(__dirname, "..", "sheet_config.json");
+  }
 
   let sheetConfig = null;
   let targetMap = new Map();
@@ -1339,6 +1553,7 @@ async function main() {
       console.log(
         `📊 Loaded Google Sheet Config for tab "${sheetConfig.tabName}" (${sheetConfig.totalItems} items)`,
       );
+      console.log(`   📁 Config file: ${path.relative(process.cwd(), configPath)}`);
       if (sheetConfig.whiteItemsCount !== undefined) {
         console.log(
           `   ⚪ White rows (Profitable & Exact ISBN): ${sheetConfig.whiteItemsCount} (queued 1st)`,
@@ -1353,7 +1568,10 @@ async function main() {
         }
       }
       console.log(
-        `   📌 Reason column: Column ${sheetConfig.columns.reasonColLetter || "D"} ("${sheetConfig.columns.reasonName}")`,
+        `   📌 Reason column: Column ${sheetConfig.columns?.reasonColLetter || "D"} ("${sheetConfig.columns?.reasonName}")`,
+      );
+      console.log(
+        `   📍 Cursor column: Column ${sheetConfig.columns?.cursorColLetter || "C"} ("${sheetConfig.columns?.cursorName}")`,
       );
 
       for (const item of sheetConfig.items) {
@@ -1399,46 +1617,6 @@ async function main() {
   }
 
   console.log(`📋 Total ISBNs in queue: ${isbnQueue.length}\n`);
-
-  // Parse CLI flags like --cursor=2, --cursor 2, --batch=2, --auto, -a
-  let requestedCursor = null;
-  let isAutoMode = false;
-  for (let a = 2; a < process.argv.length; a++) {
-    const arg = process.argv[a];
-    if (arg === "--auto" || arg === "-a") {
-      isAutoMode = true;
-    } else if (arg.startsWith("--cursor=")) {
-      requestedCursor = arg.split("=")[1].trim();
-    } else if (arg === "--cursor" && process.argv[a + 1]) {
-      requestedCursor = process.argv[a + 1].trim();
-      a++;
-    } else if (arg.startsWith("--batch=")) {
-      requestedCursor = arg.split("=")[1].trim();
-    } else if (arg === "--batch" && process.argv[a + 1]) {
-      requestedCursor = process.argv[a + 1].trim();
-      a++;
-    }
-  }
-
-  if (isAutoMode) {
-    console.log(
-      "----------------------------------------------------------------",
-    );
-    console.log("\x1b[1;36m🤖 AUTO MODE ACTIVATED (--auto):\x1b[0m");
-    console.log("   • Hands-free: Automatically adds qualified offers to cart");
-    console.log(
-      "   • Automatic Google Sheet sync: Records rejection reasons to Column D",
-    );
-    console.log(
-      `   • ⏱️  Pacing Enforcement: Minimum ${scraperConfig.automation?.minPacingSecondsPerIsbn || 30}s per ISBN to avoid rate limits`,
-    );
-    console.log(
-      `   • 🛑 Pauses ONLY at ${scraperConfig.automation?.cartBatchLimit || 50}-item Amazon cart limit for checkout`,
-    );
-    console.log(
-      "----------------------------------------------------------------\n",
-    );
-  }
 
   let cursorRow = null;
   let cursorBatch = 0;
@@ -1700,7 +1878,7 @@ async function main() {
         console.log(`📄 Google Sheet Row: #${targetInfo.sheetRowNumber}`);
       }
       console.log(`📚 Expected Title: ${targetInfo.title}`);
-      const minMarginBuffer = scraperConfig.marginRules?.minMarginBufferINR ?? 50;
+      const minMarginBuffer = scraperConfig.marginRules?.minMarginBufferINR ?? 1;
       console.log(
         `🎯 Compare Price: \x1b[1;32m₹${targetInfo.targetPrice.toFixed(2)}\x1b[0m | 💵 Sell Price: \x1b[1;36m₹${(targetInfo.sellPrice || 0).toFixed(2)}\x1b[0m (Min Margin: ₹${minMarginBuffer})`,
       );
@@ -1710,6 +1888,7 @@ async function main() {
 
       let stepResult = {
         isbn,
+        profile: ACTIVE_PROFILE_NAME,
         targetPrice: targetInfo.targetPrice,
         expectedTitle: targetInfo.title,
         timestamp: new Date().toISOString(),
@@ -1826,7 +2005,7 @@ async function main() {
             );
             if (best.passedByMargin) {
               console.log(
-                `   📈 \x1b[1;33mQualified via Margin Buffer:\x1b[0m ₹${best.margin.toFixed(0)} margin (Sell ₹${targetInfo.sellPrice.toFixed(0)} - Item ₹${best.itemPrice.toFixed(0)} >= ₹${best.minMarginBuffer || 50})`,
+                `   📈 \x1b[1;33mQualified via Margin Buffer:\x1b[0m ₹${best.margin.toFixed(0)} margin (Sell ₹${targetInfo.sellPrice.toFixed(0)} - Item ₹${best.itemPrice.toFixed(0)} >= ₹${best.minMarginBuffer || 1})`,
               );
             }
             console.log(

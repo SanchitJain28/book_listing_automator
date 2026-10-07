@@ -65,7 +65,18 @@ async function generateConfig(
   console.log(`Found headers at Row ${headerRowIdx + 1}:`, headers);
 
   const statusIdx = headers.findIndex((h) => h.toLowerCase() === "status");
-  const isbnIdx = headers.findIndex((h) => h.toLowerCase() === "isbn");
+
+  let isbnIdx = headers.findIndex(
+    (h) => h.toLowerCase() === "isbn (customer order)",
+  );
+  if (isbnIdx === -1) isbnIdx = headers.findIndex((h) => h.toLowerCase() === "isbn");
+  if (isbnIdx === -1) {
+    isbnIdx = headers.findIndex(
+      (h) =>
+        h.toLowerCase().includes("isbn") && !h.toLowerCase().includes("match"),
+    );
+  }
+
   let reasonIdx = headers.findIndex((h) =>
     h.toLowerCase().includes("no with reason"),
   );
@@ -86,6 +97,9 @@ async function generateConfig(
 
   let titleIdx = headers.findIndex((h) => h.toLowerCase() === "po title");
   if (titleIdx === -1) {
+    titleIdx = headers.findIndex((h) => h.toLowerCase() === "title");
+  }
+  if (titleIdx === -1) {
     titleIdx = headers.findIndex(
       (h) =>
         h.toLowerCase() === "amazon title" || h.toLowerCase().includes("title"),
@@ -98,12 +112,23 @@ async function generateConfig(
 
   const groupIdx = headers.findIndex((h) => h.toLowerCase() === "group");
   let cursorIdx = headers.findIndex((h) => h.toLowerCase() === "cursor");
-  const sellIdx = headers.findIndex(
+  let sellIdx = headers.findIndex(
     (h) =>
+      h.toLowerCase() === "po (inr)" ||
+      h.toLowerCase().includes("po (inr)") ||
+      h.toLowerCase().includes("po price (inr)") ||
+      h.toLowerCase() === "po price (inr)" ||
       h.toLowerCase().includes("sell (inr)") ||
-      h.toLowerCase() === "sell (inr)" ||
-      h.toLowerCase() === "sell",
+      h.toLowerCase() === "sell (inr)",
   );
+  if (sellIdx === -1) {
+    sellIdx = headers.findIndex(
+      (h) =>
+        h.toLowerCase() === "sell" ||
+        h.toLowerCase().includes("sell") ||
+        h.toLowerCase().includes("po price"),
+    );
+  }
 
   // If CURSOR column doesn't exist, create it in Google Sheet!
   if (cursorIdx === -1) {
@@ -188,8 +213,10 @@ async function generateConfig(
       cursorIdx !== -1 ? String(row[cursorIdx] || "").trim() : "";
     const matchType = matchIdx !== -1 ? String(row[matchIdx] || "").trim() : "";
 
+    const matchVal = matchType.toLowerCase();
     const isRed = group.toLowerCase().includes("loss");
-    const isYellow = !isRed && matchType.toLowerCase().includes("different");
+    const isYellow =
+      !isRed && (matchVal.includes("different") || matchVal === "no");
     const rowColor = isRed ? "red" : isYellow ? "yellow" : "white";
 
     const item = {
@@ -266,12 +293,22 @@ async function generateConfig(
     items: sortedItems,
   };
 
+  const configsDir = path.join(__dirname, "..", "sheet_configs");
+  if (!fs.existsSync(configsDir)) {
+    fs.mkdirSync(configsDir, { recursive: true });
+  }
+
+  const safeTabFileName = tabName.replace(/[/\\?%*:|"<>]/g, "_").trim();
+  const tabConfigPath = path.join(configsDir, `${safeTabFileName}.json`);
+  fs.writeFileSync(tabConfigPath, JSON.stringify(config, null, 2), "utf8");
+  console.log(`📁 Tab config saved to sheet_configs/${safeTabFileName}.json`);
+
   const outPath = path.isAbsolute(outputFile)
     ? outputFile
     : path.join(process.cwd(), outputFile);
   fs.writeFileSync(outPath, JSON.stringify(config, null, 2), "utf8");
   console.log(
-    `✅ Config saved to ${outputFile} with ${sortedItems.length} book rows.`,
+    `✅ Active config updated at ${outputFile} with ${sortedItems.length} book rows.`,
   );
   console.log(
     `   ⚪ White rows (Exact ISBN): ${whiteItems.length} (queued first)`,
@@ -297,11 +334,27 @@ async function generateConfig(
 }
 
 if (require.main === module) {
-  const url =
-    process.argv[2] ||
+  let url =
     "https://docs.google.com/spreadsheets/d/1jNGgr6d5mOZzHTpHiVlEyVBSACBdwL81VYNcUrSSOZY/edit?usp=sharing";
-  const tab = process.argv[3] || "337_23rd_SEP_LESSTHEN3";
-  const col = process.argv[4] || "Amazon Price (INR)";
+  let tab = "PREP_1_5TH_OCT_LESSTHEN3";
+  let col = "Amazon Price (INR)";
+
+  const arg1 = process.argv[2];
+  const arg2 = process.argv[3];
+  const arg3 = process.argv[4];
+
+  if (arg1) {
+    if (arg1.startsWith("http") || arg1.length > 30) {
+      url = arg1;
+      if (arg2) tab = arg2;
+      if (arg3) col = arg3;
+    } else {
+      // First arg is tab name!
+      tab = arg1;
+      if (arg2) col = arg2;
+    }
+  }
+
   generateConfig(url, tab, col).catch((err) => {
     console.error("Error generating config:", err);
     process.exit(1);
