@@ -48,10 +48,21 @@ async function generateConfig(
   let headerRowIdx = -1;
   for (let i = 0; i < Math.min(rows.length, 30); i++) {
     const row = rows[i] || [];
-    const rowStr = row.map((c) => String(c || "").toLowerCase());
-    const hasIsbn = rowStr.some((c) => c === "isbn" || c.includes("isbn"));
+    const nonEmptyCells = row.filter((c) => String(c || "").trim() !== "");
+    if (nonEmptyCells.length < 4) continue; // Real table header row must have at least 4 column headers!
+
+    const rowStr = row.map((c) => String(c || "").toLowerCase().trim());
+    const hasIsbn = rowStr.some(
+      (c) =>
+        (c === "isbn" ||
+          c === "isbn (po)" ||
+          c === "isbn (customer order)" ||
+          (c.includes("isbn") && !c.includes("match"))) &&
+        c.length < 40,
+    );
     const hasPrice = rowStr.some(
-      (c) => c.includes("amazon price") || c.includes("price"),
+      (c) =>
+        (c.includes("amazon price") || c.includes("price")) && c.length < 40,
     );
     if (hasIsbn && hasPrice) {
       headerRowIdx = i;
@@ -67,9 +78,11 @@ async function generateConfig(
   const statusIdx = headers.findIndex((h) => h.toLowerCase() === "status");
 
   let isbnIdx = headers.findIndex(
-    (h) => h.toLowerCase() === "isbn (customer order)",
+    (h) =>
+      h.toLowerCase() === "isbn (customer order)" ||
+      h.toLowerCase() === "isbn (po)" ||
+      h.toLowerCase() === "isbn",
   );
-  if (isbnIdx === -1) isbnIdx = headers.findIndex((h) => h.toLowerCase() === "isbn");
   if (isbnIdx === -1) {
     isbnIdx = headers.findIndex(
       (h) =>
@@ -114,10 +127,10 @@ async function generateConfig(
   let cursorIdx = headers.findIndex((h) => h.toLowerCase() === "cursor");
   let sellIdx = headers.findIndex(
     (h) =>
-      h.toLowerCase() === "po (inr)" ||
-      h.toLowerCase().includes("po (inr)") ||
-      h.toLowerCase().includes("po price (inr)") ||
       h.toLowerCase() === "po price (inr)" ||
+      h.toLowerCase() === "po (inr)" ||
+      h.toLowerCase().includes("po price (inr)") ||
+      h.toLowerCase().includes("po (inr)") ||
       h.toLowerCase().includes("sell (inr)") ||
       h.toLowerCase() === "sell (inr)",
   );
