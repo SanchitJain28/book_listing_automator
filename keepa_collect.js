@@ -81,6 +81,12 @@ const REVIEW_MAX = Number(process.env.REVIEW_MAX || 20);
 const ONLY_PASS = Number(process.env.PASS || 0) || null;
 const MAX_MINUTES = Number(process.env.MAX_MINUTES || 0) || null;
 const TOKEN_RATE = Number(process.env.TOKEN_RATE || 60);
+// Optional strict upper price limit in rupees; Keepa filters use paise.
+const PRICE_BELOW = process.env.PRICE_BELOW ? Number(process.env.PRICE_BELOW) : null;
+if (PRICE_BELOW !== null && (!Number.isFinite(PRICE_BELOW) || PRICE_BELOW <= 0)) {
+  throw new Error("PRICE_BELOW must be a positive number of rupees.");
+}
+const RUN_SCOPE = `${ONLY_PASS === 2 ? "0" : ONLY_PASS === 1 ? `1-${REVIEW_MAX}` : `0-${REVIEW_MAX}`} reviews, in stock${PRICE_BELOW === null ? "" : `, lowest new price < INR ${PRICE_BELOW}`}`;
 
 const BUCKET_TARGET = 9500; // headroom below Keepa's 10,000 paging cap
 const HARD_CAP = 10000;
@@ -140,6 +146,10 @@ const BOOKS_ONLY = {
   binding: PHYSICAL_BINDINGS,
 };
 const BASE_FILTERS = { ...BOOKS_ONLY, current_BUY_BOX_SHIPPING_gte: 1 };
+if (PRICE_BELOW !== null) {
+  BASE_FILTERS.current_NEW_gte = 1;
+  BASE_FILTERS.current_NEW_lte = Math.ceil(PRICE_BELOW * 100) - 1;
+}
 
 const PASSES = [
   {
@@ -320,6 +330,8 @@ const HEADERS = [
   "rating",
   "price_source",
   "pass",
+  ...(PRICE_BELOW === null ? [] : ["price_filter"]),
+  ...(PRICE_BELOW === null ? [] : ["review_status"]),
 ];
 
 const shouldStop = () => stopRequested || Date.now() >= deadline;
@@ -502,6 +514,11 @@ async function collectBatch(batch, passNo) {
       const newLow = rupees(cur[1]); // NEW
       const mrp = rupees(cur[4]); // LISTPRICE
 
+      // Retain price changes/missing prices from paid lookups and flag them below.
+      if (PRICE_BELOW !== null) {
+        if (passNo === 2 && Number.isInteger(cur[17]) && cur[17] > 0) continue;
+      }
+
       let sale = "",
         source = "";
       if (buyBox !== "") {
@@ -514,15 +531,19 @@ async function collectBatch(batch, passNo) {
         sale = newLow;
         source = "lowest_new";
       }
+      if (PRICE_BELOW !== null) {
+        sale = newLow;
+        source = newLow === "" ? "" : "lowest_new";
+      }
 
       const discount =
         mrp !== "" && sale !== "" && mrp > sale
           ? +(((mrp - sale) / mrp) * 100).toFixed(1)
           : "";
 
-      // Pass 2 is the no-review pass, so a missing count genuinely means zero.
-      let reviews = Number.isInteger(cur[17]) && cur[17] > 0 ? cur[17] : "";
-      if (reviews === "" && passNo === 2) reviews = 0;
+      // Finder's hasReviews:false is not evidence of a numeric zero.
+      // A missing/unrequested/stale count must remain unknown.
+      const reviews = Number.isInteger(cur[17]) && cur[17] >= 0 ? cur[17] : "";
 
       const rating =
         Number.isInteger(cur[16]) && cur[16] > 0
@@ -546,6 +567,12 @@ async function collectBatch(batch, passNo) {
           rating,
           source,
           passNo,
+          ...(PRICE_BELOW === null ? [] : [
+            sale === "" || sale <= 0 ? "missing_price" : sale >= PRICE_BELOW ? "high_price" : "within_limit",
+          ]),
+          ...(PRICE_BELOW === null ? [] : [
+            reviews === "" ? (passNo === 2 ? "keepa_no_reviews_unverified" : "unknown") : reviews === 0 ? "keepa_zero_not_live_verified" : "keepa_positive_count",
+          ]),
         ]
           .map(csvCell)
           .join(","),
@@ -758,7 +785,9 @@ function statusOnly() {
   const s = readJsonSafe(CHECKPOINT) || readJsonSafe(CHECKPOINT_BAK);
   if (!s) return console.log("No run in progress.");
   const grand = Object.values(s.passTotals || {}).reduce((a, b) => a + b, 0);
-  console.log(`Scope         : 0-${s.reviewMax} reviews, in stock`);
+  const onlyZero = Object.keys(s.passTotals || {}).join(",") === "2";
+  const priceCap = s.baseFilters?.current_NEW_lte;
+  console.log(`Scope         : ${onlyZero ? "0" : `0-${s.reviewMax}`} reviews, in stock${priceCap === undefined ? "" : `, lowest new price <= INR ${priceCap / 100}`}`);
   console.log(`Pass          : ${s.passIndex + 1} of ${PASSES.length}`);
   console.log(
     `Books written : ${fmt(s.booksWritten)} of ${fmt(grand)} (${grand ? ((s.booksWritten / grand) * 100).toFixed(2) : "?"}%)`,
@@ -877,7 +906,7 @@ async function main() {
   installSignalHandlers();
 
   log(
-    `Keepa collector starting - amazon.in, in stock, 0-${REVIEW_MAX} reviews`,
+    `Keepa collector starting - amazon.in, ${RUN_SCOPE}`,
   );
   log(`Using ${KEYS.length} API key(s).`);
   if (MAX_MINUTES) log(`Time-boxed to ${MAX_MINUTES} minutes.`);
@@ -953,7 +982,7 @@ function writeSummary(todo = PASSES) {
 
   const out = [];
   out.push("==================== SUMMARY ====================");
-  out.push(`Scope             : 0-${REVIEW_MAX} reviews, in stock`);
+  out.push(`Scope             : ${RUN_SCOPE}`);
   out.push(`Run time          : ${(mins / 60).toFixed(1)} hours`);
   out.push(`Books in scope    : ${fmt(grand)}`);
   out.push(

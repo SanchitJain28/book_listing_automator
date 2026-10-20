@@ -357,7 +357,14 @@ if (require.main === module) {
   const arg3 = process.argv[4];
 
   if (arg1) {
-    if (arg1.startsWith("http") || arg1.length > 30) {
+    if (
+      arg1.startsWith("http") ||
+      (arg1.length >= 40 &&
+        !arg1.includes("&") &&
+        !arg1.includes("+") &&
+        !arg1.includes("/") &&
+        arg2)
+    ) {
       url = arg1;
       if (arg2) tab = arg2;
       if (arg3) col = arg3;

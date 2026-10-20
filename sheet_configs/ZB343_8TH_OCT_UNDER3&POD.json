@@ -7,10 +7,10 @@
   "yellowItemsCount": 602,
   "redItemsCount": 0,
   "latestCursor": {
-    "batchNumber": 9,
-    "sheetRowNumber": 473,
-    "isbn": "9783952456071",
-    "cursorText": "CURSOR - 9"
+    "batchNumber": 36,
+    "sheetRowNumber": 1851,
+    "isbn": "9789383828258",
+    "cursorText": "CURSOR - 36"
   },
   "columns": {
     "status": 1,
@@ -1410,7 +1410,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "CURSOR - 2 - FAILED",
+      "existingCursor": "CURSOR - 2",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -1682,7 +1682,7 @@
       "title": "Web sites that work : secrets from winning webs sites",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "NOT AVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -1708,7 +1708,7 @@
       "title": "Lessons Of History",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "NOT AVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -1903,7 +1903,7 @@
       "title": "Adaptability in Crisis - A Psychological Perspective",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "NOT FOUND",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -2020,7 +2020,7 @@
       "title": "Effective communication for today's manager",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -5829,7 +5829,7 @@
       "title": "Histologic preparations : common problems and their solutions",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "FOR REVIEW",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -6050,7 +6050,7 @@
       "title": "Graphene in composite materials : synthesis, characterization and applications",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "FOR REVIEW",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -6792,7 +6792,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 10",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -7298,7 +7298,7 @@
       "title": "At the feet of a Himalayan master : remembering Swami Rama. Volume 6",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -7311,7 +7311,7 @@
       "title": "Trekking around upper & lower Dolpo",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "DELIVERY DATE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -7468,7 +7468,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 11",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -8039,7 +8039,7 @@
       "title": "Panorama of gems and jewellery in Indian historical setting",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -8052,7 +8052,7 @@
       "title": "Mun̲kūr̲appaṭṭa cāvin̲ carittiram",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -8144,7 +8144,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 12",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -8273,7 +8273,7 @@
       "title": "Thiraipada Solai - Sivakumar / திரைப்படச் சோலை",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -8533,7 +8533,7 @@
       "title": "THE CONSTITUTION OF INDIA, 17TH ED",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -8715,7 +8715,7 @@
       "title": "Anguttara Nikaya (in Pali) Part-1",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "DELIVERY DATE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -8820,7 +8820,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 13",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -9470,7 +9470,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 14",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -9625,7 +9625,7 @@
       "title": "SELF-ASSESSMENT IN PAEDIATRICS INTERNATIONAL EDITION : mcqs and emqs",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -9638,7 +9638,7 @@
       "title": "Ama",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -9963,7 +9963,7 @@
       "title": "Statistical regression line-fitting in the oil & gas industry : a descriptive guide with Microsoft Excel examples",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -10159,7 +10159,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 15",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -10301,7 +10301,7 @@
       "title": "Tropical diseases : molecular biology and control strategies",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -10574,7 +10574,7 @@
       "title": "Nepal-Tibet Relations 1850-1930 Years of Hopes, Challenges and Frustrations",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "DELIVERY DATE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -10704,7 +10704,7 @@
       "title": "Jambūpati-sūtra : a synoptic romanized edition",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "DELIVERY DATE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -10848,7 +10848,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 16",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -10977,7 +10977,7 @@
       "title": "Hamsa Vimsati",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -11524,7 +11524,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 17",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -11575,7 +11575,7 @@
       "title": "वैद्यजीवनम् —  कविराज लोलिम्बराजकृत",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -12187,7 +12187,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 18",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -12251,7 +12251,7 @@
       "title": "REFRACTORIES Production And Properties [Paperback] [Jan 01, 2005] Chesters",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -12329,7 +12329,7 @@
       "title": "The Simple Path to Wealth Paperback",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -12863,7 +12863,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 19",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -13200,7 +13200,7 @@
       "title": "An Introduction to Statistical Learning with applications in R 2Ed Paperback",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -13526,7 +13526,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 20",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -14176,7 +14176,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 21",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -14826,7 +14826,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 22",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -15476,7 +15476,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 23",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -16126,7 +16126,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 24",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -16776,7 +16776,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 25",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -17426,7 +17426,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 26",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -18076,7 +18076,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 27",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -18726,7 +18726,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 28",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -19376,7 +19376,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 29",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -19791,7 +19791,7 @@
       "title": "Alabama liability insurance",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "FOR REVIEW",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -19830,7 +19830,7 @@
       "title": "Analisi E Tecniche Di Gestione Dei Conflitti. Metodi Per Facilitare Le Relazioni Umane Sul Lavoro",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -19843,7 +19843,7 @@
       "title": "Analog & Digital Electronics for VTU ( Sem-III CSE / Ise CBCS Scheme 2015 )",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -20052,7 +20052,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 30",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -20715,7 +20715,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 31",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -21365,7 +21365,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 32",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -21429,7 +21429,7 @@
       "title": "Highway railway airport and harbour engineering",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -22015,7 +22015,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 33",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -22053,7 +22053,7 @@
       "title": "Linear Integrated Circuits [Paperback] [Jan 01, 2012] Rashid",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -22144,7 +22144,7 @@
       "title": "Mastering the techniques of laparoscopic suturing and knotting / RK Mishra ; foreword by Ray L Green",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -22482,7 +22482,7 @@
       "title": "NIGHTS IN PINK SATIN",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -22691,7 +22691,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 34",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -22976,7 +22976,7 @@
       "title": "Principles and Practice of Emergency Medicine",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -23354,7 +23354,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 35",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -23587,7 +23587,7 @@
       "title": "Statistical mechanics, thermodynamics and condensed matter",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -23626,7 +23626,7 @@
       "title": "Storytime with Gurudev-English",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "DELIVERY DATE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -24030,7 +24030,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 36",
       "matchType": "Yes",
       "rowColor": "white"
     },

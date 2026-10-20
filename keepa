@@ -1,0 +1,74 @@
+#!/usr/bin/env node
+"use strict";
+
+// Read-only monitoring for the current zero-review collection. No API calls.
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
+
+const root = __dirname;
+const runDir = path.join(root, "keepa_zero_reviews_under1200");
+const fmt = (n) => Number(n || 0).toLocaleString("en-IN");
+
+function runningState() {
+  let pid;
+  try {
+    pid = Number(fs.readFileSync(path.join(runDir, "collector.pid"), "utf8").trim());
+  } catch (e) {
+    if (e.code === "ENOENT") return "STOPPED (no collector PID recorded)";
+    return `UNKNOWN (cannot read PID: ${e.code || e.message})`;
+  }
+  if (!Number.isSafeInteger(pid) || pid <= 0) return "UNKNOWN (invalid PID file)";
+  const result = spawnSync("/bin/ps", ["-p", String(pid), "-o", "state=,command="], { encoding: "utf8" });
+  if (result.error || result.stderr?.trim()) {
+    return `UNKNOWN (cannot inspect process ${pid})`;
+  }
+  const command = result.stdout.trim();
+  const expected = path.join(root, "keepa_collect.js");
+  if (result.status !== 0 || !command || command.startsWith("Z") || !command.includes(expected)) {
+    return "STOPPED";
+  }
+  return `RUNNING (PID ${pid})`;
+}
+
+function checkpoint() {
+  for (const name of [".collect_checkpoint.json", ".collect_checkpoint.bak.json"]) {
+    try {
+      const file = path.join(runDir, name);
+      return { state: JSON.parse(fs.readFileSync(file, "utf8")), modified: fs.statSync(file).mtime, name };
+    } catch (_) {
+      // An interrupted write may require the backup checkpoint.
+    }
+  }
+  return null;
+}
+
+const arg = process.argv[2];
+if (arg === "--ping") {
+  console.log(runningState());
+} else if (arg === "--status") {
+  console.log(`Collector     : ${runningState()}`);
+  const saved = checkpoint();
+  if (!saved) {
+    console.log("No readable zero-review checkpoint found.");
+    process.exitCode = 1;
+  } else {
+    const s = saved.state;
+    console.log("Scope         : Keepa zero-review candidates; new price below INR 1,200 at discovery");
+    console.log("Reviews       : Unverified on Amazon; unknown counts stay blank");
+    const collected = Number(s.booksWritten || 0);
+    const estimatedTotal = Number(s.passTotals?.[2] || 0);
+    const progress = estimatedTotal > 0 ? ` / ${fmt(estimatedTotal)} (${((collected / estimatedTotal) * 100).toFixed(2)}% of initial estimate)` : "";
+    console.log(`Books collected: ${fmt(collected)}${progress}`);
+    console.log("              : Saved CSV records; initial estimate can differ from final total");
+    console.log(`Buckets done  : ${fmt(s.bucketsDone)}`);
+    console.log(`Ranges queued : ${fmt(s.stack?.length)}`);
+    console.log(`Pending ASINs : ${fmt(s.pending?.length)}`);
+    console.log(`Tokens spent  : ${fmt(s.tokensSpent)}`);
+    console.log(`Checkpoint    : ${saved.modified.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST${saved.name.includes(".bak.") ? " (backup)" : ""}`);
+    console.log(`CSV           : ${path.join(runDir, "books.csv")}`);
+  }
+} else {
+  console.log("Usage: node keepa --ping | --status");
+  if (arg) process.exitCode = 1;
+}
