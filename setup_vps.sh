@@ -23,10 +23,13 @@ if command -v apt-get >/dev/null 2>&1; then
     # -------------------------------------------------------------
     echo "⏳ Checking and waiting for background package manager locks..."
     systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
-    while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+    systemctl disable unattended-upgrades 2>/dev/null || true
+    while pgrep -f "unattended-upgr|apt-get|dpkg" >/dev/null 2>&1; do
         echo "Waiting for background system update process to release dpkg lock..."
         sleep 3
     done
+    rm -f /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock /var/cache/apt/archives/lock 2>/dev/null || true
+    dpkg --configure -a 2>/dev/null || true
 
     echo "📦 Installing system packages & Chromium shared libraries via apt..."
     export DEBIAN_FRONTEND=noninteractive
@@ -91,6 +94,7 @@ npm install
 
 # 5. Patch Playwright OS detection if on newer Ubuntu
 echo "🎭 Installing Playwright Chromium browser..."
+export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64
 if [ -f "node_modules/playwright-core/lib/server/utils/hostPlatform.js" ]; then
     sed -i 's/major < 26/major < 28/g' node_modules/playwright-core/lib/server/utils/hostPlatform.js
 fi

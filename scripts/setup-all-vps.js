@@ -3,12 +3,17 @@ const path = require("path");
 const fs = require("fs");
 
 const VPS_LIST = [
-  { id: 1, ip: "216.219.85.173", pass: "Sanchit@282930" },
-  { id: 2, ip: "69.164.249.174", pass: "Sanchit@282930" },
-  { id: 3, ip: "69.164.244.21",  pass: "Sanchit@282930" },
-  { id: 4, ip: "162.35.176.48",  pass: "Sanchit@282930" },
-  { id: 5, ip: "69.169.103.19",  pass: "Sanchit@282930" },
-  { id: 6, ip: "200.234.32.63",  pass: "+ww8T@@Eythd/2QM" },
+  { id: 1,  ip: "216.219.85.173", pass: "Sanchit@282930" },
+  { id: 2,  ip: "69.164.249.174", pass: "Sanchit@282930" },
+  { id: 3,  ip: "69.164.244.21",  pass: "Sanchit@282930" },
+  { id: 4,  ip: "162.35.176.48",  pass: "Sanchit@282930" },
+  { id: 5,  ip: "69.169.103.19",  pass: "Sanchit@282930" },
+  { id: 6,  ip: "200.234.32.63",  pass: "+ww8T@@Eythd/2QM" },
+  { id: 7,  ip: "162.35.180.234", pass: "Sanchit@282930" },
+  { id: 8,  ip: "104.37.184.22",  pass: "Sanchit@282930" },
+  { id: 9,  ip: "162.35.12.38",   pass: "Sanchit@282930" },
+  { id: 10, ip: "162.35.180.164", pass: "Sanchit@282930" },
+  { id: 11, ip: "162.35.12.37",   pass: "Sanchit@282930" },
 ];
 
 const ROOT_DIR = path.resolve(__dirname, "..");
