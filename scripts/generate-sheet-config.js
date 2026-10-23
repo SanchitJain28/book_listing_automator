@@ -78,17 +78,30 @@ async function generateConfig(
   const statusIdx = headers.findIndex((h) => h.toLowerCase() === "status");
 
   let isbnIdx = headers.findIndex(
-    (h) =>
-      h.toLowerCase() === "isbn (customer order)" ||
-      h.toLowerCase() === "isbn (po)" ||
-      h.toLowerCase() === "isbn",
+    (h) => h.toLowerCase() === "buy this isbn on amazon",
   );
+  if (isbnIdx === -1) {
+    isbnIdx = headers.findIndex(
+      (h) =>
+        h.toLowerCase() === "isbn (customer order)" ||
+        h.toLowerCase() === "isbn (po)" ||
+        h.toLowerCase() === "po isbn" ||
+        h.toLowerCase() === "isbn",
+    );
+  }
   if (isbnIdx === -1) {
     isbnIdx = headers.findIndex(
       (h) =>
         h.toLowerCase().includes("isbn") && !h.toLowerCase().includes("match"),
     );
   }
+
+  const poIsbnIdx = headers.findIndex(
+    (h) =>
+      h.toLowerCase() === "po isbn" ||
+      h.toLowerCase() === "isbn (po)" ||
+      h.toLowerCase() === "isbn",
+  );
 
   let reasonIdx = headers.findIndex((h) =>
     h.toLowerCase().includes("no with reason"),
@@ -127,6 +140,8 @@ async function generateConfig(
   let cursorIdx = headers.findIndex((h) => h.toLowerCase() === "cursor");
   let sellIdx = headers.findIndex(
     (h) =>
+      h.toLowerCase() === "po value (inr @ rate)" ||
+      h.toLowerCase().includes("po value (inr") ||
       h.toLowerCase() === "po price (inr)" ||
       h.toLowerCase() === "po (inr)" ||
       h.toLowerCase().includes("po price (inr)") ||
@@ -202,7 +217,10 @@ async function generateConfig(
 
   for (let i = headerRowIdx + 1; i < rows.length; i++) {
     const row = rows[i] || [];
-    const rawIsbn = String(row[isbnIdx] || "").trim();
+    let rawIsbn = String(row[isbnIdx] || "").trim();
+    if (!rawIsbn && poIsbnIdx !== -1) {
+      rawIsbn = String(row[poIsbnIdx] || "").trim();
+    }
     if (!rawIsbn) continue;
     const cleanIsbn = rawIsbn.replace(/[^\dX]/gi, "");
 
@@ -218,7 +236,8 @@ async function generateConfig(
         : parseFloat(String(rawSell || "0").replace(/[^0-9.]/g, ""));
 
     const title = String(row[titleIdx] || "N/A").trim();
-    const status = String(row[statusIdx] || "").trim();
+    const status =
+      statusIdx !== -1 ? String(row[statusIdx] || "").trim() : "Pending";
     const group = groupIdx !== -1 ? String(row[groupIdx] || "").trim() : "";
     const existingReason =
       reasonIdx !== -1 ? String(row[reasonIdx] || "").trim() : "";

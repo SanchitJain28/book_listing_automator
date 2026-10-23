@@ -113,12 +113,20 @@ async function main() {
   let inputFile = args.find((a) => !a.startsWith("--"));
   const delayArg = args.find((a) => a.startsWith("--delay="));
   const sideArg = args.find((a) => a.startsWith("--window="));
+  const batchArg = args.find(
+    (a) => a.startsWith("--batch=") || a.startsWith("--batch-size="),
+  );
   const isReset = args.includes("--reset");
 
   let delayMs = 1000;
   if (delayArg) {
     const parsedDelay = parseFloat(delayArg.split("=")[1]);
     delayMs = parsedDelay < 50 ? parsedDelay * 1000 : parsedDelay;
+  }
+
+  let batchSize = 25;
+  if (batchArg) {
+    batchSize = parseInt(batchArg.split("=")[1], 10) || 25;
   }
 
   let targetSide = "right";
@@ -147,7 +155,19 @@ async function main() {
   // Helper to extract domain & URL from line
   function parseLineToItem(rawLine) {
     const l = rawLine.trim();
-    if (!l || l.toLowerCase() === "links" || l.toLowerCase() === "not found low price") return null;
+    if (
+      !l ||
+      l.toLowerCase() === "links" ||
+      l.toLowerCase() === "not found low price" ||
+      l.toLowerCase() === "d" ||
+      l.toLowerCase() === "found at / notes"
+    )
+      return null;
+
+    if (l.startsWith("amazon.com/") || l.startsWith("flipkart.com/")) {
+      const fullUrl = "https://" + l;
+      return { host: l.split("/")[0].toLowerCase(), url: fullUrl, query: fullUrl };
+    }
 
     if (l.startsWith("http://") || l.startsWith("https://")) {
       try {
@@ -164,11 +184,16 @@ async function main() {
     let host = "google.com";
     if (s.includes("bestbookmart.com") || s.startsWith("best book mart")) host = "bestbookmart.com";
     else if (s.includes("flipkart.com") || s.includes("flipkart")) host = "flipkart.com";
-    else if (s.includes("amazon.in") || s.includes("amazon.com") || s.includes("amazon.ca") || s.includes("amazon.co.uk") || s.includes("amazon.com.au") || s.includes("amazon")) host = "amazon.in";
+    else if (s.includes("amazon.in")) host = "amazon.in";
+    else if (s.includes("amazon.co.uk")) host = "amazon.co.uk";
+    else if (s.includes("amazon.ca")) host = "amazon.ca";
+    else if (s.includes("amazon.com") || s.includes("amazon")) host = "amazon.com";
+    else if (s.includes("abebooks.co.uk")) host = "abebooks.co.uk";
     else if (s.includes("abebooks.com") || s.includes("abebooks")) host = "abebooks.com";
     else if (s.includes("sapnaonline.com") || s.includes("sapnaonline")) host = "sapnaonline.com";
     else if (s.includes("jupiterbooks.in") || s.includes("jupiter books")) host = "jupiterbooks.in";
-    else if (s.includes("ebay.co.uk") || s.includes("ebay.com") || s.includes("ebay")) host = "ebay.com";
+    else if (s.includes("ebay.co.uk")) host = "ebay.co.uk";
+    else if (s.includes("ebay.com") || s.includes("ebay")) host = "ebay.com";
     else if (s.includes("mypustak.com") || s.includes("mypustak")) host = "mypustak.com";
     else if (s.includes("bookchor.com") || s.includes("bookchor")) host = "bookchor.com";
     else if (s.includes("ahujabooks.com")) host = "ahujabooks.com";
@@ -189,6 +214,14 @@ async function main() {
     else if (s.includes("jain book agency")) host = "jainbookagency.com";
     else if (s.includes("webuybooks")) host = "webuybooks.co.uk";
     else if (s.includes("jaypee brothers")) host = "jaypeebrothers.com";
+    else if (s.includes("booksrun.com") || s.includes("booksrun")) host = "booksrun.com";
+    else if (s.includes("awesomebooks.com") || s.includes("awesomebooks")) host = "awesomebooks.com";
+    else if (s.includes("biblio.com") || s.includes("biblio")) host = "biblio.com";
+    else if (s.includes("alibris.com") || s.includes("alibris")) host = "alibris.com";
+    else if (s.includes("thriftbooks.com") || s.includes("thriftbooks")) host = "thriftbooks.com";
+    else if (s.includes("betterworldbooks.com") || s.includes("better world books")) host = "betterworldbooks.com";
+    else if (s.includes("bulkbooks.com") || s.includes("bulkbooks")) host = "bulkbooks.com";
+    else if (s.includes("target.com") || s.includes("target")) host = "target.com";
 
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(l)}`;
     return { host, url: searchUrl, query: l };
@@ -406,7 +439,10 @@ async function main() {
     );
   }
   console.log(`🖥️ Target Window:   ${targetSide.toUpperCase()} Chrome Window`);
-  console.log(`⏱️ Tab Delay:       ${delayMs / 1000}s\n`);
+  console.log(`⏱️ Tab Delay:       ${delayMs / 1000}s`);
+  console.log(
+    `📦 Batch Size:      ${batchSize} tabs (auto-batches platforms with > ${batchSize} links)\n`,
+  );
 
   if (excludedDomains.length > 0) {
     console.log("🚫 Excluded Websites List (Patterns):");
@@ -432,8 +468,13 @@ async function main() {
 
   console.log("📋 Active Websites Breakdown:");
   domains.forEach((d, idx) => {
+    const count = domainMap[d].length;
+    const batchInfo =
+      count > batchSize
+        ? ` (${Math.ceil(count / batchSize)} batches of ${batchSize})`
+        : "";
     console.log(
-      `  [${String(idx + 1).padStart(2, " ")}] ${d.padEnd(28)} : ${domainMap[d].length} link(s)`,
+      `  [${String(idx + 1).padStart(2, " ")}] ${d.padEnd(28)} : ${count} link(s)${batchInfo}`,
     );
   });
 
@@ -444,6 +485,7 @@ async function main() {
   );
 
   let currentDomainIndex = 0;
+  let currentBatchIndex = 0;
 
   if (singleSiteFilter) {
     const matchedIdx = !isNaN(singleSiteFilter)
@@ -465,9 +507,16 @@ async function main() {
         saved.currentDomainIndex < domains.length
       ) {
         currentDomainIndex = saved.currentDomainIndex;
-        if (currentDomainIndex > 0) {
+        if (typeof saved.currentBatchIndex === "number") {
+          currentBatchIndex = saved.currentBatchIndex;
+        }
+        if (currentDomainIndex > 0 || currentBatchIndex > 0) {
+          const batchMsg =
+            currentBatchIndex > 0
+              ? ` (Batch ${currentBatchIndex + 1})`
+              : "";
           console.log(
-            `\n▶ Resuming from Website #${currentDomainIndex + 1}: ${domains[currentDomainIndex]}`,
+            `\n▶ Resuming from Website #${currentDomainIndex + 1}: ${domains[currentDomainIndex]}${batchMsg}`,
           );
         }
       }
@@ -485,11 +534,15 @@ async function main() {
       const parsedNum = parseInt(initialChoice, 10);
       if (!isNaN(parsedNum) && parsedNum >= 1 && parsedNum <= domains.length) {
         currentDomainIndex = parsedNum - 1;
+        currentBatchIndex = 0;
       } else {
         const found = domains.findIndex((d) =>
           d.toLowerCase().includes(initialChoice.toLowerCase()),
         );
-        if (found !== -1) currentDomainIndex = found;
+        if (found !== -1) {
+          currentDomainIndex = found;
+          currentBatchIndex = 0;
+        }
       }
     }
   }
@@ -497,34 +550,145 @@ async function main() {
   while (currentDomainIndex < domains.length) {
     const domain = domains[currentDomainIndex];
     const domainUrls = domainMap[domain];
+    const totalBatches = Math.ceil(domainUrls.length / batchSize);
 
-    console.log("\n" + "━".repeat(70));
-    console.log(
-      `🚀 [Website ${currentDomainIndex + 1}/${domains.length}] Opening ${domainUrls.length} tab(s) for: ${domain}`,
-    );
-    console.log("━".repeat(70));
+    let jumpedSite = false;
 
-    await openWebsiteTabs(domainUrls, domain, delayMs, targetSide);
+    while (currentBatchIndex < totalBatches) {
+      const start = currentBatchIndex * batchSize;
+      const end = Math.min(start + batchSize, domainUrls.length);
+      const batchUrls = domainUrls.slice(start, end);
+      const batchNum = currentBatchIndex + 1;
+
+      console.log("\n" + "━".repeat(70));
+      if (totalBatches > 1) {
+        console.log(
+          `🚀 [Website ${currentDomainIndex + 1}/${domains.length}] ${domain} — Batch ${batchNum}/${totalBatches} (${batchUrls.length} links: #${start + 1} to #${end} of ${domainUrls.length})`,
+        );
+      } else {
+        console.log(
+          `🚀 [Website ${currentDomainIndex + 1}/${domains.length}] Opening ${domainUrls.length} tab(s) for: ${domain}`,
+        );
+      }
+      console.log("━".repeat(70));
+
+      await openWebsiteTabs(batchUrls, domain, delayMs, targetSide);
+
+      // Save progress with current batch finished
+      fs.writeFileSync(
+        progressFile,
+        JSON.stringify(
+          {
+            currentDomainIndex,
+            currentBatchIndex: currentBatchIndex + 1,
+            lastDomain: domain,
+            timestamp: new Date().toISOString(),
+          },
+          null,
+          2,
+        ),
+      );
+
+      if (singleSiteFilter && batchNum === totalBatches) {
+        console.log("\n✅ Completed all tabs for " + domain + "!\n");
+        break;
+      }
+
+      // If more batches remain for this domain
+      if (currentBatchIndex < totalBatches - 1) {
+        const nextStart = end + 1;
+        const nextEnd = Math.min(end + batchSize, domainUrls.length);
+        console.log(
+          `\n✅ ${batchUrls.length} tab(s) opened for ${domain} (Batch ${batchNum}/${totalBatches}: #${start + 1} to #${end}).`,
+        );
+        console.log("\nOptions:");
+        console.log(
+          `  👉 Press [ENTER]            : Open NEXT batch for ${domain} (Batch ${batchNum + 1}/${totalBatches}: #${nextStart} to #${nextEnd})`,
+        );
+        console.log(
+          `  👉 Type 's' + [ENTER]      : SKIP remaining batches for ${domain} -> Go to NEXT website`,
+        );
+        console.log(
+          `  👉 Type 'r' + [ENTER]      : Re-open current batch (#${start + 1} to #${end})`,
+        );
+        console.log(
+          `  👉 Type 'p' + [ENTER]      : Go BACK to previous batch`,
+        );
+        console.log(
+          `  👉 Type Website # (1-${domains.length})     : Jump to specific website`,
+        );
+        console.log(`  👉 Type 'q' + [ENTER]      : Quit (Progress saved)`);
+
+        const answer = await askQuestion("\nYour choice: ");
+        const a = answer.trim().toLowerCase();
+
+        if (a === "q") {
+          console.log(
+            "\n👋 Exited. Progress saved. Run again anytime to resume!\n",
+          );
+          return;
+        } else if (a === "s") {
+          console.log(`\n⏭️ Skipping remaining batches for ${domain}...`);
+          break;
+        } else if (a === "r") {
+          console.log(`\n🔄 Re-opening batch ${batchNum}/${totalBatches}...`);
+          continue;
+        } else if (a === "p") {
+          if (currentBatchIndex > 0) {
+            currentBatchIndex--;
+            console.log(
+              `\n⬅️ Going back to batch ${currentBatchIndex + 1}/${totalBatches}...`,
+            );
+          } else {
+            console.log("\n⚠️ Already at the first batch of this website.");
+          }
+          continue;
+        } else if (
+          !isNaN(parseInt(answer, 10)) &&
+          parseInt(answer, 10) >= 1 &&
+          parseInt(answer, 10) <= domains.length
+        ) {
+          currentDomainIndex = parseInt(answer, 10) - 1;
+          currentBatchIndex = 0;
+          jumpedSite = true;
+          console.log(
+            `\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`,
+          );
+          break;
+        } else {
+          const foundIdx = domains.findIndex((d) =>
+            d.toLowerCase().includes(answer.toLowerCase()),
+          );
+          if (answer && foundIdx !== -1) {
+            currentDomainIndex = foundIdx;
+            currentBatchIndex = 0;
+            jumpedSite = true;
+            console.log(
+              `\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`,
+            );
+            break;
+          } else {
+            currentBatchIndex++;
+          }
+        }
+      } else {
+        // Last batch finished
+        currentBatchIndex++;
+      }
+    }
+
+    if (jumpedSite) {
+      continue;
+    }
 
     if (singleSiteFilter) {
-      console.log("\n✅ Completed opening tabs for " + domain + "!\n");
       break;
     }
 
-    // Save progress
-    fs.writeFileSync(
-      progressFile,
-      JSON.stringify(
-        {
-          currentDomainIndex,
-          lastDomain: domain,
-          timestamp: new Date().toISOString(),
-        },
-        null,
-        2,
-      ),
-    );
+    // Domain is complete (all batches opened or skipped)
+    currentBatchIndex = 0;
 
+    // Check if all websites are completed
     if (currentDomainIndex === domains.length - 1) {
       console.log("\n" + "═".repeat(70));
       console.log("🎉 ALL WEBSITES COMPLETED! You have reviewed all links.");
@@ -537,33 +701,55 @@ async function main() {
 
     const nextDomain = domains[currentDomainIndex + 1];
     const nextCount = domainMap[nextDomain].length;
+    const nextBatchInfo =
+      nextCount > batchSize
+        ? ` (${Math.ceil(nextCount / batchSize)} batches of ${batchSize})`
+        : "";
 
-    console.log(`\n✅ ${domainUrls.length} tab(s) opened for ${domain}.`);
+    console.log(
+      `\n✅ All tabs completed for [${currentDomainIndex + 1}] ${domain}.`,
+    );
     console.log("\nOptions:");
     console.log(
-      `  👉 Press [ENTER]            : Open NEXT website (${nextDomain} - ${nextCount} tabs)`,
+      `  👉 Press [ENTER]            : Open NEXT website (${nextDomain} - ${nextCount} tabs${nextBatchInfo})`,
     );
     console.log(
       `  👉 Type Website # (1-${domains.length})     : Jump to specific website`,
     );
     console.log(
-      `  👉 Type 'r' + [ENTER]      : Re-open current website (${domain})`,
+      `  👉 Type 'r' + [ENTER]      : Re-open website [${currentDomainIndex + 1}] (${domain})`,
     );
     console.log(`  👉 Type 'p' + [ENTER]      : Go BACK to previous website`);
     console.log(`  👉 Type 'q' + [ENTER]      : Quit`);
 
     const answer = await askQuestion("\nYour choice: ");
+    const a = answer.trim().toLowerCase();
 
-    if (answer.toLowerCase() === "q") {
+    if (a === "q") {
+      fs.writeFileSync(
+        progressFile,
+        JSON.stringify(
+          {
+            currentDomainIndex: currentDomainIndex + 1,
+            currentBatchIndex: 0,
+            lastDomain: domain,
+            timestamp: new Date().toISOString(),
+          },
+          null,
+          2,
+        ),
+      );
       console.log(
         "\n👋 Exited. Progress saved. Run again anytime to resume!\n",
       );
       break;
-    } else if (answer.toLowerCase() === "r") {
+    } else if (a === "r") {
       console.log(`\n🔄 Re-opening ${domain}...`);
-    } else if (answer.toLowerCase() === "p") {
+      currentBatchIndex = 0;
+    } else if (a === "p") {
       if (currentDomainIndex > 0) {
         currentDomainIndex--;
+        currentBatchIndex = 0;
         console.log(`\n⬅️ Going back to ${domains[currentDomainIndex]}...`);
       } else {
         console.log("\n⚠️ Already at the first website.");
@@ -574,6 +760,7 @@ async function main() {
       parseInt(answer, 10) <= domains.length
     ) {
       currentDomainIndex = parseInt(answer, 10) - 1;
+      currentBatchIndex = 0;
       console.log(
         `\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`,
       );
@@ -583,11 +770,13 @@ async function main() {
       );
       if (answer && foundIdx !== -1) {
         currentDomainIndex = foundIdx;
+        currentBatchIndex = 0;
         console.log(
           `\n🎯 Jumping to [${currentDomainIndex + 1}] ${domains[currentDomainIndex]}...`,
         );
       } else {
         currentDomainIndex++;
+        currentBatchIndex = 0;
       }
     }
   }

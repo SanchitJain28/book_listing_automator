@@ -7,10 +7,10 @@
   "yellowItemsCount": 1473,
   "redItemsCount": 0,
   "latestCursor": {
-    "batchNumber": 34,
-    "sheetRowNumber": 1760,
-    "isbn": "9789365902969",
-    "cursorText": "CURSOR - 34"
+    "batchNumber": 38,
+    "sheetRowNumber": 1967,
+    "isbn": "9788183072441",
+    "cursorText": "CURSOR - 38"
   },
   "columns": {
     "status": 21,
@@ -23093,7 +23093,7 @@
       "title": "Nālaka",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -23301,7 +23301,7 @@
       "title": "குருதியியல் (Haematology - Kuruthial) Tamil book",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -23484,7 +23484,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 35",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -23639,7 +23639,7 @@
       "title": "Principles of Applied Nutrition: A Nursing Perspective_ Dr. Satarupa Bhattacherjee & Ms Vijaya Das",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -23756,7 +23756,7 @@
       "title": "Dawn of a Civilisation in the Lower Ganges Valley",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -24120,7 +24120,7 @@
       "title": "A Collection of Selected Arabic Texts (B.A. Honours – Major & General-Minor)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -24173,7 +24173,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 36",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -24302,7 +24302,7 @@
       "title": "UGC NET Sociology Paper 2 Theory Volume 1 English Medium | Comprehensive Guide | Social Theory, Research Methods & Indian Society | Chapter-wise Coverage | 2025 Edition Testbook",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -24471,7 +24471,7 @@
       "title": "Gpstr:  Samaja Vijnana Patrike 2 Vivaranatmaka Uttaragalondige Prashnakosha",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -24849,7 +24849,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 37",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -25499,7 +25499,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 38",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -34339,7 +34339,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 13DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -34989,7 +34989,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 14DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -35639,7 +35639,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 13DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -36276,7 +36276,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 14DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -36926,7 +36926,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 15DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -37576,7 +37576,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 16DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -38226,7 +38226,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 17DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -38693,7 +38693,7 @@
       "title": "Early history of the university of virginia",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "No - different edition",
       "rowColor": "yellow"
@@ -38889,7 +38889,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 18DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -39421,7 +39421,7 @@
       "title": "Plutarch's morals. tr. from the greek by several hands. cor. and rev. by",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "No - different edition",
       "rowColor": "yellow"
@@ -39565,7 +39565,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 19DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },
@@ -40228,7 +40228,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 20DE",
       "matchType": "No - different edition",
       "rowColor": "yellow"
     },

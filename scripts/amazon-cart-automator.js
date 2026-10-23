@@ -1384,35 +1384,50 @@ async function main() {
 
   for (let a = 2; a < process.argv.length; a++) {
     const arg = process.argv[a];
-    if (arg === "--auto" || arg === "-a") {
+    if (arg === "--auto" || arg === "-auto" || arg === "-a") {
       isAutoMode = true;
-    } else if (arg.startsWith("--profile=")) {
+    } else if (arg.startsWith("--profile=") || arg.startsWith("-profile=")) {
       requestedProfile = arg.split("=")[1].trim();
-    } else if (arg === "--profile" && process.argv[a + 1]) {
+    } else if (
+      (arg === "--profile" || arg === "-profile" || arg === "-p") &&
+      process.argv[a + 1]
+    ) {
       requestedProfile = process.argv[a + 1].trim();
       a++;
-    } else if (arg === "--login") {
+    } else if (arg === "--login" || arg === "-login") {
       isLoginMode = true;
-    } else if (arg.startsWith("--tab=")) {
+    } else if (arg.startsWith("--tab=") || arg.startsWith("-tab=")) {
       requestedTab = arg.split("=")[1].trim();
-    } else if (arg === "--tab" && process.argv[a + 1]) {
+    } else if (
+      (arg === "--tab" || arg === "-tab" || arg === "-t") &&
+      process.argv[a + 1]
+    ) {
       requestedTab = process.argv[a + 1].trim();
       a++;
-    } else if (arg.startsWith("--config=")) {
+    } else if (arg.startsWith("--config=") || arg.startsWith("-config=")) {
       requestedConfigFile = arg.split("=")[1].trim();
-    } else if (arg === "--config" && process.argv[a + 1]) {
+    } else if (
+      (arg === "--config" || arg === "-config") &&
+      process.argv[a + 1]
+    ) {
       requestedConfigFile = process.argv[a + 1].trim();
       a++;
     } else if (arg.endsWith(".json")) {
       requestedConfigFile = arg.trim();
-    } else if (arg.startsWith("--cursor=")) {
+    } else if (arg.startsWith("--cursor=") || arg.startsWith("-cursor=")) {
       requestedCursor = arg.split("=")[1].trim();
-    } else if (arg === "--cursor" && process.argv[a + 1]) {
+    } else if (
+      (arg === "--cursor" || arg === "-cursor" || arg === "-c") &&
+      process.argv[a + 1]
+    ) {
       requestedCursor = process.argv[a + 1].trim();
       a++;
-    } else if (arg.startsWith("--batch=")) {
+    } else if (arg.startsWith("--batch=") || arg.startsWith("-batch=")) {
       requestedCursor = arg.split("=")[1].trim();
-    } else if (arg === "--batch" && process.argv[a + 1]) {
+    } else if (
+      (arg === "--batch" || arg === "-batch" || arg === "-b") &&
+      process.argv[a + 1]
+    ) {
       requestedCursor = process.argv[a + 1].trim();
       a++;
     }
@@ -2104,6 +2119,17 @@ async function main() {
         const reasonCol = sheetConfig.columns?.reasonColLetter || "D";
         const cellRange = `'${sheetConfig.tabName}'!${reasonCol}${targetInfo.sheetRowNumber}`;
 
+        if (
+          stepResult.status === "ERROR" &&
+          (stepResult.error?.includes("closed") ||
+            stepResult.error?.includes("Target page"))
+        ) {
+          console.log(
+            `⚠️ Browser was closed or interrupted. Skipping Google Sheet update.`,
+          );
+          break;
+        }
+
         if (stepResult.cartAddedSuccess) {
           cartItemsThisBatch++;
           console.log(
@@ -2164,6 +2190,29 @@ async function main() {
           console.log(
             `📍 Cursor successfully written to Row #${nextRowNumber} for Batch ${currentBatchNumber + 1}!`,
           );
+
+          // Update local JSON cache immediately so subsequent commands know latestCursor
+          sheetConfig.latestCursor = {
+            batchNumber: currentBatchNumber,
+            sheetRowNumber: nextRowNumber,
+            isbn: nextIsbn,
+            cursorText: cursorTag,
+          };
+          if (nextTarget) {
+            nextTarget.existingCursor = cursorTag;
+          }
+          try {
+            const safeTabName = sheetConfig.tabName.replace(/[/\\?%*:|"<>]/g, "_").trim();
+            const tabConfigPath = path.join(__dirname, "..", "sheet_configs", `${safeTabName}.json`);
+            const defaultOutPath = path.join(__dirname, "..", "sheet_config.json");
+            if (fs.existsSync(tabConfigPath)) {
+              fs.writeFileSync(tabConfigPath, JSON.stringify(sheetConfig, null, 2), "utf8");
+            }
+            fs.writeFileSync(defaultOutPath, JSON.stringify(sheetConfig, null, 2), "utf8");
+            console.log(`💾 Local config cache synchronized with "${cursorTag}".`);
+          } catch (syncErr) {
+            // Non-blocking sync
+          }
         }
 
         console.log(
