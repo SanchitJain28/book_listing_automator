@@ -78,7 +78,9 @@ async function generateConfig(
   const statusIdx = headers.findIndex((h) => h.toLowerCase() === "status");
 
   let isbnIdx = headers.findIndex(
-    (h) => h.toLowerCase() === "buy this isbn on amazon",
+    (h) =>
+      h.toLowerCase() === "buy this isbn on amazon" ||
+      h.toLowerCase() === "amazon isbn",
   );
   if (isbnIdx === -1) {
     isbnIdx = headers.findIndex(
@@ -248,7 +250,10 @@ async function generateConfig(
     const matchVal = matchType.toLowerCase();
     const isRed = group.toLowerCase().includes("loss");
     const isYellow =
-      !isRed && (matchVal.includes("different") || matchVal === "no");
+      !isRed &&
+      (matchVal.includes("diff") ||
+        matchVal.includes("different") ||
+        matchVal === "no");
     const rowColor = isRed ? "red" : isYellow ? "yellow" : "white";
 
     const item = {

@@ -126,7 +126,16 @@ function startScraper() {
       return;
     }
 
-    if (code === 0) {
+    // International Amazon runners use 2 for a finished batch with unmatched,
+    // unavailable-to-verify, or blocked records. Repeating that batch is not a
+    // crash recovery and can keep requesting the same failed ISBNs indefinitely.
+    const completedWithUnverified = code === 2 && !signal &&
+      ["amazon-us-isbn.js", "amazon-uk-isbn.js"].includes(path.basename(targetScript));
+
+    if (completedWithUnverified) {
+      console.log("\n[Watcher] Batch finished with unverified ISBNs. Review its report; automatic retries are stopped.\n");
+      process.exit(2);
+    } else if (code === 0) {
       console.log(
         `\n\x1b[32m🎉 [Watcher] Scraper completed all items successfully! Exiting watcher.\x1b[0m\n`,
       );

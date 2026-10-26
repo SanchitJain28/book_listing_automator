@@ -1,12 +1,6 @@
 const { navigateWithRateLimitHandling } = require("./core/search");
 const { extractAbeBooksListings } = require("./core/multiListingExtractor");
 
-/**
- * Scrapes AbeBooks for a given product URL or ISBN using core extraction modules.
- * @param {import('playwright').Page} page
- * @param {Object} params - { directUrl, isbn }
- * @returns {Promise<Object>}
- */
 async function scrapeAbeBooksBook(page, { directUrl, isbn }) {
   let targetUrl = directUrl;
   let isUk = false;
@@ -45,9 +39,16 @@ async function scrapeAbeBooksBook(page, { directUrl, isbn }) {
   }
 
   const topListing = listings[0];
-  const isOutOfStock = !!topListing.is_out_of_stock || (topListing.price_num === null && (!topListing.price || topListing.price === "N/A"));
+  const isOutOfStock =
+    !!topListing.is_out_of_stock ||
+    (topListing.price_num === null &&
+      (!topListing.price || topListing.price === "N/A"));
   const inStock = !isOutOfStock;
-  const priceVal = inStock ? (topListing.price_num !== null ? topListing.price_num : topListing.price) : null;
+  const priceVal = inStock
+    ? topListing.price_num !== null
+      ? topListing.price_num
+      : topListing.price
+    : null;
 
   return {
     store: storeName,

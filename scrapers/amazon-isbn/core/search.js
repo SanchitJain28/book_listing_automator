@@ -6,8 +6,9 @@ const { checkDogPage } = require("../../../utils/amazon");
  * @param {string} isbn
  * @returns {Promise<{ found: boolean, productUrl: string|null }>}
  */
-async function searchAmazonForIsbn(page, isbn) {
-  const searchUrl = `https://www.amazon.in/s?k=${encodeURIComponent(isbn)}`;
+async function searchAmazonForIsbn(page, isbn, domain = "amazon.in") {
+  if (!["amazon.in", "amazon.com", "amazon.co.uk"].includes(domain)) throw new Error("Unsupported Amazon domain");
+  const searchUrl = `https://www.${domain}/s?k=${encodeURIComponent(isbn)}`;
 
   await page.goto(searchUrl, {
     timeout: 15000,

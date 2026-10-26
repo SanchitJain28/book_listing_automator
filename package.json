@@ -4,9 +4,20 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dashboard": "npm --prefix dashboard run dev",
+    "dashboard:build": "npm --prefix dashboard run build",
+    "dashboard:test": "npm --prefix dashboard test",
+    "test:flipkart": "node --test test/flipkart.test.js",
+    "test:bookchor": "node --test test/bookchor.test.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "mastra:dev": "mastra dev --dir mastra",
-    "mastra:build": "mastra build --dir mastra"
+    "mastra:build": "mastra build --dir mastra",
+    "test:sapnaonline": "node --test test/sapnaonline.test.js",
+    "test:bookswagon": "node --test test/bookswagon.test.js",
+    "test:atlanticbooks": "node --test test/atlanticbooks.test.js",
+    "test:mypustak": "node --test test/mypustak.test.js",
+    "test:ompublication": "node --test test/ompublication.test.js",
+    "test:amazon-international": "node --test test/amazon-international.test.js"
   },
   "keywords": [],
   "author": "",

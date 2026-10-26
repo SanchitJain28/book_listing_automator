@@ -11,7 +11,11 @@ const { cleanAndCheckMRP, validateIsbnMatch } = require("./core/validator");
  * @param {Object} params - { directUrl, isbn }
  * @returns {Promise<Object>}
  */
-async function scrapeAmazonBook(page, { directUrl, isbn }) {
+async function scrapeAmazonBook(page, { directUrl, isbn, domain }) {
+  const selectedDomain = domain || (directUrl ? new URL(directUrl).hostname.replace(/^www\./, '') : 'amazon.in');
+  if (selectedDomain !== 'amazon.in') {
+    return require('./core/international').scrapeInternationalAmazon(page, { directUrl, isbn, domain: selectedDomain });
+  }
   let targetUrl = directUrl;
 
   if (targetUrl) {

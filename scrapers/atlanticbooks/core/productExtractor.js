@@ -1,144 +1,37 @@
-/**
- * Fetches and parses Shopify JSON and product page HTML for Atlantic Books.
- * @param {string} handle
- * @param {string} targetIsbn
- * @returns {Promise<Object|null>}
- */
-async function fetchAtlanticProductData(handle, targetIsbn) {
-  try {
-    const jsonUrl = `https://atlanticbooks.com/products/${handle}.js`;
-    const pageUrl = `https://atlanticbooks.com/products/${handle}`;
-
-    const [jsonRes, pageRes] = await Promise.all([
-      fetch(jsonUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        },
-      }),
-      fetch(pageUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        },
-      }),
-    ]);
-
-    if (!jsonRes.ok) return null;
-    const productJson = await jsonRes.json();
-    const html = pageRes.ok ? await pageRes.text() : "";
-
-    const cleanTarget = targetIsbn ? targetIsbn.replace(/[^0-9]/g, "") : "";
-    let variant = productJson.variants?.[0];
-    if (cleanTarget && productJson.variants?.length > 1) {
-      const match = productJson.variants.find(
-        (v) =>
-          (v.barcode && v.barcode.replace(/[^0-9]/g, "") === cleanTarget) ||
-          (v.sku && v.sku.replace(/[^0-9]/g, "") === cleanTarget),
-      );
-      if (match) variant = match;
-    }
-
-    const inStock = variant ? variant.available : productJson.available;
-    const price = variant?.price
-      ? variant.price / 100
-      : productJson.price
-        ? productJson.price / 100
-        : null;
-    const mrp = variant?.compare_at_price
-      ? variant.compare_at_price / 100
-      : productJson.compare_at_price
-        ? productJson.compare_at_price / 100
-        : price;
-
-    let discount = null;
-    if (mrp && price && mrp > price) {
-      discount = `${Math.round(((mrp - price) / mrp) * 100)}%`;
-    }
-
-    let author = null;
-    const authorMatch = html.match(
-      /<div class="custom-liquid">\s*by\s*([^<]+)<\/div>/i,
-    );
-    if (authorMatch) {
-      const rawAuthor = authorMatch[1].trim();
-      if (rawAuthor && rawAuthor !== "N") author = rawAuthor;
-    }
-
-    let pages = null;
-    const pagesMatch = html.match(/<strong>Pages:<\/strong>\s*([^<]+)<\/li>/i);
-    if (pagesMatch && pagesMatch[1].trim() !== "N/A") {
-      pages = pagesMatch[1].trim();
-    }
-
-    let pubDate = null;
-    const dateMatch =
-      html.match(/<time[^>]*class="metafield-date"[^>]*>([^<]+)<\/time>/i) ||
-      html.match(/<strong>Publication Date:<\/strong>\s*([^<]+)<\/li>/i);
-    if (dateMatch && dateMatch[1].trim() !== "N/A") {
-      pubDate = dateMatch[1].trim();
-    }
-
-    let language = null;
-    const langMatch = html.match(/<strong>Language:<\/strong>\s*([^<]+)<\/li>/i);
-    if (langMatch && langMatch[1].trim() !== "N/A") {
-      language = langMatch[1].trim();
-    }
-
-    return {
-      title: productJson.title,
-      price,
-      mrp,
-      discount,
-      currency: "INR",
-      in_stock: inStock,
-      stock_status: inStock ? "In Stock" : "Out of Stock",
-      seller: "Atlantic Books",
-      author,
-      publisher: productJson.vendor || null,
-      binding: variant?.option1 || variant?.title || null,
-      language: language || "English",
-      pages,
-      publication_date: pubDate,
-      weight_grams: variant?.weight || null,
-      url: pageUrl,
-    };
-  } catch (e) {
-    return null;
-  }
-}
-
-/**
- * Fallback DOM extraction for Playwright browser pages.
- * @param {import('playwright').Page} page
- * @returns {Promise<Object>}
- */
-async function extractAtlanticDomData(page) {
-  return await page.evaluate(() => {
-    const title = document.querySelector("h1.product-title, h1")?.innerText.trim();
-    let price = null;
-    const pEl = document.querySelector(".price__current .money, [data-price]");
-    if (pEl) {
-      const m = pEl.innerText.match(/₹\s*([\d,.]+)/);
-      if (m) price = parseFloat(m[1].replace(/,/g, ""));
-    }
-    let mrp = null;
-    const mEl = document.querySelector(".price__compare-at .money, [data-price-compare]");
-    if (mEl) {
-      const m = mEl.innerText.match(/₹\s*([\d,.]+)/);
-      if (m) mrp = parseFloat(m[1].replace(/,/g, ""));
-    }
-    let inStock = true;
-    const soldBadge = document.querySelector(".product__badge--soldout");
-    const atcBtn = document.querySelector(".product-form--atc-button");
-    if (soldBadge || atcBtn?.disabled || /sold\s*out/i.test(atcBtn?.innerText || "")) {
-      inStock = false;
-    }
-    return { title, price, mrp, inStock };
+const cheerio=require('cheerio');
+const {normalizeIsbn,sameIsbn}=require('./isbn');
+const clean=value=>{const text=String(value??'').replace(/\s+/g,' ').trim();return !text||/^(?:N\/A|N|NA|none)$/i.test(text)?null:text;};
+function money(value){const match=String(value??'').match(/(?:₹|INR|Rs\.?)\s*([\d,]+(?:\.\d{1,2})?)/);return match?Number(match[1].replace(/,/g,'')):null;}
+const cents=value=>value!==null&&value!==undefined&&Number.isFinite(Number(value))?Number(value)/100:null;
+function parseProduct(html,url,target){
+  const $=cheerio.load(html),scope=$('.product-main').first(),handle=new URL(url).pathname.replace(/^\/products\//,'').replace(/\.js$/,'');
+  let product=null,variantMeta={};
+  $('script[type="application/json"]').each((_,el)=>{try{const data=JSON.parse($(el).text());if(data.product?.handle===handle&&Array.isArray(data.product.variants))product=data.product;}catch{}});
+  try{variantMeta=JSON.parse($('#variant_metafield_data').text()||'{}');}catch{}
+  const variants=product?.variants||[];
+  const variant=variants.find(v=>[v.barcode,v.sku,variantMeta[v.id]?.barcode].some(value=>sameIsbn(value,target))) || variants.find(v=>String(v.id)===new URL(url).searchParams.get('variant')) || variants[0];
+  const vm=variantMeta[variant?.id]||{}, evidence=[],meta={};
+  (scope.closest('.product--section').length ? scope.closest('.product--section') : scope).find('li:has(> strong)').each((_,el)=>{
+    const label=clean($(el).children('strong').first().text())?.replace(/[^a-z0-9]/gi,'').toLowerCase();
+    const value=clean($(el).clone().children('strong').remove().end().text());if(label&&value)meta[label]=value;
+    // Variant-specific DOM values initially describe the default variant.
+    if(/^isbn(?:10|13)?$/.test(label||'') && normalizeIsbn(value) && (!variant||String(variant.id)===String(variants[0]?.id)))evidence.push({source:'product_specifications',value});
   });
+  if(variant)for(const [source,value] of [['shopify_variant_barcode',variant.barcode],['shopify_variant_sku',variant.sku],['variant_metafield_barcode',vm.barcode]])if(normalizeIsbn(value))evidence.push({source,value});
+  const title=clean(scope.find('h1.product-title, h1').first().text())||clean(product?.title);
+  const domPrice=money(scope.find('.price__current .money').first().text());
+  const price=variant?cents(variant.price):domPrice;
+  const mrp=variant?cents(variant.compare_at_price):money(scope.find('.price__compare-at .money').first().text());
+  const atc=scope.find('button.product-form--atc-button').first();
+  const buttonText=clean(atc.text());
+  const stock=typeof variant?.available==='boolean'?variant.available:/sold out|unavailable/i.test(buttonText||'')?false:atc.length&&!atc.is('[disabled],[aria-disabled="true"]')&&/add to cart/i.test(buttonText||'')?true:null;
+  const author=clean(scope.find('.custom-liquid').filter((_,el)=>/^by\s+/i.test(clean($(el).text())||'')).first().text().replace(/^\s*by\s+/i,''));
+  const delivery=scope.find('*').toArray().filter(el=>!$(el).children().length).map(el=>clean($(el).text())).find(text=>/^Ships (?:in|within)/i.test(text||''))||null;
+  return {product_page:!!scope.length&&!!title,title,author,publisher:meta.publisher||clean(product?.vendor),publisher_imprint:meta.publisherimprint||null,
+    binding:clean(vm.binding)||clean(variant?.option1)||meta.binding||null,language:meta.language||null,pages:meta.pages||null,edition:clean(vm.edition)||meta.edition||null,
+    publication_date:meta.publicationdate||null,weight_grams:variant?.weight??null,variant_id:variant?.id||null,
+    price,mrp,discount:mrp&&price!==null&&mrp>price?`${Math.round((mrp-price)/mrp*100)}%`:null,currency:'INR',
+    in_stock:stock,stock_status:stock===true?'In Stock':stock===false?'Out of Stock':'Unknown',delivery,isbn_evidence:evidence,url,source:product?'shopify_product_data_and_dom':'browser_dom'};
 }
-
-module.exports = {
-  fetchAtlanticProductData,
-  extractAtlanticDomData,
-};
+async function extractAtlanticDomData(page){return parseProduct(await page.content(),page.url());}
+module.exports={parseProduct,money,extractAtlanticDomData};

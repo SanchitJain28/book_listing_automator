@@ -7,10 +7,10 @@
   "yellowItemsCount": 131,
   "redItemsCount": 0,
   "latestCursor": {
-    "batchNumber": 4,
-    "sheetRowNumber": 216,
-    "isbn": "9781946104083",
-    "cursorText": "CURSOR - 4"
+    "batchNumber": 8,
+    "sheetRowNumber": 423,
+    "isbn": "9781240028139",
+    "cursorText": "CURSOR - 8"
   },
   "columns": {
     "status": -1,
@@ -2241,7 +2241,7 @@
       "title": "FOR THE GREATER GOOD : puss in space",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -2423,7 +2423,7 @@
       "title": "From Pain To Passion: My Struggle My Reward",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -2436,7 +2436,7 @@
       "title": "From Tragedy To Triumph: ‘The Accident’ … A ‘Drama in Real Life’ Journey In Recovery",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -2579,7 +2579,7 @@
       "title": "Going bush",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -2657,7 +2657,7 @@
       "title": "HOW TO CARE FOR A SPIDER MONKEY: A COMPLETE GUIDE THEIR HABITAT, MAINTAINANCE, DIET, PET OWNERSHIP, HEALTH CARE, AND MANY MORE INCLUDED",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -2775,7 +2775,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 4",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -2878,7 +2878,7 @@
       "title": "How to refine gold with fire: Refining Gold",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -2917,7 +2917,7 @@
       "title": "I.R.I.S.: Induzioni Rapide, Istantanee e Shock (Italian Edition)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -3451,7 +3451,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 5",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -4100,8 +4100,8 @@
       "title": "Loris Kanneworff, una vita per l'aeromodellismo (I Quaderni di Modellismo) (Italian Edition)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
-      "existingCursor": "",
+      "existingReason": "UNAVAILABLE",
+      "existingCursor": "CURSOR - 6",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -4386,7 +4386,7 @@
       "title": "Mejora Total Mente: Como superar mi depresión (Spanish Edition)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -4425,7 +4425,7 @@
       "title": "Meyer Schapiro : the bibliography",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -4503,7 +4503,7 @@
       "title": "Miss Emily's smile: Nail-biting crime adventure of the largest blue diamond ever found. This terrifying odyssey is based on the great stone’s final journey.",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -4803,7 +4803,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 7",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -5114,7 +5114,7 @@
       "title": "Pizza and Pasta: Vegetarian",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -5466,7 +5466,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 8",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -6116,7 +6116,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 9",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -6245,7 +6245,7 @@
       "title": "Sulle tracce di un`ombra (Italian Edition)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -6466,7 +6466,7 @@
       "title": "Terras - Planet im Dunkeln",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -6531,7 +6531,7 @@
       "title": "The Connell short guide to John Steinbeck's Of mice and men",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -6583,7 +6583,7 @@
       "title": "The First Ten Beers: My Misadventures in Travel",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -6739,7 +6739,7 @@
       "title": "The Rape Of The Lock, With The Epistle To Dr. Arbuthnot: With Introductory And Explanatory Notes Selected From Works Of J.w.hales",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -6831,7 +6831,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 10",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -7363,7 +7363,7 @@
       "title": "Trotzdem das Leben lieben 11 Fragen - 11 Großmütter - 11 Schicksale",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -7389,7 +7389,7 @@
       "title": "Tutte le Strade Portano al Calvario: All Roads Lead to Calvary, Italian edition",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -7467,7 +7467,7 @@
       "title": "Verehrt, Vergöttert & Verdorben Wer Bin Ich? Das Große Quiz Der Weiblichen Promis & Persönlichkeiten",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -7493,7 +7493,7 @@
       "title": "Victor Rodriguez: Inside Victor's World",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -7533,7 +7533,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 11",
       "matchType": "Yes",
       "rowColor": "white"
     },
@@ -7789,7 +7789,7 @@
       "isbn": "9780483049987",
       "targetPrice": 2314,
       "sellPrice": 3711,
-      "title": "A Letter from the King to His People",
+      "title": "American state and american statesmen",
       "group": "",
       "status": "Pending",
       "existingReason": "",
@@ -8338,7 +8338,7 @@
       "title": "If Only",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "No",
       "rowColor": "yellow"
@@ -8456,7 +8456,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 1",
       "matchType": "No",
       "rowColor": "yellow"
     },
@@ -9106,7 +9106,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 2",
       "matchType": "No",
       "rowColor": "yellow"
     },

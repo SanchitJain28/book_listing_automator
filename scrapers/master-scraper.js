@@ -38,7 +38,15 @@ const { scrapeAmazonBook } = require("./amazon-isbn/scraper");
 const { scrapeAbeBooksBook } = require("./abebooks/scraper");
 const { scrapeAgapeaBook } = require("./agapea/scraper");
 
+const { scrapeOmPublication } = require("./ompublication/ompublication-isbn");
+
 const DEDICATED_DOMAINS = [
+  {
+    match: "ompublications.in",
+    platform: "Om Publications",
+    method: "scraper/ompublication",
+    scraper: scrapeOmPublication,
+  },
   {
     match: "flipkart.com",
     platform: "Flipkart",
