@@ -72,6 +72,6 @@ test('invalid domains and script URLs are rejected',()=>{assert.equal(mypustakUr
 test('resume skips verified successes by identity while retrying failures',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mypustak-resume-')),output=path.join(dir,'results.jsonl'),items=[{searched_isbn:isbn},{searched_isbn:'9780306406157'}];let calls=[];
  try{await runBatch({items,output,page:{},delay:async()=>{},scrape:async(_,params)=>{calls.push(params.isbn);return {searched_isbn:params.isbn,found:params.isbn===isbn,isbn_matched:params.isbn===isbn};}});assert.equal(calls.length,2);calls=[];
- const {report}=await runBatch({items:[...items].reverse(),output,page:{},delay:async()=>{},scrape:async(_,params)=>{calls.push(params.isbn);return {searched_isbn:params.isbn,found:true,isbn_matched:true};}});assert.deepEqual(calls,['9780306406157']);assert.equal(report.matched_count,2);
+ const {report}=await runBatch({retryFailed:true,items:[...items].reverse(),output,page:{},delay:async()=>{},scrape:async(_,params)=>{calls.push(params.isbn);return {searched_isbn:params.isbn,found:true,isbn_matched:true};}});assert.deepEqual(calls,['9780306406157']);assert.equal(report.matched_count,2);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

@@ -22,7 +22,7 @@ Omit `--headless` for a visible browser. Input may be a text file with one ISBN 
 
 Output is append-only JSON Lines and can be opened directly in the dashboard. A companion `<output-name>.report.json` contains one current summary per input item, including title, URL, ISBN evidence, price, stock, and any failure reason.
 
-Rerunning the same command skips previously verified successes by ISBN and original input URL, even if inputs were reordered. Failures and unverified records are retried; a successful retry is appended, preserving attempt history. Use a **new `--output` path** for a clean verification run and a table with exactly one row per input.
+Rerunning the same command with the same input/output resumes after the saved input prefix, including failed or unverified records. Failures are retried only with `--retry-failed`; retry results are appended to preserve attempt history. Use a **new `--output` path** for a clean verification run and a table with exactly one row per input.
 
 The CLI exits with code 0 when all input records are matched, 2 when any remain unverified, and 1 for setup/fatal errors. Browser profiles are isolated by output path under ignored `profiles/flipkart/`. Processing is sequential with 2–4 seconds between input items, and browser cleanup runs in `finally`.
 
@@ -32,3 +32,5 @@ The CLI exits with code 0 when all input records are matched, 2 when any remain 
 - `core/productExtractor.js`: old and current layouts, product details expansion, scoped extraction.
 - `core/isbn.js`: normalization, checksums, equivalence, evidence precedence.
 - `scraper.js`: single-book orchestration; `runner.js`: CLI, batches, resume, reports.
+
+Resume recovery uses `utils/resume.js`. If interruption leaves an incomplete final JSON line, it is backed up to a `.partial-*.bak` file before the unfinished input is retried. Keep the same input order and output path when resuming. A malformed middle record stops the run rather than silently skipping data.

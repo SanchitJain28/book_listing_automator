@@ -93,7 +93,7 @@ test('resume preserves verified results while retrying failures by input identit
   try {
     await runBatch({ items, output, page: {}, delay: async () => {}, scrape: async (_, direct, target) => { calls.push(target); return { searched_isbn: target, found: target === isbn, isbn_matched: target === isbn }; } });
     assert.equal(calls.length, 2); calls = [];
-    const { report } = await runBatch({ items: [...items].reverse(), output, page: {}, delay: async () => {}, scrape: async (_, direct, target) => { calls.push(target); return { searched_isbn: target, found: true, isbn_matched: true }; } });
+    const { report } = await runBatch({ retryFailed: true, items: [...items].reverse(), output, page: {}, delay: async () => {}, scrape: async (_, direct, target) => { calls.push(target); return { searched_isbn: target, found: true, isbn_matched: true }; } });
     assert.deepEqual(calls, ['9780306406157']); assert.equal(report.matched_count, 2);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

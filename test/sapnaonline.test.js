@@ -64,7 +64,7 @@ test('fresh batch skips no inputs and resume skips verified successes while retr
     await runBatch({ items, output, page: {}, delay: async () => {}, scrape: async (_, direct, target) => { called.push(target); return { searched_isbn: target, found: target === isbn, isbn_matched: target === isbn }; } });
     assert.deepEqual(called, items.map(item => item.searched_isbn));
     called.length = 0;
-    const { report } = await runBatch({ items: [...items].reverse(), output, page: {}, delay: async () => {}, scrape: async (_, direct, target) => { called.push(target); return { searched_isbn: target, found: true, isbn_matched: true }; } });
+    const { report } = await runBatch({ retryFailed: true, items: [...items].reverse(), output, page: {}, delay: async () => {}, scrape: async (_, direct, target) => { called.push(target); return { searched_isbn: target, found: true, isbn_matched: true }; } });
     assert.deepEqual(called, ['9780306406157']);
     assert.equal(report.matched_count, 2);
     assert.equal(identity({ searched_isbn: isbn, url }), identity({ searched_isbn: isbn, input_url: url }));

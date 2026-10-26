@@ -176,7 +176,7 @@ test('resume uses identity across reordering and retries failures while preservi
   fs.writeFileSync(output, [good, bad].map(JSON.stringify).join('\n') + '\n');
   const called = [];
   try {
-    const { report } = await runBatch({ items: [{ searched_isbn: bad.searched_isbn }, { searched_isbn: isbn }], output, page: {}, delay: async () => {}, scrape: async (_, url, value) => { called.push(value); return { searched_isbn: value, found: true, isbn_matched: true }; } });
+    const { report } = await runBatch({ retryFailed: true, items: [{ searched_isbn: bad.searched_isbn }, { searched_isbn: isbn }], output, page: {}, delay: async () => {}, scrape: async (_, url, value) => { called.push(value); return { searched_isbn: value, found: true, isbn_matched: true }; } });
     assert.deepEqual(called, [bad.searched_isbn]);
     assert.equal(report.matched_count, 2);
     assert.equal(latestRecords(output).size, 2);

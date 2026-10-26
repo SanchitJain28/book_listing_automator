@@ -1,3 +1,4 @@
+const { getResumeIndex } = require('../../utils/resume');
 const fs = require("fs");
 const path = require("path");
 const { initBrowser, getRandomDelay } = require("../../utils/browser");
@@ -28,19 +29,7 @@ const { scrapeAmazonBook } = require("./scraper");
     inputItems = readJsonLines(inputFile);
   }
 
-  let startIndex = 0;
-  if (fs.existsSync(outputFilePath)) {
-    const existingOutput = fs
-      .readFileSync(outputFilePath, "utf-8")
-      .split("\n")
-      .filter(Boolean);
-    startIndex = existingOutput.length;
-    if (startIndex > 0) {
-      console.log(
-        `\n▶ Found existing output file with ${startIndex} items. Resuming from item ${startIndex + 1}...`,
-      );
-    }
-  }
+  const startIndex = getResumeIndex(outputFilePath, inputItems);
 
   const profileSuffix = path.basename(inputFile, path.extname(inputFile)).replace(/[^a-zA-Z0-9_-]/g, '_');
   const profileName = `amazon_isbn_profile_${profileSuffix}`;

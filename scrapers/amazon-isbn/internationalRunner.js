@@ -1,3 +1,4 @@
+const { getResumeIndex } = require('../../utils/resume');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -45,14 +46,15 @@ function writeReport(output, items, records) {
   return { report, reportPath };
 }
 
-async function runBatch({ items, output, page, domain = 'amazon.com', scrape = scrapeAmazonBook, delay = () => page.waitForTimeout(getRandomDelay(2000, 5000)) }) {
+async function runBatch({ items, output, page, domain = 'amazon.com', retryFailed = false, scrape = scrapeAmazonBook, delay = () => page.waitForTimeout(getRandomDelay(2000, 5000)) }) {
+  const resumeIndex = retryFailed ? 0 : getResumeIndex(output, items, identity);
   const records = latestRecords(output);
   for (const [index, item] of items.entries()) {
-    if (isComplete(records.get(identity(item)) || {})) continue;
+    if (retryFailed ? isComplete(records.get(identity(item)) || {}) : index < resumeIndex) continue;
     const isbn = item.searched_isbn || item.isbn;
     const directUrl = item.buy_url || item.url;
     const result = await scrape(page, { directUrl, isbn, domain });
-    const record = { ...item, ...result, input_url: directUrl || null, scraped_at: new Date().toISOString() };
+    const record = { ...item, ...result, input_index: index, input_url: directUrl || null, scraped_at: new Date().toISOString() };
     appendResult(output, record);
     records.set(identity(item), record);
     console.log(`[${index + 1}/${items.length}] ${isbn || directUrl}: ${result.title || result.error || result.stock_status} | ${result.price ?? 'No price'} | ${result.stock_status} | ISBN ${result.isbn_matched ? 'matched' : 'not verified'}`);
@@ -78,7 +80,7 @@ async function main(domain) {
     await context.addCookies([{ name: 'i18n-prefs', value: markets[domain].currency, domain: `.${domain}`, path: '/' }]);
     await context.route('**/*', route => ['image', 'media', 'font'].includes(route.request().resourceType()) ? route.abort() : route.continue());
     const page = context.pages()[0] || await context.newPage();
-    const { report, reportPath } = await runBatch({ items, output, page, domain });
+    const { report, reportPath } = await runBatch({ items, output, page, domain, retryFailed: process.argv.includes('--retry-failed') });
     console.log(`Verified ${report.matched_count}/${report.input_count} ISBNs. Report: ${reportPath}`);
     if (report.matched_count !== report.input_count) process.exitCode = 2;
   } finally { await context?.close(); }

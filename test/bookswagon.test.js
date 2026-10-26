@@ -69,7 +69,7 @@ test('duplicate inputs retain output rows and resume skips both verified occurre
  const first=await runBatch({items,output,page:{},delay:async()=>{},scrape:async(_,__,target)=>{calls++;return {searched_isbn:target,found:target===isbn,isbn_matched:target===isbn};}});
  assert.equal(calls,2);assert.equal(first.report.input_count,3);assert.equal(first.report.matched_count,2);
  assert.equal(fs.readFileSync(output,'utf8').trim().split('\n').length,3);
- calls=0;const next=await runBatch({items,output,page:{},delay:async()=>{},scrape:async(_,__,target)=>{calls++;return {searched_isbn:target,found:true,isbn_matched:true};}});
+ calls=0;const next=await runBatch({retryFailed:true,items,output,page:{},delay:async()=>{},scrape:async(_,__,target)=>{calls++;return {searched_isbn:target,found:true,isbn_matched:true};}});
  assert.equal(calls,1);assert.equal(next.report.matched_count,3);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

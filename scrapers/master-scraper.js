@@ -1,3 +1,4 @@
+const { getResumeIndex } = require('../utils/resume');
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
@@ -273,32 +274,16 @@ function appendCsvRow(csvPath, data) {
 
   const isbns = readSearchTerms(inputFile);
 
-  const completedIsbns = new Set();
-  if (fs.existsSync(outputFilePath)) {
-    const lines = fs
-      .readFileSync(outputFilePath, "utf-8")
-      .split("\n")
-      .filter(Boolean);
-    for (const line of lines) {
-      try {
-        const obj = JSON.parse(line);
-        if (obj.isbn) completedIsbns.add(obj.isbn.trim());
-      } catch (e) {}
-    }
-    if (completedIsbns.size > 0) {
-      console.log(`▶ Resuming from item ${completedIsbns.size + 1}...`);
-    }
-  }
+  const startIndex = getResumeIndex(outputFilePath, isbns);
 
   const { context, page } = await initBrowser(
     effectiveHeadless,
     "master_browser_profile",
   );
 
-  for (let i = 0; i < isbns.length; i++) {
+  for (let i = startIndex; i < isbns.length; i++) {
     const isbn = isbns[i].trim();
     if (!isbn) continue;
-    if (completedIsbns.has(isbn)) continue;
 
     console.log(
       `\n\x1b[1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m`,

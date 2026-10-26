@@ -1,3 +1,4 @@
+const { getResumeIndex } = require('../../utils/resume');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -45,7 +46,7 @@ function writeReport(output, items, records) {
   return { report, reportPath };
 }
 
-async function runBatch({ items, output, page, scrape = scrapeBookswagon, delay = () => page.waitForTimeout(getRandomDelay(2000, 4000)) }) {
+async function runBatch({ items, output, page, retryFailed = false, scrape = scrapeBookswagon, delay = () => page.waitForTimeout(getRandomDelay(2000, 4000)) }) {
   const occurrences = new Map();
   items = items.map(item => {
     const key = identity({ ...item, input_occurrence: 1 });
@@ -53,9 +54,10 @@ async function runBatch({ items, output, page, scrape = scrapeBookswagon, delay 
     occurrences.set(key, occurrence);
     return { ...item, input_occurrence: occurrence };
   });
+  const resumeIndex = retryFailed ? 0 : getResumeIndex(output, items, identity);
   const records = latestRecords(output);
   for (const [index, item] of items.entries()) {
-    if (isComplete(records.get(identity(item)) || {})) continue;
+    if (retryFailed ? isComplete(records.get(identity(item)) || {}) : index < resumeIndex) continue;
     const isbn = item.searched_isbn || item.isbn;
     const directUrl = item.buy_url || item.url;
     // Repeated input lines retain their own output row, reusing a verified
@@ -63,7 +65,7 @@ async function runBatch({ items, output, page, scrape = scrapeBookswagon, delay 
     const cached = [...records.values()].find(row => isComplete(row) &&
       identity({ ...row, input_occurrence: 1 }) === identity({ ...item, input_occurrence: 1 }));
     const result = cached || await scrape(page, directUrl, isbn);
-    const record = { ...item, ...result, input_occurrence: item.input_occurrence, input_url: directUrl || null, scraped_at: new Date().toISOString() };
+    const record = { ...item, ...result, input_occurrence: item.input_occurrence, input_index: index, input_url: directUrl || null, scraped_at: new Date().toISOString() };
     appendResult(output, record);
     records.set(identity(item), record);
     console.log(`[${index + 1}/${items.length}] ${isbn || directUrl}: ${result.title || result.error || result.stock_status} | ${result.price ?? 'No price'} | ${result.stock_status} | ISBN ${result.isbn_matched ? 'matched' : 'not verified'}`);
@@ -86,7 +88,7 @@ async function main() {
     context = await chromium.launchPersistentContext(profile, { headless: isHeadless, viewport: { width: 1440, height: 1000 }, locale: 'en-IN', timezoneId: 'Asia/Kolkata' });
     await context.route('**/*', route => ['image', 'media', 'font'].includes(route.request().resourceType()) ? route.abort() : route.continue());
     const page = context.pages()[0] || await context.newPage();
-    const { report, reportPath } = await runBatch({ items, output, page });
+    const { report, reportPath } = await runBatch({ items, output, page, retryFailed: process.argv.includes('--retry-failed') });
     console.log(`Verified ${report.matched_count}/${report.input_count} ISBNs. Report: ${reportPath}`);
     if (report.matched_count !== report.input_count) process.exitCode = 2;
   } finally { await context?.close(); }

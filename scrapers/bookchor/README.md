@@ -23,4 +23,6 @@ Outputs are JSON Lines, with a companion `.report.json` summarizing each ISBN, t
 
 Processing is sequential with 2–4 seconds between inputs, at most three search result pages, and at most three navigation attempts per URL. Blocks, navigation failures, missing markup, empty searches, and ISBN conflicts remain distinct. Browser profiles are isolated under ignored `profiles/bookchor/`, with cleanup in `finally`.
 
-Resume matches ISBN plus original input URL, skipping verified successes and retrying other results. Output is append-only, so retries preserve earlier attempt records. Choose a fresh `--output` filename for one clean row per input. Exit codes are 0 for all matched, 2 for incomplete verification, and 1 for fatal setup failures.
+Normal resume continues after saved output, including blocked, not-found and failed results. Add `--retry-failed` to explicitly retry unsuccessful records. Output is append-only, so retries preserve earlier attempt records. Choose a fresh `--output` filename for one clean row per input. Exit codes are 0 for all matched, 2 for incomplete verification, and 1 for fatal setup failures.
+
+Resume recovery uses `utils/resume.js`. If interruption leaves an incomplete final JSON line, it is backed up to a `.partial-*.bak` file before the unfinished input is retried. Keep the same input order and output path when resuming. A malformed middle record stops the run rather than silently skipping data.

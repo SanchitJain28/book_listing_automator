@@ -1,3 +1,4 @@
+const { getResumeIndex } = require('../../utils/resume');
 const fs = require("fs");
 const path = require("path");
 const { initBrowser, getRandomDelay } = require("../../utils/browser");
@@ -27,14 +28,7 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
     stage1Items = readJsonLines(inputFile);
   }
 
-  let startIndex = 0;
-  if (fs.existsSync(outputFilePath)) {
-    const existingOutput = fs.readFileSync(outputFilePath, "utf-8").split("\n").filter(Boolean);
-    startIndex = existingOutput.length;
-    if (startIndex > 0) {
-      console.log(`\n▶ Found existing output file with ${startIndex} items. Resuming from item ${startIndex + 1}...`);
-    }
-  }
+  const startIndex = getResumeIndex(outputFilePath, stage1Items);
 
   let { context, page } = await initBrowser(isHeadless);
 
