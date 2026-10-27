@@ -5,7 +5,9 @@ function parseSearch(html){
   const $=cheerio.load(html),candidates=[];
   for(let index=0;index<3;index++){
     const card=$(`[data-book-grid-index="${index}"]`).first();if(!card.length)continue;
-    candidates.push({rank:index+1,id:card.find('[data-pid]').first().attr('data-pid')||null,title:card.find('h2[aria-label]').first().text().trim()||null});
+    const id=card.find('[data-pid]').first().attr('data-pid')||null;
+    const link=card.find('a[href]').toArray().map(el=>mypustakUrl($(el).attr('href'))).find(url=>url&&/\/(?:book|product)\//.test(url.pathname)&&(!id||url.pathname.replace(/\/$/,'').endsWith('/'+id)));
+    candidates.push({rank:index+1,id,title:card.find('h2[aria-label]').first().text().trim()||null,...(link?{url:link.href}:{})});
   }
   const text=$('body').text().replace(/\s+/g,' ');
   return {first:candidates[0]||null,candidates,empty:/showing\s+0\s+results|no (?:books|results|products) found|no search results/i.test(text)};
@@ -25,15 +27,45 @@ async function navigate(page,url){
     if(attempt<2)await page.waitForTimeout(2500*(attempt+1));
   }throw last;
 }
+const popupGuards=new WeakMap();
+function popupGuard(page){
+  if(popupGuards.has(page))return popupGuards.get(page);
+  const guard={active:null};
+  const onPopup=popup=>{
+    if(guard.active){guard.active.popups.add(popup);guard.active.choose(popup);}
+    else Promise.resolve().then(()=>popup.close()).catch(()=>{});
+  };
+  page.on('popup',onPopup);
+  page.once('close',()=>{page.removeListener('popup',onPopup);popupGuards.delete(page);});
+  popupGuards.set(page,guard);
+  return guard;
+}
 async function openResult(page,rank=1){
-  const popupPromise=page.waitForEvent('popup',{timeout:8000}).catch(()=>null);
-  await page.locator(`[data-book-grid-index="${rank-1}"] h2[aria-label]`).click({timeout:15000});
-  const popup=await popupPromise, productPage=popup||page;
+  const guard=popupGuard(page);
+  if(guard.active)throw new Error('MyPustak result inspection must be sequential.');
+  let resolveDestination,timer;
+  const destination=new Promise(resolve=>{resolveDestination=resolve;});
+  const operation={popups:new Set(),chosen:null,choose(target){if(!this.chosen){this.chosen=target;resolveDestination(target);}}};
+  guard.active=operation;
+  const sameTab=()=>{if(/\/(?:book|product)\//.test(new URL(page.url()).pathname))operation.choose(page);};
+  page.on('framenavigated',sameTab);
   try {
+    // The popup listener is active throughout the click, including click failures.
+    await page.locator(`[data-book-grid-index="${rank-1}"] h2[aria-label]`).click({timeout:15000});
+    sameTab();
+    if(!operation.chosen)timer=setTimeout(()=>resolveDestination(null),25000);
+    const productPage=operation.chosen||await destination;
+    if(!productPage)throw new Error('MyPustak product did not open within 25 seconds.');
     await productPage.waitForURL(url=>/\/(?:book|product)\//.test(url.pathname),{waitUntil:'domcontentloaded',timeout:25000});
     await productPage.waitForSelector('[itemprop="ISBN"]',{timeout:15000}).catch(()=>{});
     return {html:await ready(productPage),url:productPage.url()};
-  }finally {if(popup)await popup.close();}
+  }finally {
+    clearTimeout(timer);
+    page.removeListener('framenavigated',sameTab);
+    guard.active=null;
+    await Promise.allSettled([...operation.popups].map(popup=>popup.close()));
+    // Keep the idle popup guard until the main page closes: late popups are closed too.
+  }
 }
 const openFirstResult=page=>openResult(page,1);
 module.exports={openResult,mypustakUrl,searchUrl,parseSearch,pageFailure,navigate,openFirstResult};

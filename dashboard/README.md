@@ -39,3 +39,18 @@ The Vite development and preview servers provide GET-only `/api/project-files?pa
 The scraper remains unrun and unchanged by this dashboard work. Before production runs, verify the requirements in `../PLAN.md` against `.com`, `.co.uk` and IberLibro: ISBN lookup, title fallback when ISBN lookup fails, direct product URLs, and choosing the correct result from search URLs.
 
 Known code review gaps: the current shared search helper falls back from `/products/isbn/` to keyword ISBN search only for HTTP 404, with no title fallback; the wrapper selects `listings[0]`; some extraction branches infer a found ISBN from the requested ISBN. A displayed “Matched” value is the scraper's claim, not independent verification.
+
+## VPS monitor
+
+Choose **VPS** in the sidebar to inspect the 27 October manual-search batch on VPS 6. The monitor performs a read-only SSH status check when opened and when **Refresh status** is pressed. It displays tmux session state, processed input positions, recorded ISBN matches, blocks, errors, stock counts, last output time, available RAM, and swap usage. Select a scraper to see its reported outcome breakdown and remote output path. Use **View processes** under VPS resources for the largest processes, their RAM (RSS), PIDs, browser roles and inferred scraper ownership; click Refresh status for a new snapshot. Scraper-group RSS totals include shared pages and can overstate physical RAM. Command-line arguments are not sent to the browser. A running session does not necessarily mean progress; compare the last output time. A block count reflects explicitly recorded blocks, so other unrecognized failures may be counted elsewhere. A finished input is not necessarily a verified listing.
+
+The dedicated script can also be run from the repository root:
+
+```sh
+node scripts/vps-status.js
+node scripts/vps-status.js --json
+```
+
+It requires `ssh`, `sshpass`, a previously verified SSH host key, the VPS 6 credentials in local `VPSInfo.md`, Python 3 and tmux on VPS 6, and the batch's session manifest at `/root/migrations/vps6-manual-20261027T075310Z/sessions.json`. The password is passed to `sshpass` via its environment and is not returned to the browser. A failed connection leaves the last screen snapshot visible with a warning. Refresh performs no scraper starts, stops, retries, or remote file modifications.
+
+This tab currently monitors the specified VPS 6 batch, rather than discovering every scraper on every server. The local GET-only `/api/vps-status` endpoint is restricted to the local dashboard and accepts no arbitrary host or command. It is available on Vite development and preview servers; standalone static builds need a server providing the endpoint. Restart the Vite server after installing this change.

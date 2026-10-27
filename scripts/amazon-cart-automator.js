@@ -751,18 +751,21 @@ async function checkProductPageIsbn(page, searchedIsbn) {
   );
 }
 
-async function openAllOffersSidebar(page) {
-  // Check if offers are already loaded
-  const alreadyLoaded = await page.evaluate(() => {
-    return (
-      document.querySelectorAll("#aod-offer-list #aod-offer, #aod-pinned-offer")
-        .length > 0
-    );
-  });
-  if (alreadyLoaded) return true;
+async function closeAodSidebar(page) {
+  try {
+    await page.evaluate(() => {
+      const closeBtn = document.querySelector(
+        "#aod-close, [data-action='aod-close'], .aod-close-button, #aod-close-button, button[aria-label='Close']",
+      );
+      if (closeBtn) closeBtn.click();
+    });
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(800);
+  } catch (e) {}
+}
 
-  // 1. Try to find and click the trigger in page context
-  const clickedTrigger = await page.evaluate(() => {
+async function triggerAodPopover(page) {
+  return await page.evaluate(() => {
     const triggers = [
       "#buybox-see-all-buying-choices a",
       "#buybox-see-all-buying-choices .a-button-text",
@@ -791,7 +794,6 @@ async function openAllOffersSidebar(page) {
       } catch (e) {}
     }
 
-    // Fallback: search links containing relevant keywords
     const links = Array.from(document.querySelectorAll("a"));
     for (const a of links) {
       const txt = (a.innerText || "").toLowerCase();
@@ -810,35 +812,150 @@ async function openAllOffersSidebar(page) {
 
     return null;
   });
+}
 
-  if (clickedTrigger) {
-    console.log(`   👉 Triggered sidebar link (${clickedTrigger})`);
-  }
+async function openAllOffersSidebar(page) {
+  const res = await openAndExtractAllOffers(page);
+  return res.sidebarOpened;
+}
 
-  // 2. If a format popover appeared (e.g. MediaMatrix format selection for Paperback vs Hardcover)
-  await page.waitForTimeout(800);
-  await page.evaluate(() => {
-    const popoverEntries = Array.from(
-      document.querySelectorAll(
-        ".a-popover:not(.a-popover-preload) .mm-grid-aod-popover-format-entry, " +
-          ".a-popover:not(.a-popover-preload) [data-action='show-all-offers-display'] a, " +
-          "#mediaMatrixGridAODPopoverEntries a, " +
-          ".mm-grid-aod-popover-format-entry",
-      ),
+async function openAndExtractAllOffers(page) {
+  page.__activeAodDrawerIndex = -1;
+
+  // Check if offers are already loaded directly on page
+  const alreadyLoaded = await page.evaluate(() => {
+    return (
+      document.querySelectorAll("#aod-offer-list #aod-offer, #aod-pinned-offer")
+        .length > 0
     );
-
-    for (const entry of popoverEntries) {
-      if (
-        entry &&
-        (entry.offsetParent !== null || entry.id.includes("paperback"))
-      ) {
-        entry.click();
-        return;
-      }
-    }
   });
 
-  // 3. Explicitly WAIT for the AJAX request to populate the offers list (or confirm zero offers)
+  if (!alreadyLoaded) {
+    const clickedTrigger = await triggerAodPopover(page);
+    if (clickedTrigger) {
+      console.log(`   👉 Triggered sidebar link (${clickedTrigger})`);
+    }
+    await page.waitForTimeout(800);
+  }
+
+  // Check if a format popover appeared with multiple format entries
+  const popoverEntries = await page.evaluate(() => {
+    const popover = document.querySelector(".a-popover:not(.a-popover-preload)");
+    if (!popover || popover.offsetParent === null) return [];
+    const entries = Array.from(
+      popover.querySelectorAll(
+        "#mediaMatrixGridAODPopoverEntries a, .mm-grid-aod-popover-format-entry, [data-action='show-all-offers-display'] a",
+      ),
+    );
+    return entries.map((e, idx) => ({
+      idx,
+      text: (e.innerText || "").trim(),
+      id: e.id || "",
+    }));
+  });
+
+  // CASE 1: Multi-option popover detected (e.g. Paperback ₹500 and Paperback ₹450)
+  if (popoverEntries.length > 1) {
+    console.log(
+      `   📂 Multi-option popover detected (${popoverEntries.length} options): ${popoverEntries.map((e) => `"${e.text}"`).join(" | ")}`,
+    );
+
+    const allCollectedOffers = [];
+    let primaryNotice = null;
+
+    for (let i = 0; i < popoverEntries.length; i++) {
+      if (i > 0) {
+        await closeAodSidebar(page);
+        await triggerAodPopover(page);
+        await page.waitForTimeout(800);
+      }
+
+      console.log(
+        `   👉 Inspecting option [${i + 1}/${popoverEntries.length}]: "${popoverEntries[i].text}"`,
+      );
+
+      await page.evaluate((targetIdx) => {
+        const popover = document.querySelector(
+          ".a-popover:not(.a-popover-preload)",
+        );
+        if (!popover) return;
+        const entries = Array.from(
+          popover.querySelectorAll(
+            "#mediaMatrixGridAODPopoverEntries a, .mm-grid-aod-popover-format-entry, [data-action='show-all-offers-display'] a",
+          ),
+        );
+        if (entries[targetIdx]) entries[targetIdx].click();
+      }, i);
+
+      // Wait for AOD offers to populate via AJAX
+      await page
+        .waitForFunction(
+          () => {
+            const count = document.querySelectorAll(
+              "#aod-offer-list #aod-offer, #aod-pinned-offer",
+            ).length;
+            const zeroOfferConfirmed = document.querySelector(
+              "#aod-filter-no-offer-count-heading, .aod-zero-offer-class, input#aod-total-offer-count[value='0']",
+            );
+            return count > 0 || zeroOfferConfirmed !== null;
+          },
+          { timeout: 8000 },
+        )
+        .catch(() => null);
+
+      await page.waitForTimeout(600);
+
+      const { offers: drawerOffers, availabilityNotice } =
+        await extractAllOffers(page);
+      if (availabilityNotice && !primaryNotice) {
+        primaryNotice = availabilityNotice;
+      }
+
+      drawerOffers.forEach((o) => {
+        o.popoverEntryIndex = i;
+        o.popoverLabel = popoverEntries[i].text;
+      });
+
+      page.__activeAodDrawerIndex = i;
+      allCollectedOffers.push(...drawerOffers);
+      console.log(
+        `      ✔ Extracted ${drawerOffers.length} offer(s) from "${popoverEntries[i].text}"`,
+      );
+    }
+
+    // Deduplicate unique offers across options (by seller + itemPrice + condition)
+    const seen = new Set();
+    const uniqueOffers = [];
+    for (const o of allCollectedOffers) {
+      const sellerKey = (o.seller || "").toLowerCase().trim();
+      const priceKey = Math.round((o.itemPrice || 0) * 100);
+      const condKey = (o.condition || "").toLowerCase().trim();
+      const key = `${sellerKey}_${priceKey}_${condKey}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueOffers.push(o);
+      }
+    }
+
+    return {
+      sidebarOpened: true,
+      offers: uniqueOffers,
+      availabilityNotice: primaryNotice,
+    };
+  }
+
+  // CASE 2: Single popover entry
+  if (popoverEntries.length === 1) {
+    await page.evaluate(() => {
+      const entry = document.querySelector(
+        "#mediaMatrixGridAODPopoverEntries a, .mm-grid-aod-popover-format-entry, [data-action='show-all-offers-display'] a",
+      );
+      if (entry) entry.click();
+    });
+    page.__activeAodDrawerIndex = 0;
+  }
+
+  // Wait for sidebar offers to populate via AJAX
   console.log(`   ⏳ Waiting for sidebar offers to populate via AJAX...`);
   const populated = await page
     .waitForFunction(
@@ -856,19 +973,15 @@ async function openAllOffersSidebar(page) {
     .catch(() => null);
 
   if (populated) {
-    // Settle time for prices and GST text to render
     await page.waitForTimeout(600);
-    return true;
   }
 
-  // Final check
-  const finalCount = await page.evaluate(() => {
-    return document.querySelectorAll(
-      "#aod-offer-list #aod-offer, #aod-pinned-offer",
-    ).length;
-  });
-
-  return finalCount > 0;
+  const { offers, availabilityNotice } = await extractAllOffers(page);
+  return {
+    sidebarOpened: populated !== null || offers.length > 0,
+    offers,
+    availabilityNotice,
+  };
 }
 
 async function extractAllOffers(page) {
@@ -1270,11 +1383,52 @@ async function executeAddToCart(page, chosenOffer) {
   if (!chosenOffer) return false;
 
   console.log(
-    `\n🛒 Executing Add-to-Cart for chosen offer (${chosenOffer.source})...`,
+    `\n🛒 Executing Add-to-Cart for chosen offer (${chosenOffer.source}${chosenOffer.popoverLabel ? ` - ${chosenOffer.popoverLabel}` : ""})...`,
   );
 
   try {
     let clicked = false;
+
+    // 0. If offer is from a multi-option popover and that option's drawer is not currently active, switch to it!
+    if (
+      typeof chosenOffer.popoverEntryIndex === "number" &&
+      page.__activeAodDrawerIndex !== undefined &&
+      page.__activeAodDrawerIndex !== chosenOffer.popoverEntryIndex
+    ) {
+      console.log(
+        `   🔄 Switching AOD sidebar to option [${chosenOffer.popoverEntryIndex + 1}]: "${chosenOffer.popoverLabel || ""}"...`,
+      );
+      await closeAodSidebar(page);
+      await triggerAodPopover(page);
+      await page.waitForTimeout(800);
+      await page.evaluate((targetIdx) => {
+        const popover = document.querySelector(
+          ".a-popover:not(.a-popover-preload)",
+        );
+        if (!popover) return;
+        const entries = Array.from(
+          popover.querySelectorAll(
+            "#mediaMatrixGridAODPopoverEntries a, .mm-grid-aod-popover-format-entry, [data-action='show-all-offers-display'] a",
+          ),
+        );
+        if (entries[targetIdx]) entries[targetIdx].click();
+      }, chosenOffer.popoverEntryIndex);
+
+      await page
+        .waitForFunction(
+          () => {
+            return (
+              document.querySelectorAll(
+                "#aod-offer-list #aod-offer, #aod-pinned-offer",
+              ).length > 0
+            );
+          },
+          { timeout: 8000 },
+        )
+        .catch(() => null);
+      await page.waitForTimeout(600);
+      page.__activeAodDrawerIndex = chosenOffer.popoverEntryIndex;
+    }
 
     // 1. Precise targeting for sidebar offers via offerIndex
     if (
@@ -1936,18 +2090,18 @@ async function main() {
             `   🔍 Page ISBN / ASIN: ${isbnCheck.foundIsbn} | Matched: ${isbnCheck.matched ? "🟢 YES" : "🔴 NO"}`,
           );
 
-          // Step 4: Open Sidebar (All Offers Display)
+          // Step 4 & 5: Open All Buying Choices Sidebar & Extract All Offers (Supporting Multi-Option Popovers)
           console.log(`   📂 Opening All Buying Choices / Offers Sidebar...`);
-          const sidebarOpened = await openAllOffersSidebar(page);
+          const {
+            sidebarOpened,
+            offers: rawOffers,
+            availabilityNotice,
+          } = await openAndExtractAllOffers(page);
           console.log(
             `   📂 Sidebar Drawer Status: ${sidebarOpened ? "🟢 Open & Populated" : "⚪ Main Buybox Active"}`,
           );
-
-          // Step 5: Extract All Offers
-          const { offers: rawOffers, availabilityNotice } =
-            await extractAllOffers(page);
           console.log(
-            `   📦 Extracted ${rawOffers.length} offer(s) from page.`,
+            `   📦 Extracted ${rawOffers.length} unique offer(s) from page.`,
           );
           if (rawOffers.length === 0 && availabilityNotice) {
             console.log(`   ℹ️ Amazon Notice: "${availabilityNotice}"`);
@@ -1980,6 +2134,7 @@ async function main() {
             }
           } else {
             evaluation.evaluatedOffers.forEach((o, idx) => {
+              const optionTag = o.popoverLabel ? `[${o.popoverLabel}] ` : "";
               const priceStr = `Item: ₹${o.itemPrice.toFixed(2)}`;
               const penStr =
                 o.isQualified && o.deliveryPenalty > 0
@@ -1999,7 +2154,7 @@ async function main() {
                 : `\x1b[31m✖ ${o.failureReason}${o.margin !== null ? ` (Margin: ₹${o.margin.toFixed(0)})` : ""}\x1b[0m`;
 
               console.log(
-                `   [${idx + 1}] ${priceStr.padEnd(16)} | Del: ${delStr.padEnd(30)} | ${o.seller.slice(0, 18).padEnd(18)} | ${statStr}`,
+                `   [${idx + 1}] ${optionTag}${priceStr.padEnd(16)} | Del: ${delStr.padEnd(30)} | ${(o.seller || "Amazon").slice(0, 18).padEnd(18)} | ${statStr}`,
               );
             });
           }
@@ -2012,6 +2167,9 @@ async function main() {
             console.log(
               `🏆 \x1b[1;32mSELECTED BEST OFFER (HIGHEST SCORE):\x1b[0m`,
             );
+            if (best.popoverLabel) {
+              console.log(`   🏷️  Format Option:   ${best.popoverLabel}`);
+            }
             console.log(
               `   🏪 Seller:          ${best.seller} (${best.condition || "New"})`,
             );

@@ -19,6 +19,8 @@
     "test:ompublication": "node --test test/ompublication.test.js",
     "test:amazon-international": "node --test test/amazon-international.test.js test/amazon-request-policy.test.js test/watcher-amazon-completion.test.js",
     "test:walmart": "node --test test/walmart.test.js",
+    "test:shared-browsers": "node --test test/shared-browser.test.js test/mypustak.test.js",
+    "verify:shared-browsers": "node scripts/verify-shared-browser.js",
     "test:resume": "node --test test/resume.test.js"
   },
   "keywords": [],

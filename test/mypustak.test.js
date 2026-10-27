@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const os=require('node:os');
+const {EventEmitter}=require('node:events');
 const {parseSearch,searchUrl,mypustakUrl,pageFailure,openFirstResult}=require('../scrapers/mypustak/core/search');
 const {parseProduct}=require('../scrapers/mypustak/core/productExtractor');
 const {verifyIsbn,sameIsbn}=require('../scrapers/mypustak/core/isbn');
@@ -12,7 +13,7 @@ const isbn='9788174734099',url=`https://www.mypustak.com/book/dentodrite-interna
 const ref=fs.readFileSync(path.join(__dirname,'../references/mypustak-reference.md'),'utf8');
 const product=ref.split('## Product page refernence')[1],search=ref.split('## Product page refernence')[0];
 function details({identifier=isbn,body='',pricing='<span itemprop="Price">₹199</span><span itemprop="MRP">₹300</span>'}={}){return `<div class="Product_product_maindiv"><div class="product_right_inner"><h1>Book</h1>${pricing}${body}<div class="product_right_details"><div class="row"><span itemprop="ISBN">ISBN :</span><span itemprop="${identifier}">${identifier}</span></div></div></div></div>`;}
-function fakePage(pages,status=200){let current;return {visits:0,async goto(url){this.visits++;current=url;if(!pages[url])throw Error(`Unexpected URL ${url}`);return {status:()=>status};},url:()=>current,content:async()=>pages[current],waitForSelector:async()=>{},waitForTimeout:async()=>{}};}
+function fakePage(pages,status=200){let current;return Object.assign(new EventEmitter(),{visits:0,async goto(url){this.visits++;current=url;if(!pages[url])throw Error(`Unexpected URL ${url}`);return {status:()=>status};},url:()=>current,content:async()=>pages[current],waitForSelector:async()=>{},waitForTimeout:async()=>{}});}
 
 test('search uses value and page=1; only the top three cards are candidates',()=>{
  assert.equal(searchUrl(isbn),`https://www.mypustak.com/search?value=${isbn}&page=1`);const result=parseSearch(search);assert.equal(result.first.id,'2331399');assert.equal(result.first.rank,1);assert.equal(result.candidates.length,3);assert.match(result.first.title,/Dentodrite/);
@@ -30,19 +31,19 @@ test('three mismatching results report mismatch and never inspect a fourth resul
  let clicks=0,rank=0;
  const child={waitForURL:async()=>{},waitForSelector:async()=>{},content:async()=>details({identifier:'9780306406157'}),url:()=>url,close:async()=>{}};
  const page=fakePage({[searchUrl(isbn)]:search});page.waitForEvent=async()=>child;
- page.locator=selector=>({click:async()=>{rank=Number(selector.match(/index="(\d+)"/)[1])+1;assert(rank<=3);clicks++;}});
+ page.locator=selector=>({click:async()=>{rank=Number(selector.match(/index="(\d+)"/)[1])+1;assert(rank<=3);clicks++;page.emit('popup',child);}});
  const result=await scrapeMyPustakBook(page,{isbn});assert.equal(result.found,false);assert.equal(result.search_candidates_checked.length,3);assert.equal(clicks,3);assert.equal(result.stock_status,'ISBN mismatch');
 });
 test('an exact second result is selected after rejecting the first and stops further inspection',async()=>{
  let clicks=0,rank=0;
  const child={waitForURL:async()=>{},waitForSelector:async()=>{},content:async()=>details({identifier:rank===2?isbn:'9780306406157'}),url:()=>url,close:async()=>{}};
  const page=fakePage({[searchUrl(isbn)]:search});page.waitForEvent=async()=>child;
- page.locator=selector=>({click:async()=>{rank=Number(selector.match(/index="(\d+)"/)[1])+1;clicks++;}});
+ page.locator=selector=>({click:async()=>{rank=Number(selector.match(/index="(\d+)"/)[1])+1;clicks++;page.emit('popup',child);}});
  const result=await scrapeMyPustakBook(page,{isbn});assert.equal(result.found,true);assert.equal(result.search_candidate.rank,2);assert.equal(result.search_candidates_checked.length,2);assert.equal(clicks,2);
 });
 test('popup is closed after extraction and even when product load fails',async()=>{
  let closed=0;const child={waitForURL:async()=>{},waitForSelector:async()=>{},content:async()=>product,url:()=>url,close:async()=>{closed++;}};
- const page={waitForEvent:async()=>child,locator:()=>({click:async()=>{}})};
+ const page=Object.assign(new EventEmitter(),{url:()=>searchUrl(isbn),locator:()=>({click:async()=>{page.emit('popup',child);}})});
  assert.equal((await openFirstResult(page)).url,url);assert.equal(closed,1);
  child.content=async()=>{throw Error('failed');};await assert.rejects(openFirstResult(page),/failed/);assert.equal(closed,2);
 });
@@ -74,4 +75,28 @@ test('resume skips verified successes by identity while retrying failures',async
  try{await runBatch({items,output,page:{},delay:async()=>{},scrape:async(_,params)=>{calls.push(params.isbn);return {searched_isbn:params.isbn,found:params.isbn===isbn,isbn_matched:params.isbn===isbn};}});assert.equal(calls.length,2);calls=[];
  const {report}=await runBatch({retryFailed:true,items:[...items].reverse(),output,page:{},delay:async()=>{},scrape:async(_,params)=>{calls.push(params.isbn);return {searched_isbn:params.isbn,found:true,isbn_matched:true};}});assert.deepEqual(calls,['9780306406157']);assert.equal(report.matched_count,2);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('popup cleanup covers a click that throws after opening a product',async()=>{
+ let closed=0;const child={close:async()=>{closed++;}};
+ const page=Object.assign(new EventEmitter(),{url:()=>searchUrl(isbn),locator:()=>({click:async()=>{page.emit('popup',child);throw Error('click timed out');}})});
+ await assert.rejects(openFirstResult(page),/click timed out/);assert.equal(closed,1);assert.equal(page.listenerCount('framenavigated'),0);
+ page.emit('popup',child);await new Promise(resolve=>setImmediate(resolve));assert.equal(closed,2);
+ page.emit('close');assert.equal(page.listenerCount('popup'),0);
+});
+test('same-tab results are supported and unexpected additional popups are closed',async()=>{
+ let current=searchUrl(isbn),closed=0;
+ const child={close:async()=>{closed++;}};
+ const page=Object.assign(new EventEmitter(),{url:()=>current,locator:()=>({click:async()=>{current=url;page.emit('framenavigated');page.emit('popup',child);}}),
+  waitForURL:async()=>{},waitForSelector:async()=>{},content:async()=>product});
+ assert.equal((await openFirstResult(page)).url,url);assert.equal(closed,1);assert.equal(page.listenerCount('framenavigated'),0);
+ page.emit('close');
+});
+
+test('an explicit card product link is inspected in the reusable main page without a popup',async()=>{
+ const html=`<div data-book-grid-index="0"><div data-pid="2331399"><a href="${url}"><h2 aria-label="Book">Book</h2></a></div></div>`;
+ const page=fakePage({[searchUrl(isbn)]:html,[url]:details({body:'<button>Add to cart</button>'})});
+ page.waitForEvent=()=>{throw Error('No popup should be opened');};
+ const result=await scrapeMyPustakBook(page,{isbn});assert.equal(result.found,true);assert.equal(result.search_candidate.url,url);assert.equal(page.visits,2);
+ const wrong=html.replace(url,'https://mypustak.com.evil.example/book/book/2331399');assert.equal(parseSearch(wrong).candidates[0].url,undefined);
 });

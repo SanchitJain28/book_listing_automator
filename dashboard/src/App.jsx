@@ -10,12 +10,13 @@ import {
   CloseRounded, CloudUploadOutlined, DataObjectRounded, DescriptionOutlined,
   FilterAltOffRounded, FolderOpenOutlined, GridViewRounded, HelpOutlineRounded,
   LibraryBooksOutlined, MenuRounded, SearchRounded, ShieldOutlined,
-  StorefrontOutlined, TableRowsRounded, VerifiedOutlined, WarningAmberRounded,
+  StorefrontOutlined, TableRowsRounded, VerifiedOutlined, WarningAmberRounded, DnsOutlined,
 } from '@mui/icons-material';
 import { DataGrid } from '@mui/x-data-grid';
 import { formatMoney, normalizeRecords } from './lib/output';
 import { parseDataFile } from './lib/dataFile';
 import ProjectFileDialog from './ProjectFileDialog';
+import VpsDashboard from './VpsDashboard';
 import { demoRecords } from './demo';
 import { listRecentOutputs, saveRecentOutput, readRecentOutput, removeRecentOutput } from './lib/recentOutputs';
 
@@ -95,6 +96,7 @@ function RecordDrawer({ row, onClose }) {
 export default function App() {
   const inputRef = useRef(null);
   const loadId = useRef(0);
+  const [workspaceView, setWorkspaceView] = useState('outputs');
   const [records, setRecords] = useState([]);
   const [file, setFile] = useState(null);
   const [error, setError] = useState(null);
@@ -129,7 +131,7 @@ export default function App() {
   const matched = data.books.filter(row => row.match === 'Matched').length;
   const errors = data.books.filter(row => ['Error', 'Blocked'].includes(row.status)).length;
   const resetFilters = () => { setQuery(''); setStatus('all'); setStore('all'); setMatch('all'); setPagination(previous => ({ ...previous, page: 0 })); };
-  const installRecords = (next, metadata) => { setRecords(next); setFile(metadata); setError(null); setSelected(null); resetFilters(); };
+  const installRecords = (next, metadata) => { setWorkspaceView('outputs'); setRecords(next); setFile(metadata); setError(null); setSelected(null); resetFilters(); };
   const updateFilter = setter => value => { setter(value); setPagination(previous => ({ ...previous, page: 0 })); };
 
   async function loadContent(content, metadata, id) {
@@ -209,7 +211,7 @@ export default function App() {
   const sidebar = <Stack sx={{ height: '100%', p: 2, overflowY: 'auto' }}>
     <Stack direction="row" spacing={1.2} alignItems="center" sx={{ px: 1, py: 2.3, mb: 3 }}><Avatar variant="rounded" sx={{ bgcolor: '#363636', color: '#ededed', width: 34, height: 34 }}><LibraryBooksOutlined fontSize="small" /></Avatar><Box><Typography sx={{ fontWeight: 700, fontSize: '0.9rem', letterSpacing: '-0.3px' }}>Book Listing</Typography><Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', letterSpacing: 1.5 }}>SCRAPER WORKSPACE</Typography></Box></Stack>
     <Typography variant="overline" color="text.secondary" sx={{ px: 1.5, mb: 1 }}>Workspace</Typography>
-    <List disablePadding><ListItemButton selected onClick={() => { setMobileNav(false); document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }); }} sx={{ borderRadius: 2, '&.Mui-selected': { bgcolor: '#323232', color: 'primary.main' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}><GridViewRounded sx={{ fontSize: 19 }} /></ListItemIcon><ListItemText primary="Output explorer" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }} /></ListItemButton></List>
+    <List disablePadding><ListItemButton selected={workspaceView === 'outputs'} onClick={() => { setWorkspaceView('outputs'); setMobileNav(false); }} sx={{ borderRadius: 2, '&.Mui-selected': { bgcolor: '#323232', color: 'primary.main' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}><GridViewRounded sx={{ fontSize: 19 }} /></ListItemIcon><ListItemText primary="Output explorer" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }} /></ListItemButton><ListItemButton selected={workspaceView === 'vps'} onClick={() => { setWorkspaceView('vps'); setMobileNav(false); }} sx={{ borderRadius: 2, mt: .5, '&.Mui-selected': { bgcolor: '#323232', color: 'primary.main' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}><DnsOutlined sx={{ fontSize: 19 }} /></ListItemIcon><ListItemText primary="VPS" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }} /></ListItemButton></List>
     <Button startIcon={<FolderOpenOutlined />} onClick={() => { setMobileNav(false); setProjectBrowserOpen(true); }} sx={{ mt: 1, justifyContent: 'flex-start', color: 'text.secondary', px: 1.5, fontSize: '0.8rem' }}>Browse project files</Button>
     <Box sx={{ mt: 3, mb: 2, flex: 1 }}>
       <Typography variant="overline" color="text.secondary" sx={{ px: 1.5 }}>Recent outputs</Typography>
@@ -233,15 +235,16 @@ export default function App() {
     <Drawer open={mobileNav} onClose={() => setMobileNav(false)} PaperProps={{ sx: { width: SIDEBAR, bgcolor: '#1c1c1c' } }}>{sidebar}</Drawer>
     <Box sx={{ width: { xs: '100%', md: `calc(100% - ${SIDEBAR}px)` }, ml: { md: `${SIDEBAR}px` }, minWidth: 0 }}>
       <Box component="header" sx={{ height: 66, px: { xs: 2, lg: 4.5 }, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Stack direction="row" spacing={1} alignItems="center"><IconButton aria-label="Open navigation" onClick={() => setMobileNav(true)} sx={{ display: { md: 'none' } }}><MenuRounded /></IconButton><Breadcrumbs sx={{ fontSize: '0.75rem' }}><Typography color="text.secondary" sx={{ fontSize: 'inherit' }}>Workspace</Typography><Typography sx={{ fontSize: 'inherit' }}>Output explorer</Typography></Breadcrumbs></Stack>
+        <Stack direction="row" spacing={1} alignItems="center"><IconButton aria-label="Open navigation" onClick={() => setMobileNav(true)} sx={{ display: { md: 'none' } }}><MenuRounded /></IconButton><Breadcrumbs sx={{ fontSize: '0.75rem' }}><Typography color="text.secondary" sx={{ fontSize: 'inherit' }}>Workspace</Typography><Typography sx={{ fontSize: 'inherit' }}>{workspaceView === 'vps' ? 'VPS' : 'Output explorer'}</Typography></Breadcrumbs></Stack>
         <Chip icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'secondary.main', ml: '10px !important' }} />} label="Local workspace" size="small" variant="outlined" sx={{ fontSize: '0.67rem' }} />
       </Box>
       <Box component="main" sx={{ p: { xs: 2, sm: 3, lg: 4.5 }, maxWidth: 1920, mx: 'auto' }}>
+        <Box component="input" ref={inputRef} type="file" accept=".json,.jsonl,.ndjson,.csv,.tsv,.txt,application/json,text/csv,text/plain" aria-label="Choose scraper output file" sx={{ display: 'none' }} onChange={event => { importFile(event.target.files?.[0]); event.target.value = ''; }} />
+        {workspaceView === 'vps' ? <VpsDashboard /> : <>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3.5 }}>
           <Box><Stack direction="row" spacing={1.2} alignItems="center" sx={{ mb: 1 }}><Typography variant="overline" color="primary">DATA WORKSPACE</Typography><Chip label="v0.1" size="small" sx={{ height: 18, fontSize: '0.6rem', color: 'text.secondary' }} /></Stack><Typography variant="h4">A clearer view of every result.</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.82rem' }}>Explore book listings, compare sellers, and check what your scraper found.</Typography></Box>
           <Button variant="contained" startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <FolderOpenOutlined />} onClick={() => setProjectBrowserOpen(true)} disabled={loading} sx={{ flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'center' }, px: 2.3, py: 1 }}>Open output file</Button>
         </Stack>
-        <Box component="input" ref={inputRef} type="file" accept=".json,.jsonl,.ndjson,.csv,.tsv,.txt,application/json,text/csv,text/plain" aria-label="Choose scraper output file" sx={{ display: 'none' }} onChange={event => { importFile(event.target.files?.[0]); event.target.value = ''; }} />
         {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}{file && ' Your previous file is still open.'}</Alert>}
         {storageWarning && <Alert severity="warning" onClose={() => setStorageWarning(null)} sx={{ mb: 2 }}>{storageWarning}</Alert>}
         {file?.demo && <Alert severity="info" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={() => setProjectBrowserOpen(true)}>Open real output</Button>}>Sample data · These synthetic examples demonstrate the interface and are not live scraper results.</Alert>}
@@ -278,6 +281,7 @@ export default function App() {
           <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ px: 2.5, py: 1.5 }}><Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}><DescriptionOutlined sx={{ fontSize: 15, color: 'text.secondary' }} /><Typography variant="caption" color="text.secondary" noWrap>{file ? file.projectPath || file.name : 'No output file selected'}{file?.size != null ? ` · ${(file.size / 1024).toLocaleString('en-US', { maximumFractionDigits: 1 })} KB` : ''}</Typography></Stack><Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>{file ? `${rows.length.toLocaleString()} ${isTable ? 'rows' : view === 'books' ? 'books' : 'offers'} in view` : 'Read-only explorer'}</Typography></Stack>
         </Paper>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1} sx={{ mt: 2.5 }}><Typography variant="caption" color="text.secondary">Prices stay in their source currency. Shipping is displayed separately.</Typography><Link component="button" variant="caption" onClick={() => setHelpOpen(true)} underline="hover" color="text.secondary">About output formats <ArrowOutwardRounded sx={{ fontSize: 11, verticalAlign: 'middle' }} /></Link></Stack>
+        </>}
       </Box>
     </Box>
     <ProjectFileDialog open={projectBrowserOpen} onClose={() => setProjectBrowserOpen(false)} onOpen={openProjectFile} onUpload={() => inputRef.current?.click()} loading={loading} />

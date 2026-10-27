@@ -8,6 +8,7 @@ const { getRandomDelay } = require('../../utils/browser');
 const { chromium } = require('playwright-extra');
 const { normalizeIsbn } = require('./core/isbn');
 const { scrapeMyPustakBook } = require('./scraper');
+const { createRecyclingPageSession } = require('../../utils/managedBrowser');
 
 function identity(item) {
   const inputUrl = Object.hasOwn(item, 'input_url') ? item.input_url : item.buy_url || item.url || null;
@@ -46,19 +47,24 @@ function writeReport(output, items, records) {
   return { report, reportPath };
 }
 
-async function runBatch({ items, output, page, retryFailed = false, scrape = scrapeMyPustakBook, delay = () => page.waitForTimeout(getRandomDelay(2000, 4000)) }) {
+async function runBatch({ items, output, page, session, signal, retryFailed = false, scrape = scrapeMyPustakBook, delay }) {
   const resumeIndex = retryFailed ? 0 : getResumeIndex(output, items, identity);
   const records = latestRecords(output);
   for (const [index, item] of items.entries()) {
+    if (signal?.aborted) break;
     if (retryFailed ? isComplete(records.get(identity(item)) || {}) : index < resumeIndex) continue;
     const isbn = item.searched_isbn || item.isbn;
     const directUrl = item.buy_url || item.url;
-    const result = await scrape(page, { directUrl, isbn });
+    const workingPage = session ? await session.getPage() : page;
+    if (signal?.aborted) break;
+    const result = await scrape(workingPage, { directUrl, isbn });
+    if (signal?.aborted) break;
     const record = { ...item, ...result, input_index: index, input_url: directUrl || null, scraped_at: new Date().toISOString() };
     appendResult(output, record);
     records.set(identity(item), record);
+    if (session) await session.afterRecord();
     console.log(`[${index + 1}/${items.length}] ${isbn || directUrl}: ${result.title || result.error || result.stock_status} | ${result.price ?? 'No price'} | ${result.stock_status} | ISBN ${result.isbn_matched ? 'matched' : 'not verified'}`);
-    if (index < items.length - 1) await delay();
+    if (index < items.length - 1) await (delay ? delay() : workingPage.waitForTimeout(getRandomDelay(2000, 4000)));
   }
   return writeReport(output, items, records);
 }
@@ -71,16 +77,24 @@ async function main() {
   const items = inputFile.toLowerCase().endsWith('.txt') ? readSearchTerms(inputFile).map(searched_isbn => ({ searched_isbn })) : readJsonLines(inputFile);
   if (!items.length) throw new Error('Input contains no records.');
   const profile = path.resolve(__dirname, '../../profiles/mypustak', crypto.createHash('sha256').update(output).digest('hex').slice(0, 12));
-  let context;
+  const session = createRecyclingPageSession({ recycleEvery: 100, open: async () => {
+    const context = await chromium.launchPersistentContext(profile, { headless: isHeadless, viewport: { width: 1440, height: 1000 }, locale: 'en-IN', timezoneId: 'Asia/Kolkata' });
+    try {
+      await context.route('**/*', route => ['image', 'media', 'font'].includes(route.request().resourceType()) ? route.abort() : route.continue());
+      const page = context.pages()[0] || await context.newPage();
+      return { context, page };
+    } catch (error) { await context.close(); throw error; }
+  } });
+  const stop = new AbortController();
+  const onSignal = () => { stop.abort(); console.log('Stopping MyPustak after the current browser call; pending input remains resumable.'); };
+  process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
   console.log(`MyPustak input: ${inputFile}\nOutput: ${output}`);
   try {
-    context = await chromium.launchPersistentContext(profile, { headless: isHeadless, viewport: { width: 1440, height: 1000 }, locale: 'en-IN', timezoneId: 'Asia/Kolkata' });
-    await context.route('**/*', route => ['image', 'media', 'font'].includes(route.request().resourceType()) ? route.abort() : route.continue());
-    const page = context.pages()[0] || await context.newPage();
-    const { report, reportPath } = await runBatch({ items, output, page, retryFailed: process.argv.includes('--retry-failed') });
+    const { report, reportPath } = await runBatch({ items, output, session, signal: stop.signal, retryFailed: process.argv.includes('--retry-failed') });
     console.log(`Verified ${report.matched_count}/${report.input_count} ISBNs. Report: ${reportPath}`);
-    if (report.matched_count !== report.input_count) process.exitCode = 2;
-  } finally { await context?.close(); }
+    if (stop.signal.aborted) process.exitCode = 130;
+    else if (report.matched_count !== report.input_count) process.exitCode = 2;
+  } finally { process.removeListener('SIGINT', onSignal); process.removeListener('SIGTERM', onSignal); await session.close(); }
 }
 
 module.exports = { main, identity, isComplete, latestRecords, writeReport, runBatch };

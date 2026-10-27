@@ -28,7 +28,9 @@ async function scrapeMyPustakBook(page,{directUrl,isbn:targetIsbn}={}){
     if(!search.candidates.length){if(search.empty)return emptyResult(isbn,page.url(),'Not Listed');throw Object.assign(new Error('Search exposed neither result cards nor an explicit empty result.'),{code:'extraction_error'});}
     let firstResult;
     for(const candidate of search.candidates){
-      const opened=await openResult(page,candidate.rank);url=opened.url;
+      // Reuse the current page when the card exposes a real product URL.
+      // Otherwise retain the site's click/popup navigation; never invent a URL from its ID.
+      const opened=candidate.url?{html:await navigate(page,candidate.url),url:page.url()}:await openResult(page,candidate.rank);url=opened.url;
       const result=extract(opened.html,opened.url,candidate);
       if(!firstResult)firstResult=result;
       if(result.isbn_matched)return {...result,search_candidates_checked:checked};

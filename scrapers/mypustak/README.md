@@ -16,3 +16,11 @@ Prices come from the target product panel, excluding recommendations, discounts,
 Navigation uses bounded retries and sequential 2–4 second pacing. Resume continues after saved output, preserving successes and failures. Add `--retry-failed` for an intentional retry pass. Browser resources close in finally. No cart actions, purchases or form submissions occur. Exit code 2 signals incomplete ISBN verification.
 
 Resume recovery uses `utils/resume.js`. If interruption leaves an incomplete final JSON line, it is backed up to a `.partial-*.bak` file before the unfinished input is retried. Keep the same input order and output path when resuming. A malformed middle record stops the run rather than silently skipping data.
+
+## Bounded browser memory
+
+The standalone runner now recycles its persistent browser context after every 100 saved inputs and closes extra pages after each input. It keeps the existing output/resume paths and top-three ISBN matching rule. Context generations, open-page counts and Node RSS are logged every 25 inputs. Ctrl+C/SIGTERM finishes cleanup and leaves the current pending input resumable.
+
+Popup tracking starts before the candidate click and remains active through click failures. An idle guard closes late popups until the main page closes. If a card exposes an actual same-site product URL matching its product ID, the scraper can navigate the reusable main page directly; it never constructs a URL from an ID. All extraction still happens through Playwright.
+
+For the shared Node/two-browser runner and resource/cache comparison options, see `../../scripts/SHARED-SCRAPERS.md`.
