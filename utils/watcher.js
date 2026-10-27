@@ -126,15 +126,22 @@ function startScraper() {
       return;
     }
 
-    // International Amazon runners use 2 for a finished batch with unmatched,
-    // unavailable-to-verify, or blocked records. Repeating that batch is not a
-    // crash recovery and can keep requesting the same failed ISBNs indefinitely.
-    const completedWithUnverified = code === 2 && !signal &&
+    if (!signal && [2, 3].includes(code) && path.basename(targetScript) === "walmart-isbn.js") {
+      console.log(code === 3
+        ? "[Watcher] Walmart paused after a block. Resume manually after the saved cooldown; no automatic restart."
+        : "[Watcher] Walmart batch completed with unverified ISBNs. Review its report; no automatic restart.");
+      process.exit(code);
+    }
+
+    // International Amazon: 2 means completed with unverified rows, 3 means
+    // deliberately paused after blocks. Neither should trigger crash recovery.
+    const internationalStop = [2, 3].includes(code) && !signal &&
       ["amazon-us-isbn.js", "amazon-uk-isbn.js"].includes(path.basename(targetScript));
 
-    if (completedWithUnverified) {
-      console.log("\n[Watcher] Batch finished with unverified ISBNs. Review its report; automatic retries are stopped.\n");
-      process.exit(2);
+    if (internationalStop) {
+      if (code === 2) console.log("\n[Watcher] Batch finished with unverified ISBNs. Review its report; automatic retries are stopped.\n");
+      if (code === 3) console.log("[Watcher] Amazon circuit paused. Resume manually after the saved cooldown; no automatic restart.");
+      process.exit(code);
     } else if (code === 0) {
       console.log(
         `\n\x1b[32m🎉 [Watcher] Scraper completed all items successfully! Exiting watcher.\x1b[0m\n`,

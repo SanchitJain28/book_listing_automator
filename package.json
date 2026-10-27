@@ -17,7 +17,8 @@
     "test:atlanticbooks": "node --test test/atlanticbooks.test.js",
     "test:mypustak": "node --test test/mypustak.test.js",
     "test:ompublication": "node --test test/ompublication.test.js",
-    "test:amazon-international": "node --test test/amazon-international.test.js",
+    "test:amazon-international": "node --test test/amazon-international.test.js test/amazon-request-policy.test.js test/watcher-amazon-completion.test.js",
+    "test:walmart": "node --test test/walmart.test.js",
     "test:resume": "node --test test/resume.test.js"
   },
   "keywords": [],

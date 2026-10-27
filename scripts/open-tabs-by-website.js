@@ -531,6 +531,10 @@ async function main() {
     );
     const initialChoice = await askQuestion("Your choice (or press [ENTER]): ");
     if (initialChoice) {
+      if (initialChoice.trim().toLowerCase() === "q") {
+        console.log("\n👋 Exited.\n");
+        return;
+      }
       const parsedNum = parseInt(initialChoice, 10);
       if (!isNaN(parsedNum) && parsedNum >= 1 && parsedNum <= domains.length) {
         currentDomainIndex = parsedNum - 1;

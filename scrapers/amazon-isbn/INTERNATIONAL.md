@@ -21,3 +21,15 @@ The 25 ISBNs in `test/data/amazon-scraper/input.txt` were tested on Amazon.com. 
 20 listings had independently matching product ISBNs (1 in stock, 19 out of stock). Searches for `9780727914217`, `9788481747430`, and `9783111000657` returned explicit empty results. The first listing for `9780753139578` exposed ISBN-10 `1585679070`, a different edition. The first listing for `9781441780751` was ASIN `B004PF5CHM` without product ISBN evidence, so it remained unverified. These five records are not counted as verified matches. There was no UK live run, per the user's instruction.
 
 Resume recovery uses `utils/resume.js`. If interruption leaves an incomplete final JSON line, it is backed up to a `.partial-*.bak` file before the unfinished input is retried. Keep the same input order and output path when resuming. A malformed middle record stops the run rather than silently skipping data.
+
+## Request pacing and block recovery
+
+Amazon.com and Amazon.co.uk wait a random 2–5 seconds before each subsequent page navigation, including search-to-product transitions and retries. The existing 2–5 second delay between ISBNs also remains. Failed requests use exponential backoff starting at 30 seconds, doubling to a maximum of 5 minutes. `Retry-After` accepts seconds or an HTTP date; its deadline is always honored even when longer than the backoff cap. Waits log progress every minute.
+
+For a slower run, add `--slow`. This doubles both pacing ranges to 4–10 seconds, doubles transient failure backoff to start at 60 seconds (capped at 10 minutes), and pauses immediately on the first block for at least 30 minutes. A longer `Retry-After` is honored. It leaves the normal mode unchanged. The delays are doubled, but actual throughput also depends on loading times and other waits; running ten machines simultaneously increases aggregate traffic. None of these settings guarantees access.
+
+After three consecutive blocked responses, or immediately on a CAPTCHA form, the batch stops and closes its browser. The pending ISBN is not appended to completed output, and the remaining inputs are not requested. The blocked attempt goes to `<output>.blocked.jsonl`; `<output>.pause.json` records the pending input and a cooldown of at least 5 minutes, extended by `Retry-After` when necessary. The verification report includes the pause details.
+
+Restart the same command with the same input and output after the printed `resume_after` time. Restarting earlier exits without opening a browser. After cooldown, normal resume retries the pending ISBN and preserves earlier output. Historical blocked records already in the main output retain the existing resume behavior; `--retry-failed` intentionally retries those records. A pause exits with code **3**; the watcher recognizes it and does not auto-restart. Completed runs with unverified inputs still exit with code **2**.
+
+These changes are covered by offline request, cooldown, resume and watcher tests in `npm run test:amazon-international`. Pacing does not guarantee Amazon will accept a request.

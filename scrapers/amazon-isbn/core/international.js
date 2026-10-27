@@ -1,3 +1,4 @@
+const { policyForPage } = require('./requestPolicy');
 const cheerio = require('cheerio');
 const { normalizeIsbn, isValidIsbn, verifyIsbn } = require('./isbn');
 const clean = value => String(value ?? '').replace(/[\u200e\u200f\u202a-\u202e]/g, '').replace(/\s+/g, ' ').trim() || null;
@@ -81,17 +82,28 @@ function pageFailure(html, status = 200) {
   if ([403,429,503].includes(status) || $('form[action*="validateCaptcha"], #captchacharacters').length || /robot check|sorry! something went wrong/i.test(title) || /enter the characters you see below|something went wrong on our end|sorry, we just need to make sure/i.test(text)) return { code: 'blocked', message: `Amazon blocked the request (HTTP ${status}).` };
   return status >= 400 ? { code: 'http_error', message: `Amazon returned HTTP ${status}.` } : null;
 }
-async function navigate(page, url) {
+async function navigate(page, url, requestPolicy = policyForPage(page)) {
   let last;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try { const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await requestPolicy.beforeRequest();
+    let response, html, failure;
+    try {
+      response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
       const status = response?.status() || 200;
       if (status < 400) await page.waitForSelector(/\/(?:dp|gp\/product)\//.test(new URL(url).pathname) ? '#productTitle' : '.s-search-results [data-component-type="s-search-result"], .s-no-results-result, #captchacharacters', { timeout: 12000 }).catch(() => {});
-      const html = await page.content(), failure = pageFailure(html, status);
-      if (!failure) return html;
+      html = await page.content(); failure = pageFailure(html, status);
+      if (!failure) { requestPolicy.success(); return html; }
       last = Object.assign(new Error(failure.message), { code: failure.code });
     } catch (error) { last = error; }
-    if (attempt < 1) await page.waitForTimeout(3000);
+    const $ = html ? cheerio.load(html) : null;
+    const captcha = !!$ && !!$('form[action*="validateCaptcha"], #captchacharacters').length;
+    const headers = response?.headers ? await response.headers() : {};
+    const retryAfter = headers['retry-after'] || headers['Retry-After'];
+    const state = requestPolicy.failure({ blocked: last.code === 'blocked', retryAfter, captcha });
+    Object.assign(last, state, { retry_after: retryAfter || null });
+    if (state.circuit_open) throw last;
+    // Non-transient HTTP errors do not benefit from repeated requests.
+    if (last.code === 'http_error' && response?.status() < 500) throw last;
   }
   throw last;
 }
@@ -113,6 +125,9 @@ async function scrapeInternationalAmazon(page, { isbn: target, directUrl, domain
     const validation = verifyIsbn(isbn,data);
     return { store: markets[domain].store, searched_isbn: isbn, found: validation.isbn_matched, ...data, ...validation,
       ...(!validation.isbn_matched ? { listing_stock_status: data.stock_status, stock_status: validation.found_isbn ? 'ISBN mismatch' : 'ISBN unverified' } : {}) };
-  } catch (error) { return empty(error.code === 'blocked' ? 'Blocked' : 'Error',error.code || 'navigation_error',error.message); }
+  } catch (error) {
+    return { ...empty(error.code === 'blocked' ? 'Blocked' : 'Error', error.code || 'navigation_error', error.message),
+      ...(error.resume_after ? { resume_after: error.resume_after, circuit_open: !!error.circuit_open, consecutive_blocks: error.consecutive_blocks, retry_after: error.retry_after } : {}) };
+  }
 }
-module.exports = { markets, amazonUrl, searchUrl, parseSearch, parseProduct, readPrice, pageFailure, scrapeInternationalAmazon };
+module.exports = { markets, amazonUrl, searchUrl, parseSearch, parseProduct, readPrice, pageFailure, navigate, scrapeInternationalAmazon };

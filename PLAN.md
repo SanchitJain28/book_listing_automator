@@ -76,3 +76,8 @@
 
 - We have to directly search isbn on bookchor like at this url
 - https://www.ompublications.in/products/search?q=9789326352000 (Please confirm this url for searching books)
+
+## Walmart
+
+- We have to directly search isbn on walmart like at this url
+- https://www.walmart.com/search?q=9798287703462 (Please confirm this url for searching books)

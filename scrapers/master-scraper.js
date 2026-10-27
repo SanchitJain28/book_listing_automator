@@ -40,8 +40,15 @@ const { scrapeAbeBooksBook } = require("./abebooks/scraper");
 const { scrapeAgapeaBook } = require("./agapea/scraper");
 
 const { scrapeOmPublication } = require("./ompublication/ompublication-isbn");
+const { scrapeWalmart } = require("./walmart/walmart-isbn");
 
 const DEDICATED_DOMAINS = [
+  {
+    match: "walmart.com",
+    platform: "Walmart",
+    method: "scraper/walmart",
+    scraper: scrapeWalmart,
+  },
   {
     match: "ompublications.in",
     platform: "Om Publications",

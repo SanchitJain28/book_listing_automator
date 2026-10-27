@@ -20,6 +20,9 @@ function checkCompletion(scriptName, exitCode) {
 }
 
 for (const script of ['amazon-us-isbn.js', 'amazon-uk-isbn.js']) {
+  test(`${script}: circuit pause stops automatic restarts`, () => {
+    assert.match(checkCompletion(script, 3), /no automatic restart/);
+  });
   test(`${script}: completed batch with unverified records stops instead of restarting`, () => {
     assert.match(checkCompletion(script, 2), /automatic retries are stopped/);
   });
@@ -27,3 +30,9 @@ for (const script of ['amazon-us-isbn.js', 'amazon-uk-isbn.js']) {
 test('successful completion still exits normally', () => {
   assert.match(checkCompletion('amazon-us-isbn.js', 0), /completed all items successfully/);
 });
+
+for (const code of [2, 3]) {
+  test(`Walmart deliberate exit ${code} does not restart`, () => {
+    assert.match(checkCompletion('walmart-isbn.js', code), /no automatic restart/);
+  });
+}

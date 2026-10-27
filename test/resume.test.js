@@ -67,7 +67,7 @@ for (const name of runners) {
       const isbn = typeof arg === 'object' && arg ? arg.isbn : target;
       calls.push(isbn);
       if (calls.length === 3) throw new Error('simulated interruption');
-      return { searched_isbn: isbn, found: isbn !== ids[0], isbn_matched: isbn !== ids[0], stock_status: isbn === ids[0] ? 'Blocked' : 'In Stock' };
+      return { searched_isbn: isbn, found: isbn !== ids[0], isbn_matched: isbn !== ids[0], stock_status: isbn === ids[0] ? (name === 'amazon-isbn/internationalRunner' ? 'Error' : 'Blocked') : 'In Stock' };
     };
     await assert.rejects(runBatch({ items, output: file, page: {}, delay: async () => {}, scrape }), /simulated interruption/);
     assert.equal(fs.readFileSync(file, 'utf8').trim().split('\n').length, 2);

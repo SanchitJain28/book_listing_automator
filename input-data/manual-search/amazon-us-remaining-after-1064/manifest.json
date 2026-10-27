@@ -1,0 +1,122 @@
+{
+  "created_at": "2026-10-27T09:14:10.878947+00:00",
+  "source": "input-data/manual-search/input.txt",
+  "source_sha256": "4ddf60f6f94c8065a2bfddce7e8593ad00f30874b7c14d6a00efba337845eaff",
+  "total_input_rows": 5647,
+  "excluded_input_positions": 1064,
+  "remaining_input_rows": 4583,
+  "excluded_status_counts": {
+    "Out of Stock": 201,
+    "Unknown": 296,
+    "Not Found": 242,
+    "In Stock": 79,
+    "ISBN mismatch": 119,
+    "ISBN unverified": 30,
+    "Blocked": 35,
+    "Error": 62
+  },
+  "excluded_verified_matches": 576,
+  "excluded_output_prefix_sha256": "ea9f7a1270cf3181753049f7e0a9271cd32fdcaa483dfa5a344d081d1be840bc",
+  "chunks": [
+    {
+      "chunk": 1,
+      "file": "chunk-01.txt",
+      "count": 459,
+      "input_start": 1065,
+      "input_end": 1523,
+      "first_isbn": "9780789037206",
+      "last_isbn": "9788430605057",
+      "sha256": "ddef12934a1e0ff34ca2244f1779262faf6d2158a4d4f515bfbb9773ea3b6899"
+    },
+    {
+      "chunk": 2,
+      "file": "chunk-02.txt",
+      "count": 459,
+      "input_start": 1524,
+      "input_end": 1982,
+      "first_isbn": "9786070704659",
+      "last_isbn": "9781889262505",
+      "sha256": "ef6d6e9b2f05c9d64762267a685b148d7bbe4822fdffc69b36430c862bc58a31"
+    },
+    {
+      "chunk": 3,
+      "file": "chunk-03.txt",
+      "count": 459,
+      "input_start": 1983,
+      "input_end": 2441,
+      "first_isbn": "9781906784157",
+      "last_isbn": "9781508489832",
+      "sha256": "9b6f3699894d27a04a47f05453584ce45af6ab04c9e36072a68033acb57cfde9"
+    },
+    {
+      "chunk": 4,
+      "file": "chunk-04.txt",
+      "count": 458,
+      "input_start": 2442,
+      "input_end": 2899,
+      "first_isbn": "9781511933032",
+      "last_isbn": "9781541348318",
+      "sha256": "ca4124553c9c915067785823edb563b8150126260f58e06ef78b28b956da1e30"
+    },
+    {
+      "chunk": 5,
+      "file": "chunk-05.txt",
+      "count": 458,
+      "input_start": 2900,
+      "input_end": 3357,
+      "first_isbn": "9798329029819",
+      "last_isbn": "9780259966616",
+      "sha256": "efee85c850ed3176ee9836e0b4d3898a5f2713f5603eab8ef70cc34ea819bf4c"
+    },
+    {
+      "chunk": 6,
+      "file": "chunk-06.txt",
+      "count": 458,
+      "input_start": 3358,
+      "input_end": 3815,
+      "first_isbn": "9789351444992",
+      "last_isbn": "9780999415689",
+      "sha256": "6155adbb9dd52cfb954689446a7716b1b4913ae677717938d5326ab1166e2955"
+    },
+    {
+      "chunk": 7,
+      "file": "chunk-07.txt",
+      "count": 458,
+      "input_start": 3816,
+      "input_end": 4273,
+      "first_isbn": "9781937559045",
+      "last_isbn": "9788189996321",
+      "sha256": "d6dc61c6ef237a1f3943db1a84dbc823ec284eb3e226609f87c13a4d7caf93ed"
+    },
+    {
+      "chunk": 8,
+      "file": "chunk-08.txt",
+      "count": 458,
+      "input_start": 4274,
+      "input_end": 4731,
+      "first_isbn": "9789373745190",
+      "last_isbn": "9789387925618",
+      "sha256": "d9ee87269e2bb3f7e34eaa32991ea897f20650d427ad0f6c070f5edbe1e1c48d"
+    },
+    {
+      "chunk": 9,
+      "file": "chunk-09.txt",
+      "count": 458,
+      "input_start": 4732,
+      "input_end": 5189,
+      "first_isbn": "9788130929798",
+      "last_isbn": "9789350237052",
+      "sha256": "74032ab4237414a2a0368dc84a83ba1a4b2720476eddf3b1421c0fa3dc1895f0"
+    },
+    {
+      "chunk": 10,
+      "file": "chunk-10.txt",
+      "count": 458,
+      "input_start": 5190,
+      "input_end": 5647,
+      "first_isbn": "9789388850568",
+      "last_isbn": "9780074515273",
+      "sha256": "38833ea48d65791345f0a9476dd042731245bb0df57e069b011db64441af1993"
+    }
+  ]
+}

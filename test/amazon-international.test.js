@@ -60,7 +60,7 @@ test('shared scraper infers marketplace from a direct US or UK product URL', asy
 });
 test('blocked pages never count as empty results; navigation retries are bounded', async () => {
  const search = searchUrl(isbn, 'amazon.com'); const page = fakePage({ [search]: '<title>Robot Check</title><form action="/errors/validateCaptcha"></form>' });
- const data = await scrapeInternationalAmazon(page, { isbn, domain: 'amazon.com' }); assert.equal(data.stock_status, 'Blocked'); assert.equal(page.visits.length, 2); assert.equal(pageFailure('', 503).code, 'blocked');
+ const data = await scrapeInternationalAmazon(page, { isbn, domain: 'amazon.com' }); assert.equal(data.stock_status, 'Blocked'); assert.equal(page.visits.length, 1); assert.equal(data.circuit_open, true); assert.equal(pageFailure('', 503).code, 'blocked');
  const empty = await scrapeInternationalAmazon(fakePage({ [search]: '<body>No results for this ISBN</body>' }), { isbn, domain: 'amazon.com' }); assert.equal(empty.stock_status, 'Not Found');
 });
 test('resume preserves verified results and retries failures by identity', async () => {
