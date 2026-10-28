@@ -11,6 +11,7 @@ const theme = createTheme({
     background: { default: '#181818', paper: '#222222' },
     text: { primary: '#ededed', secondary: '#a6a6a6', disabled: '#737373' },
     divider: '#383838',
+    DataGrid: { bg: '#222222', headerBg: '#282828', pinnedBg: '#222222' },
     success: { main: '#c2c2c2' },
     warning: { main: '#c2c2c2' },
     error: { main: '#c2c2c2' },

@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Card, Chip, CircularProgress, Divider, LinearProgress, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import { CloudOutlined, DataUsageRounded, RefreshRounded, StorageRounded, WarningAmberRounded, VerifiedOutlined } from '@mui/icons-material';
-import { DataGrid } from '@mui/x-data-grid';
+import DataGrid from './DashboardDataGrid';
+import { vpsStateStyle } from './lib/vpsStyles';
 
 const number = value => Number(value || 0).toLocaleString();
 const gib = bytes => bytes == null ? '—' : `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 const when = date => date ? new Date(date).toLocaleString() : 'No output yet';
-const chipStyle = state => state === 'Running' ? { color: '#9be1b5', borderColor: '#447b58', bgcolor: '#20392a' }
-  : ['Finished', 'Queued'].includes(state) ? { color: '#d4d4d4', borderColor: '#666', bgcolor: '#303030' }
-    : { color: '#ffb2a6', borderColor: '#8a5050', bgcolor: '#3b2727' };
 
 function Stat({ label, value, caption, icon }) {
   return <Card variant="outlined" sx={{ p: 2.2, minWidth: 0 }}>
@@ -43,7 +41,7 @@ export default function VpsDashboard() {
     matched: sum.matched + row.counts.matched, blocked: sum.blocked + row.counts.blocked, errors: sum.errors + row.counts.errors }), { processed: 0, total: 0, matched: 0, blocked: 0, errors: 0 });
   const columns = useMemo(() => [
     { field: 'name', headerName: 'Scraper', minWidth: 155, flex: 1, renderCell: ({ row }) => <Stack justifyContent="center" sx={{ height: '100%' }}><Typography sx={{ fontSize: '.8rem', fontWeight: 600 }}>{row.name}</Typography><Typography variant="caption" color="text.secondary" sx={{ fontSize: '.65rem' }}>{row.session}</Typography></Stack> },
-    { field: 'state', headerName: 'Session', width: 112, renderCell: ({ value }) => <Chip size="small" label={value} variant="outlined" sx={{ height: 24, ...chipStyle(value) }} /> },
+    { field: 'state', headerName: 'Session', width: 112, renderCell: ({ value }) => <Chip size="small" label={value} variant="outlined" sx={{ height: 24, ...vpsStateStyle(value) }} /> },
     { field: 'processed', headerName: 'Progress', width: 190, renderCell: ({ row }) => <Box sx={{ width: '100%', pr: 1 }}><Stack direction="row" justifyContent="space-between"><Typography sx={{ fontSize: '.75rem', fontVariantNumeric: 'tabular-nums' }}>{number(row.processed)} / {number(row.total)}</Typography><Typography variant="caption" color="text.secondary">{row.total ? (row.processed / row.total * 100).toFixed(1) : '0.0'}%</Typography></Stack><LinearProgress variant="determinate" value={row.total ? Math.min(100, row.processed / row.total * 100) : 0} sx={{ height: 5, mt: .8, borderRadius: 8, bgcolor: '#3b3b3b', '& .MuiLinearProgress-bar': { bgcolor: '#c6c6c6', borderRadius: 8 } }} /></Box> },
     { field: 'matched', headerName: 'ISBN matches', type: 'number', width: 116, valueGetter: (_, row) => row.counts.matched, valueFormatter: value => number(value) },
     { field: 'blocked', headerName: 'Blocked', type: 'number', width: 105, valueGetter: (_, row) => row.counts.blocked, renderCell: ({ value, row }) => <Tooltip title={`${row.processed ? (value / row.processed * 100).toFixed(1) : '0.0'}% of processed records`}><Typography sx={{ fontSize: '.78rem', fontWeight: value ? 700 : 400, color: value ? '#ff9f9f' : 'text.secondary' }}>{number(value)}</Typography></Tooltip> },

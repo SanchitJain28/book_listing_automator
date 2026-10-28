@@ -1,11 +1,13 @@
 """Dashboard VPS operations. Invoked over SSH with a validated JSON request."""
-import base64, fcntl, hashlib, json, os, re, shlex, subprocess, sys, time
+import base64, fcntl, hashlib, json, os, re, shlex, signal, subprocess, sys, time
 from pathlib import Path
 ROOT = Path('/root/book_listing_automator')
 STATE = Path.home() / '.book-listing-dashboard'
 SCRIPTS = {name: 'scrapers/{0}/{0}-isbn.js'.format(name) for name in ['atlanticbooks','bookchor','bookswagon','flipkart','mypustak','ompublication','sapnaonline','abebooks','walmart']}
 SCRIPTS.update({'amazon-in':'scrapers/amazon-isbn/amazon-isbn.js','amazon-com':'scrapers/amazon-us-isbn/amazon-us-isbn.js','amazon-uk':'scrapers/amazon-uk-isbn/amazon-uk-isbn.js'})
+SCRIPTS['abebooks-google']='scrapers/abebooks-google/abebooks-google-isbn.js'
 LEGACY = {'abebooks','amazon-in'}
+SHARED = 'scripts/run-shared-scrapers.js'
 
 def run(*args, check=True, timeout=30):
     p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
@@ -28,7 +30,9 @@ def jobs():
     if not STATE.exists(): return []
     found=[]
     for f in sorted(STATE.glob('*.json'),reverse=True):
-        try: found.append(json.loads(f.read_text()))
+        try:
+            job=json.loads(f.read_text())
+            if job.get('kind')!='scraper-process' and all(key in job for key in ('id','scraper','input','output','session')): found.append(job)
         except (ValueError,OSError): continue
     return found
 
@@ -62,47 +66,294 @@ def output_stats(path):
                 except (ValueError,UnicodeDecodeError,AttributeError): bad+=1
     return dict(processed=rows,matched=matches,errors=errors,blocked=blocks,invalid_lines=bad,last_isbn=last)
 
-def discover_jobs():
-    """Discover compatible already-running CLI jobs without exposing process arguments."""
+def process_identity(pid):
+    """Kernel identity prevents stale PIDs from controlling unrelated processes."""
+    try:
+        directory=Path('/proc')/str(int(pid)); raw=(directory/'stat').read_text()
+        values=raw[raw.rfind(')')+2:].split()
+        return {'pid':int(pid),'parent':int(values[1]),'start':values[19],'state':values[0],
+                'executable':os.readlink(directory/'exe')}
+    except (OSError,ValueError,IndexError,TypeError): return None
+
+def process_spec(executable,cwd,args):
+    executable=str(Path(executable).resolve())
+    if Path(executable).name not in ('node','nodejs') or Path(cwd).resolve()!=ROOT.resolve() or len(args)<3: return None
+    try:
+        script=str(Path(args[1]).relative_to(ROOT)) if Path(args[1]).is_absolute() else args[1]
+        if script not in set(SCRIPTS.values())|{SHARED}: return None
+        if not safe_path(script,'scripts' if script==SHARED else 'scrapers').is_file(): return None
+        rel=str(Path(args[2]).relative_to(ROOT)) if Path(args[2]).is_absolute() else args[2]
+        inp=safe_path(rel,'input-data')
+        if not inp.is_file(): return None
+        flags={}; tail=args[3:]; index=0
+        while index<len(tail):
+            flag=tail[index]
+            if flag in ('--headless','--slow','--retry-failed','--retry-zero-links','--no-clearance-reuse'): flags[flag]=True
+            elif flag in ('--output','--platforms','--concurrency','--browsers','--batch-size','--resources','--output-subdir') and index+1<len(tail) and not tail[index+1].startswith('--'):
+                index+=1;flags[flag]=tail[index]
+            else: return None
+            index+=1
+        if '--output' in flags:
+            value=Path(flags['--output']); output=str(value.relative_to(ROOT)) if value.is_absolute() else str(value)
+            safe_path(output,'output')
+        else: output=None
+        if '--output-subdir' in flags: safe_path('output/'+flags['--output-subdir'],'output')
+        with inp.open('rb') as f: total=sum(1 for row in f if row.strip())
+        shared=script==SHARED
+        name=next((name for name,value in SCRIPTS.items() if value==script),None)
+        if not shared:
+            if not output and name=='walmart': output=f'output/walmart/{Path(rel).parent.name}-{Path(rel).stem}.jsonl'
+            elif not output and name=='abebooks-google': output=f'output/abebooks-google/{Path(rel).parent.name if Path(rel).stem=="input" else Path(rel).stem}/results.jsonl'
+            elif name in LEGACY or not output: output='output/'+str(Path(rel).relative_to('input-data').with_suffix('.json'))
+            safe_path(output,'output')
+        command=[executable,script,rel]+tail
+        return {'command':command,'command_key':hashlib.sha256(json.dumps(command).encode()).hexdigest(),'input':rel,
+                'input_sha256':hashlib.sha256(inp.read_bytes()).hexdigest(),'total':total,'shared':shared,'scraper':name,'output':output}
+    except (OSError,ValueError,KeyError,TypeError): return None
+
+def known_processes():
     result=[]
-    for line in run('ps','-eo','pid=,args=',check=False).splitlines():
-        parts=line.strip().split(None,1)
-        if len(parts)!=2: continue
-        try: pid=int(parts[0]); args=shlex.split(parts[1])
-        except (ValueError,TypeError): continue
-        if len(args)<3 or Path(args[0]).name!='node': continue
-        script=args[1]
-        if script.startswith(str(ROOT)+'/'): script=script[len(str(ROOT))+1:]
-        if script=='scripts/run-shared-scrapers.js':
-            directory=ROOT/'output/shared-runs'
-            for path in directory.glob('*.status.json') if directory.exists() else []:
-                try:
-                    snapshot=json.loads(path.read_text())
-                    if snapshot.get('pid')!=pid: continue
-                    rel=args[2]; rel=str(Path(rel).relative_to(ROOT)) if Path(rel).is_absolute() else rel
-                    safe_path(rel,'input-data')
-                    for name,row in snapshot.get('scrapers',{}).items():
-                        out=Path(row['output']); outrel=str(out.relative_to(ROOT)) if out.is_absolute() else str(out)
-                        output=safe_path(outrel,'output'); metrics=output_stats(output)
-                        attempts=Path(str(output)+'.blocked.jsonl')
-                        if attempts.exists(): metrics['blocked']+=output_stats(attempts)['processed']
-                        result.append({'id':f'external-{pid}-{name}','scraper':name,'input':rel,'output':outrel,'total':row.get('total',0),'state':row.get('state','Unknown'),'running':row.get('state')=='Running',**metrics})
-                except (OSError,ValueError,KeyError,TypeError): continue
-            continue
-        names=[name for name,filename in SCRIPTS.items() if filename==script]
-        if not names: continue
+    for directory in Path('/proc').iterdir():
+        if not directory.name.isdigit(): continue
+        identity=process_identity(directory.name)
+        if not identity or Path(identity['executable']).name not in ('node','nodejs'): continue
         try:
-            rel=args[2]; rel=str(Path(rel).relative_to(ROOT)) if Path(rel).is_absolute() else rel
-            inp=safe_path(rel,'input-data')
-            if not inp.is_file(): continue
-            if '--output' in args:
-                raw=Path(args[args.index('--output')+1]); outrel=str(raw.relative_to(ROOT)) if raw.is_absolute() else str(raw)
-            else: outrel='output/'+str(Path(rel).relative_to('input-data').with_suffix('.json'))
-            output=safe_path(outrel,'output')
-            with inp.open('rb') as f: total=sum(1 for row in f if row.strip())
-            result.append({'id':f'external-{pid}','scraper':names[0],'input':rel,'output':outrel,'total':total,'state':'Running','running':True,**output_stats(output)})
-        except (OSError,ValueError,IndexError,TypeError): continue
+            args=[os.fsdecode(value) for value in (directory/'cmdline').read_bytes().split(b'\0') if value]
+            spec=process_spec(identity['executable'],os.readlink(directory/'cwd'),args)
+            if spec: result.append((identity,spec))
+        except (OSError,ValueError): continue
     return result
+
+def tracked_records():
+    result=[]
+    if STATE.exists():
+        for file in STATE.glob('process-*.json'):
+            try:
+                record=json.loads(file.read_text())
+                if record.get('kind')=='scraper-process' and re.fullmatch(r'process-[a-f0-9]{20}',record.get('id','')): result.append(record)
+            except (OSError,ValueError): continue
+    return result
+
+def save_record(record):
+    STATE.mkdir(mode=0o700,parents=True,exist_ok=True)
+    file=STATE/(record['id']+'.json'); temporary=file.with_suffix('.tmp')
+    temporary.write_text(json.dumps(record));temporary.chmod(0o600);temporary.replace(file)
+
+def shared_rows(identity,spec):
+    directory=ROOT/'output/shared-runs'
+    for file in directory.glob('*.status.json') if directory.exists() else []:
+        try:
+            snapshot=json.loads(file.read_text())
+            if snapshot.get('pid')!=identity['pid']: continue
+            rows=[]
+            for name,row in snapshot.get('scrapers',{}).items():
+                if name not in SCRIPTS: continue
+                value=Path(row['output']); output=str(value.relative_to(ROOT)) if value.is_absolute() else str(value)
+                safe_path(output,'output')
+                rows.append({'scraper':name,'input':spec['input'],'output':output,'total':row.get('total',spec['total'])})
+            if rows: return rows,str(file.relative_to(ROOT))
+        except (OSError,ValueError,KeyError,TypeError): continue
+    return [],None
+
+def discover_groups():
+    records=tracked_records(); active=known_processes(); bound=set()
+    for identity,spec in active:
+        existing=next((r for r in records if r.get('pid')==identity['pid'] and r.get('start')==identity['start']),None)
+        if not existing:
+            existing=next((r for r in records if r.get('command_key')==spec['command_key'] and r['id'] not in bound and not live_record(r)),None)
+        if not existing:
+            ident=hashlib.sha256((spec['command_key']+str(identity['pid'])+identity['start']).encode()).hexdigest()[:20]
+            rows,status_file=shared_rows(identity,spec) if spec['shared'] else ([{key:spec[key] for key in ('scraper','input','output','total')}],None)
+            if not rows: continue
+            existing={'kind':'scraper-process','id':'process-'+ident,**spec,'rows':rows,'status_file':status_file,'created_at':int(time.time())};records.append(existing)
+        bound.add(existing['id'])
+        if existing.get('pid')!=identity['pid'] or existing.get('start')!=identity['start']:
+            existing.update(pid=identity['pid'],start=identity['start']);save_record(existing)
+    return records
+
+def live_record(record):
+    identity=process_identity(record.get('pid',0))
+    if not identity or identity['start']!=record.get('start'): return None
+    try:
+        directory=Path('/proc')/str(identity['pid'])
+        args=[os.fsdecode(value) for value in (directory/'cmdline').read_bytes().split(b'\0') if value]
+        spec=process_spec(identity['executable'],os.readlink(directory/'cwd'),args)
+        return identity if spec and spec['command_key']==record.get('command_key') else None
+    except OSError: return None
+
+def pause_for(output,shared=False):
+    suffix='.shared-pause.json' if shared else '.pause.json'
+    try: return json.loads(Path(str(output)+suffix).read_text())
+    except (OSError,ValueError): return {}
+
+def pause_files(output):
+    return [Path(str(output)+suffix) for suffix in ('.pause.json','.shared-pause.json')]
+
+def discover_jobs():
+    result=[]
+    for record in discover_groups():
+        identity=live_record(record); live=bool(identity); shared=record['shared']; snapshot={}
+        if shared and record.get('status_file'):
+            try: snapshot=json.loads(safe_path(record['status_file'],'output').read_text()).get('scrapers',{})
+            except (OSError,ValueError): pass
+        pending=any(output_stats(safe_path(row['output'],'output'))['processed']<row['total'] for row in record['rows'])
+        for row in record['rows']:
+            output=safe_path(row['output'],'output'); metrics=output_stats(output)
+            attempts=Path(str(output)+'.blocked.jsonl')
+            if attempts.exists(): metrics['blocked']+=output_stats(attempts)['processed']
+            pause=pause_for(output,shared); until=pause.get('resume_after'); cooling=bool(until and iso_timestamp(until)>time.time())
+            has_pause=any(file.exists() for file in pause_files(output))
+            finished=metrics['processed']>=row['total']
+            if finished: state='Finished'
+            elif cooling: state='Blocked'
+            elif live and shared: state=snapshot.get(row['scraper'],{}).get('state','Running')
+            elif live: state='Running'
+            else: state='Stopped'
+            result.append({**row,**metrics,'id':record['id']+'-'+row['scraper'],'control_id':record['id'],'state':state,'running':live and state=='Running',
+                           'process_running':live,'shared':shared,'group_scrapers':[r['scraper'] for r in record['rows']],
+                           'can_stop':live,'can_resume':not live and pending and (shared or not cooling),'resume_after':until,
+                           'can_clear_pause':has_pause,'can_retry':not finished and (has_pause or state in ('Blocked','Failed')),'pause_reason':pause.get('reason')})
+    return result
+
+def iso_timestamp(value):
+    from datetime import datetime
+    try: return datetime.fromisoformat(str(value).replace('Z','+00:00')).timestamp()
+    except (ValueError,TypeError): return 0
+
+def control_record(identifier):
+    if not isinstance(identifier,str) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,100}',identifier): raise ValueError('Invalid scraper job.')
+    records=discover_groups()
+    record=next((record for record in records if record['id']==identifier),None)
+    if record: return record
+    job=next((job for job in jobs() if job['id']==identifier),None)
+    if not job or job['scraper'] not in SCRIPTS: raise ValueError('The scraper job no longer exists. Refresh the VPS status.')
+    inp=safe_path(job['input'],'input-data');safe_path(job['output'],'output')
+    if hashlib.sha256(inp.read_bytes()).hexdigest()!=job.get('input_sha256'): raise ValueError('Input changed since this job was created.')
+    executable=run('which','node')
+    command=[executable,SCRIPTS[job['scraper']],job['input'],'--headless']
+    if job['scraper'] not in LEGACY: command+=['--output',job['output']]
+    spec=process_spec(executable,str(ROOT),command)
+    if not spec or spec['output']!=job['output']: raise ValueError('Saved job does not match the scraper output path.')
+    record={'kind':'scraper-process','id':'process-'+hashlib.sha256(identifier.encode()).hexdigest()[:20],**spec,
+            'rows':[{key:job[key] for key in ('scraper','input','output','total')}],'pid':None,'start':None,'created_at':int(time.time())}
+    save_record(record);return record
+
+def browser_children(root):
+    identities=[]
+    for directory in Path('/proc').iterdir():
+        if directory.name.isdigit():
+            item=process_identity(directory.name)
+            if item: identities.append(item)
+    descendants={root['pid']};changed=True
+    while changed:
+        changed=False
+        for item in identities:
+            if item['parent'] in descendants and item['pid'] not in descendants:
+                descendants.add(item['pid']);changed=True
+    return [item for item in identities if item['pid']!=root['pid'] and item['pid'] in descendants
+            and re.search(r'ms-playwright|playwright.*cache|chrome-for-testing|chrome-linux|chromium-',item['executable'],re.I)
+            and re.search(r'chrome|chromium|crashpad',Path(item['executable']).name,re.I)]
+
+def signal_identity(identity,signum):
+    current=process_identity(identity['pid'])
+    if current and current['start']==identity['start'] and current['executable']==identity['executable']:
+        try: os.kill(identity['pid'],signum)
+        except ProcessLookupError: pass
+
+def stop_job(identifier):
+    record=control_record(identifier);identity=live_record(record)
+    if not identity: raise ValueError('This scraper process has already stopped. Refresh the VPS status.')
+    children=browser_children(identity)
+    if identity['state']=='T':
+        for item in [identity]+children: signal_identity(item,signal.SIGCONT)
+    signal_identity(identity,signal.SIGINT)
+    deadline=time.monotonic()+12
+    while live_record(record) and time.monotonic()<deadline: time.sleep(.25)
+    if live_record(record):
+        signal_identity(identity,signal.SIGTERM)
+        deadline=time.monotonic()+3
+        while live_record(record) and time.monotonic()<deadline: time.sleep(.25)
+    if live_record(record): signal_identity(identity,signal.SIGKILL)
+    for item in children: signal_identity(item,signal.SIGTERM)
+    if children:
+        time.sleep(.5)
+        for item in children: signal_identity(item,signal.SIGKILL)
+    record['stopped_at']=int(time.time());save_record(record)
+    return {'message':'Stopped the scraper batch; saved outputs are preserved.' if record['shared'] else 'Stopped the scraper; saved output is preserved.',
+            'scrapers':[row['scraper'] for row in record['rows']]}
+
+def validate_resume(record,ignore_identity=None,skip_cooldown=False):
+    command=record.get('command',[])
+    spec=process_spec(command[0] if command else '',str(ROOT),command)
+    if not spec or spec['command_key']!=record['command_key']: raise ValueError('The saved scraper command is no longer valid.')
+    if spec['input_sha256']!=record['input_sha256']: raise ValueError('Input changed since this run was recorded. Restore the original input before resuming.')
+    outputs={row['output'] for row in record['rows']}
+    if all(output_stats(safe_path(row['output'],'output'))['processed']>=row['total'] for row in record['rows']): raise ValueError('This scraper has completed its input.')
+    if not record['shared'] and not skip_cooldown:
+        pause=pause_for(safe_path(record['output'],'output'))
+        if iso_timestamp(pause.get('resume_after'))>time.time(): raise ValueError('Scraper cooldown is active until '+pause['resume_after']+'.')
+    for identity,active in known_processes():
+        if ignore_identity and identity['pid']==ignore_identity['pid'] and identity['start']==ignore_identity['start']: continue
+        if active['command_key']==record['command_key'] or active['input']==record['input'] and active['command'][1]==command[1]: raise ValueError('A matching scraper process is already running.')
+        active_rows,_=shared_rows(identity,active) if active['shared'] else ([{'output':active['output']}],None)
+        if any(row['output'] in outputs for row in active_rows): raise ValueError('A running scraper already writes to this output.')
+    for row in record['rows']: safe_path(row['output'],'output')
+    return command
+
+def resume_job(identifier):
+    record=control_record(identifier)
+    if live_record(record): raise ValueError('This scraper process is already running.')
+    command=validate_resume(record)
+    STATE.mkdir(mode=0o700,parents=True,exist_ok=True)
+    attempt=str(time.time_ns());session='dashboard_resume_'+record['id'].replace('-','_')+'_'+attempt
+    log=STATE/(record['id']+'.log');exitfile=STATE/(record['id']+'.exit');launcher=STATE/(record['id']+'.sh')
+    exitfile.unlink(missing_ok=True)
+    launcher.write_text('#!/bin/sh\ncd '+shlex.quote(str(ROOT))+' || exit 1\n'+shlex.join(command)+' >> '+shlex.quote(str(log))+' 2>&1\nresult=$?\nprintf "%s\\n" "$result" > '+shlex.quote(str(exitfile))+'\nexit "$result"\n');launcher.chmod(0o700)
+    run('tmux','new-session','-d','-s',session,'sh '+shlex.quote(str(launcher)))
+    record.update(session=session,resumed_at=int(time.time()),log=str(log),pid=None,start=None);save_record(record)
+    deadline=time.monotonic()+3
+    while time.monotonic()<deadline:
+        found=next(((identity,active) for identity,active in known_processes() if active['command_key']==record['command_key']),None)
+        if found:
+            record.update(pid=found[0]['pid'],start=found[0]['start']);save_record(record);break
+        if exitfile.exists(): break
+        time.sleep(.2)
+    return {'message':'Resumed the scraper batch with its original command and output files.' if record['shared'] else 'Resumed the scraper with its original input and output.',
+            'session':session,'scrapers':[row['scraper'] for row in record['rows']]}
+
+def selected_row(record,scraper):
+    row=next((row for row in record['rows'] if row['scraper']==scraper),None)
+    if not row: raise ValueError('This scraper does not belong to the selected job.')
+    return row
+
+def clear_pause_job(identifier,scraper):
+    record=control_record(identifier);row=selected_row(record,scraper)
+    output=safe_path(row['output'],'output');files=pause_files(output)
+    # Validate every checkpoint before moving anything. Never follow a link.
+    for file in files:
+        if file.is_symlink() or file.exists() and not file.is_file(): raise ValueError('Invalid scraper pause checkpoint.')
+    archive=STATE/'pause-archive';moved=[]
+    for file in files:
+        if not file.exists(): continue
+        archive.mkdir(mode=0o700,parents=True,exist_ok=True)
+        destination=archive/(record['id']+'-'+scraper+'-'+str(time.time_ns())+'-'+file.name)
+        file.replace(destination);destination.chmod(0o600);moved.append(file.name)
+    return {'message':('Removed the saved pause for '+scraper+'.') if moved else 'No saved pause remains for '+scraper+'.',
+            'scraper':scraper,'cleared':len(moved),'shared':record['shared']}
+
+def retry_job(identifier,scraper):
+    record=control_record(identifier);row=selected_row(record,scraper)
+    if output_stats(safe_path(row['output'],'output'))['processed']>=row['total']: raise ValueError('This scraper has completed its input.')
+    identity=live_record(record)
+    validate_resume(record,ignore_identity=identity,skip_cooldown=True)
+    # Confirm checkpoint paths before interrupting a live shared process.
+    for file in pause_files(safe_path(row['output'],'output')):
+        if file.is_symlink() or file.exists() and not file.is_file(): raise ValueError('Invalid scraper pause checkpoint.')
+    if identity: stop_job(identifier)
+    cleared=clear_pause_job(record['id'],scraper)
+    resumed=resume_job(record['id'])
+    return {**resumed,'message':'Removed the pause for '+scraper+' and retried from saved progress.'+(' The shared batch was restarted.' if record['shared'] else ''),
+            'retried_scraper':scraper,'cleared':cleared['cleared']}
 
 def status():
     sessions=live_sessions(); result=[]
@@ -120,10 +371,15 @@ def status():
         running=job['session'] in sessions
         state='Running' if running else 'Blocked' if pause and exit_code==3 else 'Finished' if exit_code in (0,2) else 'Failed' if exit_code is not None else 'Stopped'
         if state=='Blocked' and not metrics['blocked']: metrics['blocked']=1
-        result.append({**job,'running':running,'state':state,'exit_code':exit_code,'resume_after':pause.get('resume_after') if pause else None,**metrics})
+        cooling=pause and iso_timestamp(pause.get('resume_after'))>time.time()
+        result.append({**job,'control_id':job['id'],'shared':False,'group_scrapers':[job['scraper']],'can_stop':False,
+                       'can_resume':not running and metrics['processed']<job.get('total',0) and not cooling,
+                       'can_clear_pause':any(file.exists() for file in pause_files(output)),
+                       'can_retry':metrics['processed']<job.get('total',0) and (bool(pause) or state in ('Blocked','Failed')),'pause_reason':pause.get('reason') if pause else None,
+                       'running':running,'state':state,'exit_code':exit_code,'resume_after':pause.get('resume_after') if pause else None,**metrics})
     discovered=discover_jobs()
-    managed_pairs={(j['scraper'],j['input']) for j in result if j['running']}
-    result.extend(j for j in discovered if (j['scraper'],j['input']) not in managed_pairs)
+    tracked_pairs={(j['scraper'],j['input'],j['output']) for j in discovered}
+    result=[job for job in result if (job['scraper'],job['input'],job['output']) not in tracked_pairs]+discovered
     processes=process_info()
     memory={}
     for line in Path('/proc/meminfo').read_text().splitlines():
@@ -200,13 +456,18 @@ def launch(req):
 
 def main():
     encoded = sys.argv[1]; req=json.loads(base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4)).decode()); op=req.get('op')
-    if op=='status': result=status()
-    elif op=='files': result={'items':list_inputs(req.get('folder','input-data'))}
-    elif op in ('sync','launch'):
+    if op=='files': result={'items':list_inputs(req.get('folder','input-data'))}
+    elif op in ('status','sync','launch','stop','resume','retry','clear-pause'):
         STATE.mkdir(mode=0o700,parents=True,exist_ok=True)
         with (STATE / 'management.lock').open('a') as lock:
             fcntl.flock(lock,fcntl.LOCK_EX)
-            result=sync(req.get('commit')) if op=='sync' else launch(req)
+            if op=='status': result=status()
+            elif op=='sync': result=sync(req.get('commit'))
+            elif op=='launch': result=launch(req)
+            elif op=='stop': result=stop_job(req.get('job'))
+            elif op=='resume': result=resume_job(req.get('job'))
+            elif op=='retry': result=retry_job(req.get('job'),req.get('scraper'))
+            else: result=clear_pause_job(req.get('job'),req.get('scraper'))
     else: raise ValueError('Unknown operation.')
     print(json.dumps({'ok':True,'result':result}))
 try: main()

@@ -51,11 +51,19 @@ export function vpsManagerMiddleware(root, operate = remoteOperation) {
       if(req.method!=='POST' || url.search || req.headers.origin!==`http://${host}` || !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) throw Object.assign(new Error('Use the local dashboard to submit this request.'),{status:403});
       let raw='';for await (const chunk of req){raw+=chunk;if(raw.length>8192) throw Object.assign(new Error('Request too large.'),{status:413});}
       const body=JSON.parse(raw); const server=servers.find(s=>s.id===String(body.server));
-      if(!server || !['status','files','sync','launch'].includes(body.op)) throw Object.assign(new Error('Invalid server or operation.'),{status:400});
+      if(!server || !['status','files','sync','launch','stop','resume','retry','clear-pause'].includes(body.op)) throw Object.assign(new Error('Invalid server or operation.'),{status:400});
       if(busy.has(server.id)) throw Object.assign(new Error('Another operation is already running for this VPS.'),{status:409});
       const request={op:body.op};
       if(body.op==='files') request.folder=body.folder;
       if(body.op==='launch') {request.input=body.input;request.scraper=body.scraper;}
+      if(['stop','resume','retry','clear-pause'].includes(body.op)) {
+        if(typeof body.job!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(body.job))throw Object.assign(new Error('Choose a listed scraper job.'),{status:400});
+        request.job=body.job;
+      }
+      if(body.op==='retry'||body.op==='clear-pause') {
+        if(typeof body.scraper!=='string'||!/^[-a-z0-9]{1,64}$/.test(body.scraper))throw Object.assign(new Error('Choose a scraper in this job.'),{status:400});
+        request.scraper=body.scraper;
+      }
       if(body.op==='sync' || body.op==='launch') { const {stdout}=await exec('git',['rev-parse','HEAD'],{cwd:root,timeout:5000}); request.commit=stdout.trim(); }
       busy.add(server.id);
       try {res.end(JSON.stringify(await operate(root,server,request)));} finally {busy.delete(server.id);}

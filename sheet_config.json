@@ -7,10 +7,10 @@
   "yellowItemsCount": 215,
   "redItemsCount": 0,
   "latestCursor": {
-    "batchNumber": 7,
-    "sheetRowNumber": 384,
-    "isbn": "9789395552615",
-    "cursorText": "CURSOR - 7"
+    "batchNumber": 10,
+    "sheetRowNumber": 538,
+    "isbn": "9789390511761",
+    "cursorText": "CURSOR - 10"
   },
   "columns": {
     "status": 0,
@@ -4568,7 +4568,7 @@
       "title": "Odisha Adarsha Vidyalaya: An Overview on Socio-Economic Status, Study Habits and Academic Achievement",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -4750,7 +4750,7 @@
       "title": "Mathematics and Programming for Machine Learning with R",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -4842,7 +4842,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 7",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -4984,7 +4984,7 @@
       "title": "QISSA BE SAMT ZINDAGI KA",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -5309,7 +5309,7 @@
       "title": "Communicate with Cambridge Coursebook 4",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -5518,7 +5518,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 8",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -6168,7 +6168,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 9",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -6323,7 +6323,7 @@
       "title": "Russian in Exercises by S.A Khavronina and A.I Shirochenskaya",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -6622,7 +6622,7 @@
       "title": "Srimad Devi Bhagavatam - VI (Malayalam) [Hardcover] N.V.Nambiathiri",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -6844,7 +6844,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 10",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },

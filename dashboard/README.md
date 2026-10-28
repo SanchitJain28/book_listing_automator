@@ -16,7 +16,10 @@ Open the local URL printed by Vite. To build or test:
 ```sh
 npm run dashboard:build
 npm run dashboard:test
+npm --prefix dashboard run verify:theme
 ```
+
+The theme check uses a local headless browser and mocked VPS data to verify all five grids, text contrast, and status colors under light and dark OS preferences. It does not contact a VPS.
 
 ## Inspect results
 
@@ -64,3 +67,9 @@ Use **Sync Git** to fetch `origin/main` and fast-forward the VPS checkout to the
 Choose a scraper and an input file already under the VPS's `input-data/` folder, then review and start it. The server runs the selected standalone scraper headless in tmux; launching requires a clean remote checkout at the local committed HEAD. Dashboard-managed outputs use `output/dashboard/<scraper>/...`; AbeBooks and Amazon.in use their existing derived output path. To prevent accidental resume against another dataset, pre-existing output must belong to a dashboard run using the same scraper and unchanged input. Active matching jobs and conflicting outputs are rejected. Resuming retains the scraper's own policy, including pause checkpoints and prior failure records. Dashboard-managed job records and logs are stored on the VPS under `~/.book-listing-dashboard/`. Jobs started outside this interface are only discovered where the command and input/output paths can be safely identified.
 
 The dashboard management endpoint accepts requests only from the local same-origin interface, supports an allowlisted set of scraper entry points, and does not expose VPS passwords to the browser. A running tmux session is not proof of scraper progress; check output counts and errors. Counts reflect recorded output, and undetected blocks may appear as other outcomes. Restart the Vite server after upgrading the dashboard so the management endpoints are registered.
+
+The **VPS controls** column provides **Stop** and **Resume** for remote scraper processes. Stop requests a clean scraper exit, then terminates any remaining scraper and Playwright browser children while preserving output. Resume runs the recorded command again in tmux with the original input, output and flags. Changed inputs, active output writers and standalone block cooldowns prevent an unsafe restart. Stop/Resume never accept arbitrary PIDs or commands, and the general server process table remains read-only.
+
+Blocked jobs also provide **Remove pause** and **Retry now**. Remove pause immediately archives only the selected scraper's saved cooldown; it does not stop or start a process. Retry now archives that cooldown and retries the saved command from its current output. For a shared runner, the confirmation explains that the batch must restart; other platforms keep their output and cooldowns. A new block can create a new pause, so Retry now is one user-requested attempt. Pause archives are kept under `~/.book-listing-dashboard/pause-archive/`.
+
+Several platform rows may belong to one shared Node runner. These rows display **Stop batch / Resume batch**, and the confirmation names every affected scraper. Stopping one shared process stops the whole batch; resuming continues each platform's saved output and respects its cooldown. Discovered scraper commands are recorded under `~/.book-listing-dashboard/process-*.json`, so they remain resumable after they exit or the local dashboard restarts. No production job is stopped or restarted until its confirmation is submitted.

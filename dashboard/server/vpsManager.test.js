@@ -27,5 +27,17 @@ test('management endpoint enforces local same-origin JSON and selects only confi
     assert.equal((await request('POST',{server:'2',op:'status'},headers)).statusCode,400);
     assert.equal((await request('POST',{server:'1',op:'status',host:'198.51.100.2'},headers)).statusCode,200);
     assert.deepEqual(calls[0].request,{op:'status'});assert.equal(calls[0].server.ip,'192.0.2.1');
+    assert.equal((await request('POST',{server:'1',op:'stop',job:'../../native'},headers)).statusCode,400);
+    assert.equal((await request('POST',{server:'1',op:'stop',pid:1},headers)).statusCode,400);
+    assert.equal((await request('POST',{server:'1',op:'stop',job:'process-abc',pid:1,command:'kill everything'},headers)).statusCode,200);
+    assert.deepEqual(calls.at(-1).request,{op:'stop',job:'process-abc'});
+    assert.equal((await request('POST',{server:'1',op:'resume',job:'process-abc'},headers)).statusCode,200);
+    assert.deepEqual(calls.at(-1).request,{op:'resume',job:'process-abc'});
+    assert.equal((await request('POST',{server:'1',op:'retry',job:'process-abc'},headers)).statusCode,400);
+    assert.equal((await request('POST',{server:'1',op:'clear-pause',job:'process-abc',scraper:'../native'},headers)).statusCode,400);
+    assert.equal((await request('POST',{server:'1',op:'clear-pause',job:'process-abc',scraper:'flipkart',path:'/etc/native'},headers)).statusCode,200);
+    assert.deepEqual(calls.at(-1).request,{op:'clear-pause',job:'process-abc',scraper:'flipkart'});
+    assert.equal((await request('POST',{server:'1',op:'retry',job:'process-abc',scraper:'flipkart'},headers)).statusCode,200);
+    assert.deepEqual(calls.at(-1).request,{op:'retry',job:'process-abc',scraper:'flipkart'});
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });

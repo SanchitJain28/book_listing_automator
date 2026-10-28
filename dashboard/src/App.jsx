@@ -12,7 +12,7 @@ import {
   LibraryBooksOutlined, MenuRounded, SearchRounded, ShieldOutlined,
   StorefrontOutlined, TableRowsRounded, VerifiedOutlined, WarningAmberRounded, DnsOutlined,
 } from '@mui/icons-material';
-import { DataGrid } from '@mui/x-data-grid';
+import DataGrid from './DashboardDataGrid';
 import { formatMoney, normalizeRecords } from './lib/output';
 import { parseDataFile } from './lib/dataFile';
 import ProjectFileDialog from './ProjectFileDialog';
