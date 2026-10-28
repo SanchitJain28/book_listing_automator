@@ -7,7 +7,7 @@ const number = value => Number(value || 0).toLocaleString();
 const gib = bytes => bytes == null ? '—' : `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 const when = date => date ? new Date(date).toLocaleString() : 'No output yet';
 const chipStyle = state => state === 'Running' ? { color: '#9be1b5', borderColor: '#447b58', bgcolor: '#20392a' }
-  : state === 'Finished' ? { color: '#d4d4d4', borderColor: '#666', bgcolor: '#303030' }
+  : ['Finished', 'Queued'].includes(state) ? { color: '#d4d4d4', borderColor: '#666', bgcolor: '#303030' }
     : { color: '#ffb2a6', borderColor: '#8a5050', bgcolor: '#3b2727' };
 
 function Stat({ label, value, caption, icon }) {
@@ -73,7 +73,7 @@ export default function VpsDashboard() {
       {flagged.length > 0 && <Alert severity="warning" sx={{ mb: 2 }}>{flagged.map(row => `${row.name}: ${number(row.counts.errors)} of ${number(row.processed)} processed records are errors`).join(' · ')}. Review the scraper before relying on these results.</Alert>}
       {broken.length > 0 && <Alert severity="error" sx={{ mb: 2 }}>Some output lines could not be parsed: {broken.map(row => `${row.name} (${row.invalid_lines})`).join(', ')}. Progress excludes those lines.</Alert>}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0,1fr))', lg: 'repeat(4, minmax(0,1fr))' }, gap: 2, mb: 3 }}>
-        <Stat label="Active sessions" value={`${rows.filter(row => row.running === true).length} / ${rows.length}`} caption="tmux sessions currently present" icon={<CloudOutlined fontSize="small" />} />
+        <Stat label="Active scrapers" value={`${rows.filter(row => row.running === true).length} / ${rows.length}`} caption={data.shared_runtime ? 'Using browser contexts; others queued or stopped' : 'tmux sessions currently present'} icon={<CloudOutlined fontSize="small" />} />
         <Stat label="Inputs processed" value={number(totals.processed)} caption={`of ${number(totals.total)} across scrapers`} icon={<DataUsageRounded fontSize="small" />} />
         <Stat label="ISBN matches" value={number(totals.matched)} caption="Reported by the scrapers" icon={<VerifiedOutlined fontSize="small" />} />
         <Stat label="Blocks / errors" value={`${number(totals.blocked)} / ${number(totals.errors)}`} caption="Recorded output outcomes" icon={<WarningAmberRounded fontSize="small" />} />
@@ -92,6 +92,7 @@ export default function VpsDashboard() {
             <Button size="small" variant="outlined" onClick={() => setShowProcesses(value => !value)} aria-expanded={showProcesses} aria-controls="vps-processes">{showProcesses ? 'Hide processes' : 'View processes'}</Button>
           </Stack>
         </Stack>
+        {data.shared_runtime && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Shared pool: {data.shared_runtime.browser_instances} browser(s), {data.shared_runtime.active_contexts} active contexts, {data.shared_runtime.queued_contexts} queued jobs.</Typography>}
       </Paper>
       {showProcesses && <Paper id="vps-processes" variant="outlined" sx={{ mt: 2, overflow: 'hidden' }}>
         <Box sx={{ p: 2.5 }}><Typography variant="h6">Processes by RAM</Typography><Typography variant="caption" color="text.secondary">Showing {number(data.processes?.length)} of {number(data.process_count)} processes, sorted by resident memory. Refresh status to update.</Typography>

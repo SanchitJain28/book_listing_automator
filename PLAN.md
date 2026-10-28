@@ -81,3 +81,41 @@
 
 - We have to directly search isbn on walmart like at this url
 - https://www.walmart.com/search?q=9798287703462 (Please confirm this url for searching books)
+
+## ebay
+
+- We have to directly search isbn on walmart like at this url
+- https://www.ebay.com/sch/i.html?_nkw=9781429600378&_sacat=0&_from=R40&_trksid=p2334524.m570.l1313&_odkw=9781429600378&_osacat=0 (Please confirm this url for searching books)
+
+## Abebooks google scraper
+
+### the flow
+
+1. Search the given isbn on google.com , collect all the abebooks urls NOTE: Only first google page , no other pages , only first page results
+2. After collecting the urls , there are mainly two type of urls
+
+- Direct product page urls
+- Search result page urls
+
+3. Nwo for direct page urls , check the isbn if matched writed matched ,if not match not matched and save the result (scraper is already built for abebooks.com)
+4. For result page urls , save all the listing with all the details
+5. I have also cap solver (captch solver for google) so integrate it will , api key in .env as CAP_SOLVER , please check its documentation , Read docs correctly : start from here : https://docs.capsolver.com/en/guide/getting-started/
+   Ex : DIRECT PRODUT PAGE URL
+
+6. https://www.abebooks.com/Norman-Mailer-JFK-Superman-Comes-Supermarket/32533322632/bd
+7. https://www.abebooks.com/9780091884970/Where-Live-Reg-cartwright-0091884977/plp?cm_sp=plped-_-1-_-image
+8. https://www.abebooks.com/Sociology-International-Edition-Macionis-John-J/31351229084/bd
+9. https://www.abebooks.com/Firewalls-Jumpstart-Network-Systems-Administrators-Vacca/31003524429/bd
+10. https://www.abebooks.com/9783794051908/Leistungsf%C3%A4higkeit-Datenverarbeitung-Steuerung-Methoden-Effektivit%C3%A4tsmessung-3794051904/3. plphttps://www.abebooks.com/9783794051908/3. Leistungsf%C3%A4higkeit-Datenverarbeitung-Steuerung-Methoden-Effektivit%C3%A4tsmessung-3794051904/plp
+11. https://www.abebooks.com/News-Culture-Issues-Cultural-Media-Studies/31900536928/bd
+12. https://www.abebooks.com/Comparative-Analyses-Operating-Hours-Working-Times/30860583454/bd
+
+Ex : SEARCH RESULT PAGE URLs
+
+1. https://www.abebooks.com/servlet/SearchResults?an=gega%20peter&bi=h&cond=an%20fine%20nf%20vg%20good%20fair%20poor%20uns&ds=5&sortby=17&tn=science%20elementary%20education
+2. https://www.abebooks.com/servlet/SearchResults?an=parker%20paul&bi=h&ds=5&sortby=17&tn=formula%20camera%201960-69
+3. https://www.abebooks.com/servlet/SearchResults?an=claybourne%20anna&bi=s&ds=5&sortby=17&tn=mental%20development%20birth%20old
+4. https://www.abebooks.com/servlet/SearchResults?an=tony%20cutler&bi=s&ds=5&sortby=17&tn=marxs%20capital%20capitalism%20today
+5. https://www.abebooks.com/servlet/SearchResults?bi=s&cond=an%20fine%20nf%20vg%20good%20fair%20poor%20uns&ds=5&sortby=17&tn=clara%20zetkin%20letters%20writings
+6. https://www.abebooks.com/servlet/SearchResults?an=ian%20stewart&bi=s&ds=5&sortby=17&tn=flatterland%20flatland
+7. https://www.abebooks.com/servlet/SearchResults?an=david%20bird&bi=s&cond=an%20fine%20nf%20vg%20good%20fair%20poor%20uns&ds=5&sortby=17&tn=winning%20cardplay%20techniques

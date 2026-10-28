@@ -78,3 +78,20 @@ test('process collector sorts RAM, follows scraper ancestry and does not expose 
   assert.equal(data.processes[1].memory_percent, 19.53);
   assert.deepEqual(data.scraper_groups, [{ scraper: 'mypustak', rss_bytes: 358400 * 1024, process_count: 3 }]);
 });
+
+test('shared runner monitoring distinguishes queued jobs and identifies the shared process tree', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shared-monitor-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'output'));
+    fs.writeFileSync(path.join(dir, 'output/result.jsonl'), '{"input_index":0,"stock_status":"In Stock","found":true}\n');
+    fs.writeFileSync(path.join(dir, 'output/result.jsonl.blocked.jsonl'), '{"input_index":1,"stock_status":"Blocked"}\n');
+    fs.writeFileSync(path.join(dir, 'output/runtime.json'), JSON.stringify({ runtime: { browser_instances:2,active_contexts:4,queued_contexts:4 }, scrapers:{ mypustak:{state:'Queued'} } }));
+    fs.writeFileSync(path.join(dir, 'sessions.json'), JSON.stringify({mypustak:{total_inputs:3,output:'output/result.jsonl',session:'shared-session',exit_file:path.join(dir,'exit'),runtime_status:'output/runtime.json'}}));
+    const collector=path.resolve('..','scripts/vps-status/collector.py');
+    const program=`import importlib.util,json,sys\nfrom pathlib import Path\nfrom types import SimpleNamespace\ns=importlib.util.spec_from_file_location('collector',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)\nm.subprocess.run=lambda *a,**k:SimpleNamespace(returncode=0,stdout='shared-session\\n',stderr='')\nm.process_info=lambda *a:{}\nr=m.collect(Path(sys.argv[2]),Path(sys.argv[2])/'sessions.json')\np=m.parse_processes('100 1 100 node node scripts/run-shared-scrapers.js input.txt\\n101 100 200 chrome chrome --type=renderer',1000000)\nprint(json.dumps({'status':r,'processes':p}))`;
+    const child=spawnSync('python3',['-c',program,collector,dir],{encoding:'utf8'});
+    assert.equal(child.status,0,child.stderr);const data=JSON.parse(child.stdout);
+    assert.equal(data.status.scrapers[0].state,'Queued');assert.equal(data.status.scrapers[0].running,false);assert.equal(data.status.scrapers[0].session_alive,true);
+    assert.equal(data.status.scrapers[0].processed,1);assert.equal(data.status.scrapers[0].counts.blocked,1);assert.equal(data.status.shared_runtime.active_contexts,4);assert.equal(data.processes.processes[0].scraper,'shared-pool');
+  } finally { fs.rmSync(dir,{recursive:true,force:true}); }
+});

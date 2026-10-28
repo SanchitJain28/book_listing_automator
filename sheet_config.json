@@ -7,10 +7,10 @@
   "yellowItemsCount": 215,
   "redItemsCount": 0,
   "latestCursor": {
-    "batchNumber": 1,
-    "sheetRowNumber": 66,
-    "isbn": "9789352870943",
-    "cursorText": "CURSOR - 1"
+    "batchNumber": 7,
+    "sheetRowNumber": 384,
+    "isbn": "9789395552615",
+    "cursorText": "CURSOR - 7"
   },
   "columns": {
     "status": 0,
@@ -1123,7 +1123,7 @@
       "title": "My Sixty Years as an IITian: Experiences and Lessons",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -1370,8 +1370,8 @@
       "title": "the Roads We Crossed: In the Hidden Chapters Of Life, Our Story Remained And Love Endured",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
-      "existingCursor": "",
+      "existingReason": "CHECK",
+      "existingCursor": "CURSOR - 2",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -1396,7 +1396,7 @@
       "title": "INTERNATIONAL TRADE AND EXPORT MANAGEMENT (CODE PCI- 051) 20/E PB....",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "CHECK",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -1604,7 +1604,7 @@
       "title": "Bloomsbury Securities Law Manual, 2019",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "CHECK",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -1968,7 +1968,7 @@
       "title": "SORATHI BAHARVATIYA PART 1 TO 3 (SET)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2020,8 +2020,8 @@
       "title": "Public Finance : A Contemporary Application",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
-      "existingCursor": "",
+      "existingReason": "UNAVAILABLE",
+      "existingCursor": "CURSOR - 3 - FAILED",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -2072,7 +2072,7 @@
       "title": "Communicate with Cambridge Coursebook 8",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2215,7 +2215,7 @@
       "title": "Talent and Knowledge Management",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2267,7 +2267,7 @@
       "title": "Entrepreneurship Development in India (Issues and Opportunities)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2280,7 +2280,7 @@
       "title": "Spying in South Asia (South Asia Edition)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2293,7 +2293,7 @@
       "title": "PW MedEd 3rd Prof MBBS Notes | Ophthalmology By Dr. Sudha Seetharam & ENT By Dr. Sanchit Bajpai Combo Set of 2 Books",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2501,7 +2501,7 @@
       "title": "War and Aviation",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2540,7 +2540,7 @@
       "title": "Retired from Job, Not from Life: A Practical Guide to Purposeful Living After Retirement | Life Planning, Second Innings, Personal Growth Book | By Satish Khanna",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2644,7 +2644,7 @@
       "title": "The Geography of Transport Systems (Third Edition) [paperback] Jean-Paul Rodrigue [Jan 01, 2016]",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2775,7 +2775,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 4",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -2813,7 +2813,7 @@
       "title": "URDU ADAB KI MUKHTASAR TAREEN TAREEKH (FROM BEGINNING TO 2010 )",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -2943,7 +2943,7 @@
       "title": "Cambridge Splendid Science Class 7",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -3073,7 +3073,7 @@
       "title": "Cambridge Splendid Science Class 8",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -3464,7 +3464,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 5",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -3801,7 +3801,7 @@
       "title": "Dynamics of Physical Education and Health: Issues And Trends",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -3918,7 +3918,7 @@
       "title": "Management of Infertility for the MRCOG and Beyond, 3rd Edition",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -3931,7 +3931,7 @@
       "title": "Fundamentals of Combustion",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -3944,7 +3944,7 @@
       "title": "Arihant Cracking the CSAT Paper II 2027 | UPSC Civil Services Aptitude Test | Complete CSAT Syllabus Coverage with Latest Questions, Trends & Strategy | Solved Papers (2026–2025) & 10 Crack Sets",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -4126,7 +4126,7 @@
       "title": "New Age International Private Limited Principles of Geomomrphology",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -4166,7 +4166,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 6",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },

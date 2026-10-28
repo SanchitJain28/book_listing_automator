@@ -91,10 +91,11 @@ def parse_processes(output, total_memory=None, limit=500):
             continue
         args = parts[4] if len(parts) > 4 else ''
         scraper = re.search(r'(?:^|[\s/])scrapers/([\w-]+)/[^\s]*\.js(?:\s|$)', args)
+        shared = bool(re.search(r'(?:^|[\s/])scripts/run-shared-scrapers\.js(?:\s|$)', args))
         browser_type = re.search(r'(?:^|\s)--type=([\w-]+)', args)
         processes[pid] = {'pid': pid, 'parent_pid': parent_pid, 'name': os.path.basename(parts[3]),
                           'browser_type': browser_type.group(1) if browser_type else None,
-                          'rss_bytes': rss_kib * 1024, 'scraper': scraper.group(1) if scraper else None}
+                          'rss_bytes': rss_kib * 1024, 'scraper': scraper.group(1) if scraper else 'shared-pool' if shared else None}
     for process in processes.values():
         current, seen = process, set()
         while current and current['pid'] not in seen:
@@ -130,7 +131,7 @@ def collect(root=ROOT, manifest=MANIFEST):
         active = set(tmux.stdout.splitlines()) if known else None
     except (OSError, subprocess.TimeoutExpired):
         active = None
-    result = []
+    result, runtimes = [], {}
     for name, entry in sessions.items():
         total = entry['total_inputs']
         output = Path(entry['output'])
@@ -138,22 +139,44 @@ def collect(root=ROOT, manifest=MANIFEST):
             raise ValueError('Invalid output path in session manifest')
         rows, invalid, modified, exists = read_output(root / output, total)
         counts, statuses = summarize(rows)
+        # Shared runs keep blocked attempts separate so pending inputs stay resumable.
+        blocked_rows, _, _, _ = read_output(Path(str(root / output) + '.blocked.jsonl'), total)
+        counts['blocked'] += len(blocked_rows)
         running = entry['session'] in active if active is not None else None
         exit_path = Path(entry['exit_file'])
         try:
             code = int(exit_path.read_text().strip()) if exit_path.exists() else None
         except (OSError, ValueError):
             code = None
+        runtime_row = None
+        if entry.get('runtime_status'):
+            runtime_path = Path(entry['runtime_status'])
+            if runtime_path.is_absolute() or '..' in runtime_path.parts:
+                raise ValueError('Invalid shared runtime status path')
+            key = str(runtime_path)
+            if key not in runtimes:
+                try:
+                    runtimes[key] = json.loads((root / runtime_path).read_text())
+                except (OSError, ValueError):
+                    runtimes[key] = {}
+            runtime_row = runtimes[key].get('scrapers', {}).get(name)
         complete = len(rows) >= total
         state = 'Running' if running is True else 'Finished' if complete else 'Unknown' if running is None else 'Stopped'
+        session_alive = running
+        if runtime_row and running is True:
+            candidate_state = runtime_row.get('state')
+            if candidate_state in ('Running', 'Queued', 'Finished', 'Blocked', 'Failed', 'Stopped'):
+                state = candidate_state
+                running = state == 'Running'
         result.append({'id': name, 'name': {'atlanticbooks':'Atlantic Books', 'bookswagon':'BooksWagon', 'flipkart':'Flipkart', 'mypustak':'MyPustak', 'sapnaonline':'SapnaOnline', 'abebooks':'AbeBooks', 'ompublication':'Om Publications', 'bookchor':'BookChor'}.get(name, name),
-                       'session': entry['session'], 'state': state, 'running': running, 'processed': len(rows), 'total': total,
+                       'session': entry['session'], 'state': state, 'running': running, 'session_alive': session_alive, 'processed': len(rows), 'total': total,
                        'invalid_lines': invalid, 'output_exists': exists, 'exit_code': code, 'last_updated': modified,
                        'last_isbn': rows[-1].get('searched_isbn') if rows else None, 'output': str(output),
                        'counts': counts, 'statuses': statuses})
     memory = memory_info()
     return {'vps': 'VPS 6', 'checked_at': datetime.now(timezone.utc).isoformat(), 'input': 'input-data/manual-search/2026-10-27/input.txt',
-            'memory': memory, 'scrapers': result, **process_info(memory.get('total_bytes') if memory else None)}
+            'memory': memory, 'scrapers': result, 'shared_runtime': next((value.get('runtime') for value in runtimes.values() if value.get('runtime')), None),
+            **process_info(memory.get('total_bytes') if memory else None)}
 
 
 if __name__ == '__main__':

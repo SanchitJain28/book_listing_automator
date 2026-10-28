@@ -71,7 +71,7 @@ const KEYS = [
   ),
 ];
 const KEY = KEYS[0] || ""; // preflight checks this
-const keyState = KEYS.map(() => ({ left: null, readyAt: 0 }));
+const keyState = KEYS.map(() => ({ left: null, readyAt: 0, disabled: false }));
 
 const BASE = "https://api.keepa.com";
 const DOMAIN = 10; // amazon.in
@@ -364,12 +364,19 @@ async function pickKey() {
     const now = Date.now();
     const ready = keyState
       .map((_, i) => i)
-      .filter((i) => keyState[i].readyAt <= now);
+      .filter((i) => !keyState[i].disabled && keyState[i].readyAt <= now);
     if (ready.length) {
       ready.sort((a, b) => tokens(b) - tokens(a));
       return ready[0];
     }
-    const soonest = Math.min(...keyState.map((k) => k.readyAt));
+    const enabled = keyState.filter((k) => !k.disabled);
+    if (!enabled.length) {
+      fatal = new Error("No usable Keepa API keys: all keys rejected authentication or have no active plan.");
+      log(`ERROR: ${fatal.message} Saving checkpoint without dropping pending work.`);
+      stopRequested = true;
+      return -1;
+    }
+    const soonest = Math.min(...enabled.map((k) => k.readyAt));
     await sleepInterruptible(soonest - now);
   }
   return -1;
@@ -409,6 +416,13 @@ async function apiCall(endpoint, params, label) {
       lastTokensLeft = keyState.reduce((a, k) => a + (k.left || 0), 0);
     }
     const refill = ((data && data.refillIn) || 60000) + 1000;
+
+    if ([401, 402, 403].includes(res.status)) {
+      ks.disabled = true;
+      log(`  HTTP ${res.status} on ${tag}: key disabled for this run; trying another key.`);
+      attempt--;
+      continue;
+    }
 
     // Rate limited: rest THIS key and carry on with the other one.
     // Being rate limited is not a failure, so it does not use up an attempt
@@ -611,6 +625,11 @@ async function runPass(pass) {
       const result = await collectBatch(batch, pass.n);
 
       if (result === "stop") break; // leave pending intact for resume
+      if (result !== "ok") {
+        log("ERROR: lookup failed; keeping this batch pending for the next run.");
+        stopRequested = true;
+        break;
+      }
       S.pending.splice(0, batch.length); // only drop after a real outcome
       checkpoint();
 

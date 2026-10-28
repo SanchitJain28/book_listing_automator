@@ -16,7 +16,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import { formatMoney, normalizeRecords } from './lib/output';
 import { parseDataFile } from './lib/dataFile';
 import ProjectFileDialog from './ProjectFileDialog';
-import VpsDashboard from './VpsDashboard';
+import VpsManager from './VpsManager';
 import { demoRecords } from './demo';
 import { listRecentOutputs, saveRecentOutput, readRecentOutput, removeRecentOutput } from './lib/recentOutputs';
 
@@ -240,7 +240,7 @@ export default function App() {
       </Box>
       <Box component="main" sx={{ p: { xs: 2, sm: 3, lg: 4.5 }, maxWidth: 1920, mx: 'auto' }}>
         <Box component="input" ref={inputRef} type="file" accept=".json,.jsonl,.ndjson,.csv,.tsv,.txt,application/json,text/csv,text/plain" aria-label="Choose scraper output file" sx={{ display: 'none' }} onChange={event => { importFile(event.target.files?.[0]); event.target.value = ''; }} />
-        {workspaceView === 'vps' ? <VpsDashboard /> : <>
+        {workspaceView === 'vps' ? <VpsManager /> : <>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3.5 }}>
           <Box><Stack direction="row" spacing={1.2} alignItems="center" sx={{ mb: 1 }}><Typography variant="overline" color="primary">DATA WORKSPACE</Typography><Chip label="v0.1" size="small" sx={{ height: 18, fontSize: '0.6rem', color: 'text.secondary' }} /></Stack><Typography variant="h4">A clearer view of every result.</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.82rem' }}>Explore book listings, compare sellers, and check what your scraper found.</Typography></Box>
           <Button variant="contained" startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <FolderOpenOutlined />} onClick={() => setProjectBrowserOpen(true)} disabled={loading} sx={{ flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'center' }, px: 2.3, py: 1 }}>Open output file</Button>
