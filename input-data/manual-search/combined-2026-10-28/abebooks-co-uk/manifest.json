@@ -1,0 +1,71 @@
+{
+  "created_at": "2026-10-28T15:58:36.658Z",
+  "scraper": "abebooks-co-uk",
+  "sources": [
+    {
+      "file": "input-data/manual-search/input.txt",
+      "rows": 5647,
+      "sha256": "4ddf60f6f94c8065a2bfddce7e8593ad00f30874b7c14d6a00efba337845eaff"
+    },
+    {
+      "file": "input-data/manual-search/2026-10-27/input.txt",
+      "rows": 14777,
+      "sha256": "e008d9ea66de595d8feda6c22d4f766468baf75cefeefd33e9df732d2eae2b75"
+    }
+  ],
+  "source_rows": 20424,
+  "unique_rows": 20397,
+  "duplicates_removed": 27,
+  "chunks": [
+    {
+      "vps": 12,
+      "input": "input-data/manual-search/combined-2026-10-28/abebooks-co-uk/chunks/chunk-vps12.txt",
+      "rows": 4080,
+      "start_index": 0,
+      "end_index": 4079,
+      "sha256": "336c0c91bbfe698ee5d83736af956d91bea5418adc4b9a73414a185a9a73d347",
+      "output": "output/abebooks-co-uk/manual-search/combined-2026-10-28/chunk-vps12/results.jsonl",
+      "session": "abebooks_uk_manual_vps12_20261028"
+    },
+    {
+      "vps": 13,
+      "input": "input-data/manual-search/combined-2026-10-28/abebooks-co-uk/chunks/chunk-vps13.txt",
+      "rows": 4080,
+      "start_index": 4080,
+      "end_index": 8159,
+      "sha256": "399dceb49ce5b2625a8f59e2f298bb4872a720ac8755f98be2c1e440831dd89e",
+      "output": "output/abebooks-co-uk/manual-search/combined-2026-10-28/chunk-vps13/results.jsonl",
+      "session": "abebooks_uk_manual_vps13_20261028"
+    },
+    {
+      "vps": 14,
+      "input": "input-data/manual-search/combined-2026-10-28/abebooks-co-uk/chunks/chunk-vps14.txt",
+      "rows": 4079,
+      "start_index": 8160,
+      "end_index": 12238,
+      "sha256": "8f51f7354f697d72f1dd189aef165b5cf86e0a694e60734f140a25745f3d91d2",
+      "output": "output/abebooks-co-uk/manual-search/combined-2026-10-28/chunk-vps14/results.jsonl",
+      "session": "abebooks_uk_manual_vps14_20261028"
+    },
+    {
+      "vps": 15,
+      "input": "input-data/manual-search/combined-2026-10-28/abebooks-co-uk/chunks/chunk-vps15.txt",
+      "rows": 4079,
+      "start_index": 12239,
+      "end_index": 16317,
+      "sha256": "e34442b0608cf77071a804b35122ddca4d0edb0ea675b9cc33aca577896d58f0",
+      "output": "output/abebooks-co-uk/manual-search/combined-2026-10-28/chunk-vps15/results.jsonl",
+      "session": "abebooks_uk_manual_vps15_20261028"
+    },
+    {
+      "vps": 16,
+      "input": "input-data/manual-search/combined-2026-10-28/abebooks-co-uk/chunks/chunk-vps16.txt",
+      "rows": 4079,
+      "start_index": 16318,
+      "end_index": 20396,
+      "sha256": "fbe1ce5aac8592a99b241e8c7b059b7454d3e49c24d274779fe920ee3202e4a6",
+      "output": "output/abebooks-co-uk/manual-search/combined-2026-10-28/chunk-vps16/results.jsonl",
+      "session": "abebooks_uk_manual_vps16_20261028"
+    }
+  ]
+}

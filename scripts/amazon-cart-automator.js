@@ -271,7 +271,9 @@ networkMonitor.on("internet-on", () => {
     `\n📡 \x1b[1;32m[EVENT: internet-on] Network connection restored at ${new Date().toLocaleTimeString()}.\x1b[0m`,
   );
 });
-networkMonitor.start();
+if (require.main === module) {
+  networkMonitor.start();
+}
 
 async function updateGoogleSheetCell(spreadsheetId, cellRange, value, maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -923,14 +925,14 @@ async function openAndExtractAllOffers(page) {
       );
     }
 
-    // Deduplicate unique offers across options (by seller + itemPrice + condition)
+    // Deduplicate unique offers across options (by seller + totalPrice + condition)
     const seen = new Set();
     const uniqueOffers = [];
     for (const o of allCollectedOffers) {
       const sellerKey = (o.seller || "").toLowerCase().trim();
-      const priceKey = Math.round((o.itemPrice || 0) * 100);
+      const totalKey = Math.round(((o.itemPrice || 0) + (o.shippingFee || 0)) * 100);
       const condKey = (o.condition || "").toLowerCase().trim();
-      const key = `${sellerKey}_${priceKey}_${condKey}`;
+      const key = `${sellerKey}_${totalKey}_${condKey}`;
       if (!seen.has(key)) {
         seen.add(key);
         uniqueOffers.push(o);
@@ -1256,48 +1258,81 @@ function evaluateOffers(
     };
   }
 
-  // 1. Evaluate Rule 1 & Rule 2 for each offer
+  // 1. Step 1 — Initial Eligibility Check (Book Price ONLY + Delivery Window)
   const evaluatedOffers = rawOffers.map((offer) => {
     const deliveryEval = parseDeliveryDays(offer.deliveryText);
-    // Rule 1: Item Price <= given target price OR Margin (Sell Price - raw Item Price) >= minMarginBuffer
-    const margin = sellPrice > 0 ? (sellPrice - offer.itemPrice) : null;
+    const shippingFee = offer.shippingFee || 0;
+    const totalPrice =
+      typeof offer.totalPrice === "number"
+        ? offer.totalPrice
+        : offer.itemPrice + shippingFee;
+
+    // Rule 1 (Initial Eligibility): Check Book Price ONLY (offer.itemPrice) against Target Compare Price & Margin Price
+    const margin = sellPrice > 0 ? sellPrice - offer.itemPrice : null;
     const passStandardPrice = offer.itemPrice <= targetPrice;
     const passMarginBuffer = margin !== null && margin >= minMarginBuffer;
-    const passRule1 = passStandardPrice || passMarginBuffer;
+    const passInitialPrice = passStandardPrice || passMarginBuffer;
 
     const passRule2 =
       deliveryEval.valid && deliveryEval.days !== null
         ? deliveryEval.days <= maxDeliveryDays
         : true; // Rule 2: Delivery <= maxDeliveryDays (or valid default)
 
-    let failureReason = null;
-    if (!passRule1) failureReason = "HIGH PRICE";
-    else if (!passRule2) failureReason = "DELIVERY DATE";
-
     const deliveryDays = deliveryEval.days;
     const deliveryPenalty = passRule2
       ? calculateDeliveryPenalty(deliveryDays, deliveryRules)
       : 0;
-    const effectivePrice = offer.itemPrice + deliveryPenalty;
+    const effectivePrice = totalPrice + deliveryPenalty;
+
+    let failureReason = null;
+    if (!passInitialPrice) failureReason = "HIGH PRICE";
+    else if (!passRule2) failureReason = "DELIVERY DATE";
 
     return {
       ...offer,
+      shippingFee,
+      totalPrice,
       deliveryDays,
       deliveryDateFormatted: deliveryEval.dateStr,
       deliveryPenalty,
       effectivePrice,
-      passRule1,
+      passInitialPrice,
+      passRule1: passInitialPrice,
       passRule2,
-      isQualified: passRule1 && passRule2,
+      isInitiallyQualified: passInitialPrice && passRule2,
+      isQualified: passInitialPrice && passRule2,
       failureReason,
       margin,
       minMarginBuffer,
       passedByMargin: !passStandardPrice && passMarginBuffer,
+      passedByEffectivePrice: false,
       score: 0,
     };
   });
 
-  // 2. Score qualified offers
+  // 2. Step 2 — Unlock any valid-delivery offer with lower/equal Effective Price than an initially qualified offer
+  const initiallyQualified = evaluatedOffers.filter(
+    (o) => o.isInitiallyQualified,
+  );
+  if (initiallyQualified.length > 0) {
+    const unlockedEffectiveCeiling = Math.max(
+      ...initiallyQualified.map((o) => o.effectivePrice),
+    );
+    evaluatedOffers.forEach((o) => {
+      if (
+        !o.isQualified &&
+        o.passRule2 &&
+        o.effectivePrice <= unlockedEffectiveCeiling
+      ) {
+        o.passRule1 = true;
+        o.isQualified = true;
+        o.failureReason = null;
+        o.passedByEffectivePrice = true;
+      }
+    });
+  }
+
+  // 3. Score qualified offers
   const qualifiedOffers = evaluatedOffers.filter((o) => o.isQualified);
 
   if (qualifiedOffers.length > 0) {
@@ -1315,7 +1350,7 @@ function evaluateOffers(
 
     // 3. Sort qualified offers by:
     //    a. Score descending (highest score wins)
-    //    b. Tie-breaker 1: Lowest item price (cheapest book price)
+    //    b. Tie-breaker 1: Lowest total price (book + delivery charge)
     //    c. Tie-breaker 2: Earliest delivery date (lowest deliveryDays wins!)
     //    d. Tie-breaker 3: Condition New > Used
     qualifiedOffers.sort((a, b) => {
@@ -1323,9 +1358,9 @@ function evaluateOffers(
       if (Math.abs(b.score - a.score) > 0.0001) {
         return b.score - a.score;
       }
-      // Tie-breaker 1: Lowest item price
-      if (Math.abs(a.itemPrice - b.itemPrice) > 0.01) {
-        return a.itemPrice - b.itemPrice;
+      // Tie-breaker 1: Lowest total price (book + delivery charge)
+      if (Math.abs(a.totalPrice - b.totalPrice) > 0.01) {
+        return a.totalPrice - b.totalPrice;
       }
       // Tie-breaker 2: Earliest delivery date (lowest deliveryDays)
       const aDays =
@@ -2135,7 +2170,9 @@ async function main() {
           } else {
             evaluation.evaluatedOffers.forEach((o, idx) => {
               const optionTag = o.popoverLabel ? `[${o.popoverLabel}] ` : "";
-              const priceStr = `Item: ₹${o.itemPrice.toFixed(2)}`;
+              const shipTag =
+                o.shippingFee > 0 ? `+₹${o.shippingFee.toFixed(0)}del` : "FreeDel";
+              const priceStr = `₹${o.itemPrice.toFixed(2)}(${shipTag})=₹${o.totalPrice.toFixed(2)}`;
               const penStr =
                 o.isQualified && o.deliveryPenalty > 0
                   ? ` (+₹${o.deliveryPenalty.toFixed(1)} pen)`
@@ -2148,13 +2185,15 @@ async function main() {
                 ? `Score: ${o.score.toFixed(2)}`
                 : "";
               const statStr = o.isQualified
-                ? o.passedByMargin
-                  ? `\x1b[32m✔ [${scoreStr} | ${effStr} | Margin: ₹${o.margin?.toFixed(0)}]\x1b[0m`
-                  : `\x1b[32m✔ [${scoreStr} | ${effStr}]\x1b[0m`
+                ? o.passedByEffectivePrice
+                  ? `\x1b[32m✔ [${scoreStr} | ${effStr} | Cheaper Eff]\x1b[0m`
+                  : o.passedByMargin
+                    ? `\x1b[32m✔ [${scoreStr} | ${effStr} | Margin: ₹${o.margin?.toFixed(0)}]\x1b[0m`
+                    : `\x1b[32m✔ [${scoreStr} | ${effStr}]\x1b[0m`
                 : `\x1b[31m✖ ${o.failureReason}${o.margin !== null ? ` (Margin: ₹${o.margin.toFixed(0)})` : ""}\x1b[0m`;
 
               console.log(
-                `   [${idx + 1}] ${optionTag}${priceStr.padEnd(16)} | Del: ${delStr.padEnd(30)} | ${(o.seller || "Amazon").slice(0, 18).padEnd(18)} | ${statStr}`,
+                `   [${idx + 1}] ${optionTag}${priceStr.padEnd(24)} | Del: ${delStr.padEnd(30)} | ${(o.seller || "Amazon").slice(0, 18).padEnd(18)} | ${statStr}`,
               );
             });
           }
@@ -2173,12 +2212,20 @@ async function main() {
             console.log(
               `   🏪 Seller:          ${best.seller} (${best.condition || "New"})`,
             );
+            const shipSummary =
+              best.shippingFee > 0
+                ? `₹${best.itemPrice.toFixed(2)} + ₹${best.shippingFee.toFixed(2)} delivery = ₹${best.totalPrice.toFixed(2)}`
+                : `₹${best.itemPrice.toFixed(2)} + FREE delivery = ₹${best.totalPrice.toFixed(2)}`;
             console.log(
-              `   💰 Item Price:      ₹${best.itemPrice.toFixed(2)} (Compare Price: ₹${targetInfo.targetPrice.toFixed(2)})`,
+              `   💰 Total Price:     ${shipSummary} (Compare Price: ₹${targetInfo.targetPrice.toFixed(2)})`,
             );
-            if (best.passedByMargin) {
+            if (best.passedByEffectivePrice) {
               console.log(
-                `   📈 \x1b[1;33mQualified via Margin Buffer:\x1b[0m ₹${best.margin.toFixed(0)} margin (Sell ₹${targetInfo.sellPrice.toFixed(0)} - Item ₹${best.itemPrice.toFixed(0)} >= ₹${best.minMarginBuffer || 1})`,
+                `   ⚡ \x1b[1;36mQualified via Lowest Effective Price:\x1b[0m ₹${best.effectivePrice.toFixed(1)} beats higher-shipping qualified offers`,
+              );
+            } else if (best.passedByMargin) {
+              console.log(
+                `   📈 \x1b[1;33mQualified via Margin Buffer:\x1b[0m ₹${best.margin.toFixed(0)} margin (Sell ₹${targetInfo.sellPrice.toFixed(0)} - Book ₹${best.itemPrice.toFixed(0)} >= ₹${best.minMarginBuffer || 1})`,
               );
             }
             console.log(
@@ -2447,7 +2494,16 @@ async function main() {
   console.log("\n🎉 Session ended cleanly. All data preserved in profile.");
 }
 
-main().catch((err) => {
-  console.error("Fatal exception:", err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Fatal exception:", err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  evaluateOffers,
+  extractAllOffers,
+  calculateDeliveryPenalty,
+  parseDeliveryDays,
+};

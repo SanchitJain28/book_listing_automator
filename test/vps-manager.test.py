@@ -8,7 +8,7 @@ exec(compile(source, 'manager.py', 'exec'), manager)
 
 class ManagerTests(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(); self.root=Path(self.temp.name); self.state=self.root/'state'
+        self.temp=tempfile.TemporaryDirectory(); self.root=Path(self.temp.name).resolve(); self.state=self.root/'state'
         manager['ROOT']=self.root; manager['STATE']=self.state
         (self.root/'input-data').mkdir(); (self.root/'input-data'/'sample.txt').write_text('9781234567890\n')
         (self.root/'scrapers'/'flipkart').mkdir(parents=True); (self.root/'scrapers'/'flipkart'/'flipkart-isbn.js').write_text('// fixture')
@@ -168,5 +168,72 @@ class ManagerTests(unittest.TestCase):
         with patch.dict(manager,{'control_record':lambda ident:record,'live_record':lambda record:None,'validate_resume':fail,'stop_job':lambda ident:self.fail('Must not stop on invalid input')}):
             with self.assertRaisesRegex(ValueError,'Input changed'):manager['retry_job'](record['id'],'flipkart')
         self.assertTrue(pause.exists())
+
+class MonitoringTests(unittest.TestCase):
+    setUp=ManagerTests.setUp
+    tearDown=ManagerTests.tearDown
+    def test_incremental_cache_handles_append_partial_rewrite_and_rotation(self):
+        file=self.root/'output.jsonl'
+        file.write_text('{"isbn_matched":true}\n')
+        first=manager['output_stats'](file);self.assertEqual(first['processed'],1)
+        self.assertEqual(manager['output_stats'](file),first)
+        with file.open('a') as f: f.write('{"stock_status":"Error","error":"timeout","searched_isbn":"9780306406157"')
+        self.assertEqual(manager['output_stats'](file)['processed'],1)
+        with file.open('a') as f: f.write('}\n')
+        second=manager['output_stats'](file);self.assertEqual(second['processed'],2);self.assertEqual(second['last_failure']['message'],'timeout')
+        file.write_text('{"stock_status":"Not Found"}\n')
+        self.assertEqual(manager['output_stats'](file)['errors'],0)
+        file.replace(self.root/'old.jsonl');file.write_text('{"isbn_matched":true}\n')
+        self.assertEqual(manager['output_stats'](file)['processed'],1)
+
+    def test_bounded_log_cursors_follow_appends_and_reset_after_rotation(self):
+        folder=self.root/'output'/'sample';folder.mkdir(parents=True)
+        log=folder/'run.log';log.write_text('first\nsecond\n')
+        output=folder/'results.jsonl'
+        row={'scraper':'flipkart','output':str(output.relative_to(self.root))}
+        record={'id':'job','rows':[row],'shared':True}
+        with patch.dict(manager,{'control_record':lambda identifier:record,'live_record':lambda record:None}):
+            request={'job':'job','scraper':'flipkart','source':'console'}
+            a=manager['job_logs'](request);self.assertTrue(a['mixed']);self.assertEqual(len(a['entries']),2)
+            b=manager['job_logs']({**request,'cursor':a['cursor']});self.assertEqual(b['entries'],[])
+            with log.open('a') as f:f.write('third\n')
+            c=manager['job_logs']({**request,'cursor':a['cursor']});self.assertEqual(c['entries'][0]['text'],'third')
+            log.replace(folder/'run.old.log');log.write_text('new\n')
+            d=manager['job_logs']({**request,'cursor':c['cursor']});self.assertTrue(d['reset'])
+            with self.assertRaises(ValueError):manager['job_logs']({**request,'scraper':'native'})
+            with self.assertRaises(ValueError):manager['job_logs']({**request,'cursor':'invalid'})
+
+    def test_log_paths_reject_symlinks_and_parent_traversal(self):
+        folder=self.root/'output';folder.mkdir()
+        native=self.root/'native.log';native.write_text('private')
+        (folder/'link.log').symlink_to(native)
+        self.assertIsNone(manager['registered_log_path'](folder/'link.log'))
+        self.assertIsNone(manager['registered_log_path'](folder/'..'/'native.log'))
+
+    def test_failure_reason_uses_snapshot_before_row_errors_without_inventing_oom(self):
+        folder=self.root/'output';folder.mkdir()
+        row={'output':'output/results.jsonl'}
+        data=manager['failure_details']({'id':'job','shared':True},row,{'error':'Browser page closed','failed_at':'now'},{},{'last_failure':{'message':'old failure'}})
+        self.assertEqual(data['message'],'Browser page closed');self.assertEqual(data['source'],'snapshot');self.assertIsNone(data['signal'])
+
+class LauncherRegressionTests(unittest.TestCase):
+    setUp=ManagerTests.setUp
+    tearDown=ManagerTests.tearDown
+
+    def test_shared_resume_with_null_scraper_and_runtime_logging(self):
+        args=['node','scripts/run-shared-scrapers.js','input-data/sample.txt','--headless','--concurrency','10']
+        record={'id':'process-shared-fixture','shared':True,'scraper':None,'attempts':None,'legacy_job_id':None,'command':args,'command_key':'fixture','rows':[{'scraper':'flipkart','output':'output/flipkart/results.jsonl','total':2}]}
+        started=[False];calls=[]
+        def launch(*args,**kwargs): calls.append(args);started[0]=True;return ''
+        runtime={ 'RUNTIME_SOURCE':Path('utils/runtimeObserver.cjs').read_text(), 'EVENTS_SOURCE':Path('utils/jobEvents.js').read_text(), 'SINK_SOURCE':Path('utils/consoleSink.py').read_text(), 'SERVER_ID':'6' }
+        with patch.dict(manager,{**runtime,'control_record':lambda identifier:record,'live_record':lambda record:None,'validate_resume':lambda record:record['command'],'known_processes':lambda:[({'pid':123,'start':'456'},{'command_key':'fixture'})] if started[0] else [],'run':launch,'save_record':lambda record:None}):
+            result=manager['resume_job'](record['id'])
+        self.assertEqual(len(calls),1)
+        launcher=(self.state/(record['id']+'.sh')).read_text()
+        self.assertIn('BOOK_SCRAPER=shared-batch',launcher)
+        self.assertNotIn('BOOK_SCRAPER=None',launcher)
+        self.assertIn('--concurrency 10',launcher)
+        self.assertEqual(record['attempts'][-1]['id'],record['attempt_id'])
+        self.assertIn('Resumed the scraper batch',result['message'])
 
 if __name__=='__main__': unittest.main()

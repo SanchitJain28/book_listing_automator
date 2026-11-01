@@ -77,16 +77,24 @@ const BASE = "https://api.keepa.com";
 const DOMAIN = 10; // amazon.in
 const BOOKS_ROOT = 976389031; // Books
 
-const REVIEW_MAX = Number(process.env.REVIEW_MAX || 20);
+const REVIEW_MIN = Number(process.env.REVIEW_MIN || 1);
+const REVIEW_MAX = process.env.REVIEW_MAX === "none" ? null : Number(process.env.REVIEW_MAX || 20);
+const STRICT_ISBN = process.env.STRICT_ISBN === "1";
+const REVIEW_LABEL = REVIEW_MAX === null ? `${REVIEW_MIN}+` : `${REVIEW_MIN}-${REVIEW_MAX}`;
 const ONLY_PASS = Number(process.env.PASS || 0) || null;
 const MAX_MINUTES = Number(process.env.MAX_MINUTES || 0) || null;
 const TOKEN_RATE = Number(process.env.TOKEN_RATE || 60);
 // Optional strict upper price limit in rupees; Keepa filters use paise.
 const PRICE_BELOW = process.env.PRICE_BELOW ? Number(process.env.PRICE_BELOW) : null;
+const PRICE_ABOVE = process.env.PRICE_ABOVE ? Number(process.env.PRICE_ABOVE) : null;
 if (PRICE_BELOW !== null && (!Number.isFinite(PRICE_BELOW) || PRICE_BELOW <= 0)) {
   throw new Error("PRICE_BELOW must be a positive number of rupees.");
 }
-const RUN_SCOPE = `${ONLY_PASS === 2 ? "0" : ONLY_PASS === 1 ? `1-${REVIEW_MAX}` : `0-${REVIEW_MAX}`} reviews, in stock${PRICE_BELOW === null ? "" : `, lowest new price < INR ${PRICE_BELOW}`}`;
+if (PRICE_ABOVE !== null && (!Number.isFinite(PRICE_ABOVE) || PRICE_ABOVE < 0 || (PRICE_BELOW !== null && PRICE_ABOVE >= PRICE_BELOW))) {
+  throw new Error("PRICE_ABOVE must be nonnegative and lower than PRICE_BELOW.");
+}
+const RUN_SCOPE = `${ONLY_PASS === 2 ? "Keepa zero-review candidates" : ONLY_PASS === 1 ? `${REVIEW_LABEL} reviews` : `0-${REVIEW_MAX ?? "unlimited"} reviews`}, in stock${PRICE_ABOVE === null ? "" : `, new price > INR ${PRICE_ABOVE}`}${PRICE_BELOW === null ? "" : `, new price < INR ${PRICE_BELOW}`}`;
+const SCOPE = { reviewMin: REVIEW_MIN, reviewMax: REVIEW_MAX, onlyPass: ONLY_PASS, priceAbove: PRICE_ABOVE, priceBelow: PRICE_BELOW, strictIsbn: STRICT_ISBN };
 
 const BUCKET_TARGET = 9500; // headroom below Keepa's 10,000 paging cap
 const HARD_CAP = 10000;
@@ -150,12 +158,17 @@ if (PRICE_BELOW !== null) {
   BASE_FILTERS.current_NEW_gte = 1;
   BASE_FILTERS.current_NEW_lte = Math.ceil(PRICE_BELOW * 100) - 1;
 }
+if (PRICE_ABOVE !== null) BASE_FILTERS.current_NEW_gte = Math.floor(PRICE_ABOVE * 100) + 1;
 
 const PASSES = [
   {
     n: 1,
-    label: `1-${REVIEW_MAX} reviews`,
-    filters: { ...BASE_FILTERS, current_COUNT_REVIEWS_lte: REVIEW_MAX },
+    label: `${REVIEW_LABEL} reviews`,
+    filters: {
+      ...BASE_FILTERS,
+      ...(REVIEW_MIN === 1 ? {} : { current_COUNT_REVIEWS_gte: REVIEW_MIN }),
+      ...(REVIEW_MAX === null ? {} : { current_COUNT_REVIEWS_lte: REVIEW_MAX }),
+    },
   },
   { n: 2, label: "0 reviews", filters: { ...BASE_FILTERS, hasReviews: false } },
 ];
@@ -168,6 +181,7 @@ let stopRequested = false;
 let fatal = null;
 
 const S = {
+  scope: SCOPE,
   reviewMax: REVIEW_MAX,
   baseFilters: BASE_FILTERS,
   passIndex: 0,
@@ -300,7 +314,11 @@ function sleepSync(ms) {
 // ============================================================== HELPERS
 const rupees = (v) =>
   Number.isInteger(v) && v > 0 ? +(v / 100).toFixed(2) : "";
-const isIsbn10 = (a) => typeof a === "string" && /^\d{9}[\dX]$/.test(a);
+const isIsbn10 = (a) => {
+  if (typeof a !== "string" || !/^\d{9}[\dX]$/.test(a)) return false;
+  if (!STRICT_ISBN) return true;
+  return [...a].reduce((sum, digit, i) => sum + (10 - i) * (digit === "X" ? 10 : Number(digit)), 0) % 11 === 0;
+};
 
 function isbn10to13(isbn10) {
   try {
@@ -519,6 +537,7 @@ async function collectBatch(batch, passNo) {
   for (const p of products) {
     try {
       if (!p || typeof p.asin !== "string") continue;
+      if (STRICT_ISBN && !isIsbn10(p.asin)) continue;
 
       const stats = p.stats || {};
       const cur = Array.isArray(stats.current) ? stats.current : [];
@@ -582,7 +601,7 @@ async function collectBatch(batch, passNo) {
           source,
           passNo,
           ...(PRICE_BELOW === null ? [] : [
-            sale === "" || sale <= 0 ? "missing_price" : sale >= PRICE_BELOW ? "high_price" : "within_limit",
+            sale === "" || sale <= 0 ? "missing_price" : sale >= PRICE_BELOW ? "high_price" : PRICE_ABOVE !== null && sale <= PRICE_ABOVE ? "low_price" : "within_limit",
           ]),
           ...(PRICE_BELOW === null ? [] : [
             reviews === "" ? (passNo === 2 ? "keepa_no_reviews_unverified" : "unknown") : reviews === 0 ? "keepa_zero_not_live_verified" : "keepa_positive_count",
@@ -892,8 +911,8 @@ function preflight() {
     console.error("KEEPA_API_KEY is empty. Put your key in the .env file.");
     process.exit(1);
   }
-  if (!Number.isInteger(REVIEW_MAX) || REVIEW_MAX < 0) {
-    console.error("REVIEW_MAX must be a non-negative integer.");
+  if (!Number.isInteger(REVIEW_MIN) || REVIEW_MIN < 1 || (REVIEW_MAX !== null && (!Number.isInteger(REVIEW_MAX) || REVIEW_MAX < REVIEW_MIN))) {
+    console.error("REVIEW_MIN must be a positive integer; REVIEW_MAX must be >= REVIEW_MIN or 'none'.");
     process.exit(1);
   }
 
@@ -941,13 +960,14 @@ async function main() {
   if (saved) {
     if (
       saved.reviewMax !== REVIEW_MAX ||
-      JSON.stringify(saved.baseFilters) !== JSON.stringify(BASE_FILTERS)
+      JSON.stringify(saved.baseFilters) !== JSON.stringify(BASE_FILTERS) ||
+      (saved.scope ? JSON.stringify(saved.scope) !== JSON.stringify(SCOPE) : REVIEW_MIN !== 1 || REVIEW_MAX === null || PRICE_ABOVE !== null || STRICT_ISBN)
     ) {
       console.error(
         `\nCheckpoint is for 0-${saved.reviewMax} reviews; you asked for 0-${REVIEW_MAX}.`,
       );
       console.error(
-        `Delete ${CHECKPOINT} and ${OUT_CSV} to start the new scope.\n`,
+        "Use a separate output directory for a different scope; do not overwrite this checkpoint.\n",
       );
       process.exit(1);
     }
@@ -1042,6 +1062,7 @@ function writeSummary(todo = PASSES) {
   out.forEach((l) => log(l));
 
   writeJsonAtomic(OUT_SUMMARY, {
+    scope: SCOPE,
     reviewMax: REVIEW_MAX,
     runHours: +(mins / 60).toFixed(2),
     passTotals: S.passTotals,

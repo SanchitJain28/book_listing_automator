@@ -7,10 +7,10 @@
   "yellowItemsCount": 215,
   "redItemsCount": 0,
   "latestCursor": {
-    "batchNumber": 10,
-    "sheetRowNumber": 538,
-    "isbn": "9789390511761",
-    "cursorText": "CURSOR - 10"
+    "batchNumber": 4,
+    "sheetRowNumber": 226,
+    "isbn": "9789366659510",
+    "cursorText": "CURSOR - 4"
   },
   "columns": {
     "status": 0,
@@ -6856,7 +6856,7 @@
       "title": "PRATAP Academy Great Punjab GK Book | Punjab General Knowledge for All Exams | Bilingual (English & Punjabi) | by Ankit Singh Rana",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -6934,7 +6934,7 @@
       "title": "MILESTONES ACHIEVERS EXPLORING SOCIAL SCIENCE CLASS-8",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -6947,7 +6947,7 @@
       "title": "GATE Topic-wise Previous Years' Solved Question Papers Computer Science and Information Technology 2022 | By Pearson",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -7220,7 +7220,7 @@
       "title": "Specialised Accounting For B.Com (Hons.) IInd Year of Magadh University, Munger University, Patliputra University, Tilka Manjhi Bhagalpur University, Veer Kunwar Singh University [Paperback] Dr. S.M. Shukla and Dr. K.L. Gupta",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -7298,7 +7298,7 @@
       "title": "Local Monsters: 1",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -7376,7 +7376,7 @@
       "title": "Legal Aspects of Business by Ravinder Kumar, Naveen Mittal (Cengage) ISBN: 9789355739919",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -7532,7 +7532,7 @@
       "title": "Kautilya's Arthashastra: Philosophy of Strategy",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -7585,7 +7585,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 11",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -7987,7 +7987,7 @@
       "title": "Ratna Sagar - My Big Book Of Social Science For Class 8 (Rationalized Edition) (NCF 2023)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -8000,7 +8000,7 @@
       "title": "Taxmann's CRACKER for Company Law & Practice (Paper 2 | Company Law) – Featuring Solved Past Papers | Case Study-based Questions for CS Executive | New Syllabus | Dec. 2025/June 2026 Exams",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -8261,7 +8261,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 12",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -8325,7 +8325,7 @@
       "title": "TESTBOOK Banking - English Smartbook (Conceptual Notes with 2500+ MCQs) | Useful for SBI, IBPS, RRBs, RBI, LIC, NABARD, and other key Banking & Insurance exams",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -8455,7 +8455,7 @@
       "title": "I Wish I Could Hate You",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -8585,7 +8585,7 @@
       "title": "Your Thoughts Create Your Destiny",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -8689,7 +8689,7 @@
       "title": "?????? ??????? Corporate Accounting (54th Edition) for B.Com. II Year of Awadhesh Pratap Singh University Rewa, Barkatullah University Bhopal, Rani Durgavati Vishwavidyalaya Jabalpur, Vikram University Ujjain, Dr Harisingh Gour University Sagar & M.Com Semester III of Jiwaji University Gwalior [Paperback] Dr. S.M. Shukla and Dr. K.L. Gupta",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -8963,7 +8963,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 13",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -9274,7 +9274,7 @@
       "title": "UGC NET Home Science Paper 2 MCQ Book - 2000+ Questions for Exam Preparation",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -9287,7 +9287,7 @@
       "title": "UGC NET/SET/JRF Sociology MCQ Practice Book | 2500+ Questions for Exam Success | Social Theory, Stratification & Institutions | Detailed Explanations | Updated Syllabus 2025 | Testbook",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -9391,7 +9391,7 @@
       "title": "Arihant CUET UG 2026 PCB Combo (Physics, Chemistry & Biology) | Chapterwise Notes & Question Bank | Based on NTA Pattern | 1000+ NCERT MCQs, Assertion ... & Flash Cards | Free Online Digital Support.",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -9652,7 +9652,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 14",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -9950,7 +9950,7 @@
       "title": "Node.js for PHP Developers: Porting PHP to Node.js",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -10132,7 +10132,7 @@
       "title": "Mahabharat Book in English for Kids – Illustrated Mahabharata for Kids with Pictures | Mythology Story Book for Children Ages 7+ | Kids Mahabharat Story Book with Pictures",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -10328,7 +10328,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 15",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -10340,7 +10340,7 @@
       "title": "SAMANDAR PER EK UDAN",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -10561,7 +10561,7 @@
       "title": "Examcart Blue Book Series Booster KVS Perspectives on Education & Leadership + Educational Perspective Book by Prateek Shivalik for PRT, TGT, PGT Exams 2026 (Hindi Medium) (Set of 2 Books)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -11004,7 +11004,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 16",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -11654,7 +11654,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 17",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -11991,7 +11991,7 @@
       "title": "Professional Sitecore Development (Wrox)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -12317,7 +12317,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 18",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -12810,7 +12810,7 @@
       "title": "ORCHARD ENGLISH COURSEBOOK PART TWO",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -12980,7 +12980,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 19",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -13499,7 +13499,7 @@
       "title": "Specialized Accounting B.Com (Honours) 2nd Year B. R. Ambedkar University Muzaffarpur - Sahitya Bhawan Publications [Paperback] Dr. S.M. Shukla and Dr. K.L. Gupta",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -13643,7 +13643,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 20",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -13668,7 +13668,7 @@
       "title": "Arihant NIFT NID IIFT Navigator Entrance Exam Guide 2026 | for UG & PG, Complete Syllabus Coverage for GAT, CAT & Situation Test | Solved Papers 2025 | Chapterwise Notes for Design Entrance Exams |",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -14136,7 +14136,7 @@
       "title": "Communicate with Cambridge Coursebook 1",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -14306,7 +14306,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 21",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -14513,7 +14513,7 @@
       "title": "Cradle and the Crown: A Literary Saga Exploring Love for Power, Country, and Family",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "DELIVERY DATE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -14916,7 +14916,7 @@
       "title": "கந்தர்வ நாடி ( சிவபெருமான் அருளிய நாடி ஜோதிட ரகசியம் , த்யானம் , யோகம் , ஞானம் ) / Kandharva Naadi - Jothida Sasthiram",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -14982,7 +14982,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 22",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -15632,7 +15632,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 23",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -16086,7 +16086,7 @@
       "title": "भारत का रक्षक महाराजा सुहेलदेव (Hindi Edition)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -16295,7 +16295,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 24",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -16580,7 +16580,7 @@
       "title": "Return To The Source - Volume 2: An Enlightened Master Speaks",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -16606,7 +16606,7 @@
       "title": "Baatcheet Ki Kala",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -16892,7 +16892,7 @@
       "title": "R D Sharma Mathematics Class 7 CBSE - by R.D. Sharma - 2025-26",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -16918,7 +16918,7 @@
       "title": "Financial Accounting Vol ll",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -16931,7 +16931,7 @@
       "title": "AMLI TANQEED ( MAGHRIB-O-MASHREQ KE HAWALE SE )",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -17010,7 +17010,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 25",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -17620,7 +17620,7 @@
       "title": "Revised Social Science History 6 (2018)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -17673,7 +17673,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 26",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -17815,7 +17815,7 @@
       "title": "REVISED NEW OXFORD MODERN ENGLISH COURSEBOOK 1_OPP",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -17854,7 +17854,7 @@
       "title": "Mulberry ICSE WB1_ED18",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -18166,7 +18166,7 @@
       "title": "Popular Short Stories",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -18192,7 +18192,7 @@
       "title": "THE SUCCESS FACTOR (HINDI)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -18375,7 +18375,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 27",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -18647,7 +18647,7 @@
       "title": "The Cobber's Companion: For College and Beyond",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -18972,7 +18972,7 @@
       "title": "Orient BlackSwan Vyakaran Vani Hindi Grammar Book for Class 8, NEP NCF Aligned (Vyakaran Vani for class 8)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -19051,7 +19051,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 28",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -19076,7 +19076,7 @@
       "title": "Full Marks Accountancy Textbook for Class 12 Part-A (Vol 2) | Based on Accounting for Companies | Aligned with Latest CBSE Syllabus",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -19310,7 +19310,7 @@
       "title": "Wiley India Pvt Ltd Casino Gambling For Dummies",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -19453,7 +19453,7 @@
       "title": "Key2Practice CBSE Class 8 Mathematics Chapterwise Worksheets Part 2 (Ganita Prakash) | Objective & Subjective Worksheets, NCERT Solutions, NEP-Aligned Practice Workbook",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -19739,8 +19739,8 @@
       "title": "A AM THAT",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
-      "existingCursor": "",
+      "existingReason": "ISBN NOT MATCHED",
+      "existingCursor": "CURSOR - 29",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -19791,7 +19791,7 @@
       "title": "ARBI ADABIYAT KE URDU TARAJIM (TAHQEEQ-O-TANQEED)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -20416,7 +20416,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 30",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -20662,7 +20662,7 @@
       "title": "Self-Reliance",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -21079,7 +21079,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 31",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -21117,7 +21117,7 @@
       "title": "URDU SAHAFAT AUR ADAB (IDARE AUR SHAZRAT) URDU JOURNALISM & LITERATURE COLLECTION OF EDITORIALS & ARTICLES",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -21130,7 +21130,7 @@
       "title": "URDU ADAB KE ARKAN-E-ARBA AUR QADAR SHANASI KE DEEGAR ZAVIYE",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -21351,7 +21351,7 @@
       "title": "ZILA GULBARGA MEIN URDU ADAB-O-SAHAFAT",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -21390,7 +21390,7 @@
       "title": "B.A / B.Sc Second Year Economic Geography [ TELUGU MEDIUM ]",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -21663,7 +21663,7 @@
       "title": "Pearson Tune In to Grammar For Class 3",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -21794,7 +21794,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 32",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -21845,7 +21845,7 @@
       "title": "Wiley's NTA based JEE Main Practice Question Bank Chapter-wise & Topic-wise, Physics",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -21884,7 +21884,7 @@
       "title": "Maths Matters - Teachers Manual Tm 6",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -22339,7 +22339,7 @@
       "title": "RAYREKH (VIJAYNAGAR GRANTHAVALI-3)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -22352,7 +22352,7 @@
       "title": "RAY HARIHAR (VIJAYNAGAR GRANTHAVALI-1)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -22470,7 +22470,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 33",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -23120,7 +23120,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 34",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -23262,7 +23262,7 @@
       "title": "Agile Project Management For Dummies, 2Ed",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -23379,7 +23379,7 @@
       "title": "GRAMMAR FOR ALL BOOK 1",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -23496,7 +23496,7 @@
       "title": "PUNJAB MEIN FARSI GHAZAL (BAHAWALA NASIR ALI SIRHINDI)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -23626,7 +23626,7 @@
       "title": "BARR-E-SAGHEER KE HUSAIN BRADRAN AUR URDU ADAB ( AKHTAR PAYAMI, SAYEED ANWAR, SHEEN AKHTAR, JABIR HUSAIN )",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -23691,7 +23691,7 @@
       "title": "Furyborn (Empirium Trilogy, 1)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -23835,7 +23835,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 35",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -23899,7 +23899,7 @@
       "title": "Conspiracy 365: November [Paperback] Gabrielle Lord",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -24029,7 +24029,7 @@
       "title": "ADILABAD MEIN URDU SHER-O-ADAB",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -24042,7 +24042,7 @@
       "title": "URDU ADAB MEIN TAKRAR-E-ALFAZ EK JAYEZA",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -24185,7 +24185,7 @@
       "title": "Corporate Banking (CAIIB 2010)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -24537,7 +24537,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 36",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -24926,7 +24926,7 @@
       "title": "Glimpses of Urdu Poetry",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -24939,7 +24939,7 @@
       "title": "777 Curiosity, Textbook of Science for Grade 7 (Edition First Edition)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -25017,7 +25017,7 @@
       "title": "You Can’t Please All: Memoirs 1980-2024",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -25213,7 +25213,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 37",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -25277,7 +25277,7 @@
       "title": "Ratna Sagar - Revised Communicate In English Activity For Class 2",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -25511,7 +25511,7 @@
       "title": "URDU TANQEED KE TASAUWARAT KA MUTALA",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -25550,7 +25550,7 @@
       "title": "Mechanics of Structures (WBSCTE)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -25758,7 +25758,7 @@
       "title": "Not Part of the Plan: Tik-Tok Sensation | From Author of Things We Never Got Over | Book 4 in the Blue Moon Series | Romance | Enemies to Lovers | Best of Booktok!",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -25836,7 +25836,7 @@
       "title": "GENERAL KNOWLEDGE CLASS 4",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -25928,7 +25928,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 38",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -25992,7 +25992,7 @@
       "title": "Skt_Vyakaran Manika-SM-07-130-16: Educational Book",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -26200,7 +26200,7 @@
       "title": "Vel Maral Mahamantram With Meaning ( Malayalam ) Pocket size Book ( Pack of 6 Books )",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -26213,7 +26213,7 @@
       "title": "Sri Narayana Kavacam Religious Book, Sanskrit-English-Tamil Trilingual Edition, (Pack of 3 books)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -26447,7 +26447,7 @@
       "title": "Vivekanand Ke Sapano Ka Bharat",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -26525,7 +26525,7 @@
       "title": "CBSE All In One Business Studies Class 11 2022-23 Edition (As per latest CBSE Syllabus issued on 21 April 2022)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -26577,7 +26577,7 @@
       "title": "Beginners ARITHMETIC 1 & 2 (2 Parts)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -26656,7 +26656,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 39",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -27006,7 +27006,7 @@
       "title": "Dairy Science and Technology: A Comprehensive objective guide",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -27319,7 +27319,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 40",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -27344,7 +27344,7 @@
       "title": "IKKISVIN SADI MEIN DELHI MEIN URDU ADAB-E-ATFAL KA IRTEQA",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -27435,7 +27435,7 @@
       "title": "MCTS Self - Paced Training Kit (Exam 70 - 528): Microsoft .Net Framework 2.0 Web - Based Client Development",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -27995,7 +27995,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 41",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -28033,7 +28033,7 @@
       "title": "Khaamosh Lamhon Ka Saphar",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -28423,7 +28423,7 @@
       "title": "NCERT Compendium Bhartiya Samaj for UPSC Class 6th to 12th | Hindi Medium | Coverage of both Old and New NCERTs | One stop solution for UPSC and State PSCs | by UPSC Toppers | 2024-25",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -28671,7 +28671,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 42",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -28722,7 +28722,7 @@
       "title": "A Saree for Ammi/Ammir Jonno Ekti Shari",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -29008,7 +29008,7 @@
       "title": "DO YOU KNOW? LEVEL 2 STUDENT'S BOOK WITH AR APP",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -29138,7 +29138,7 @@
       "title": "Prajnasutra (Bengali Edition)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -29190,7 +29190,7 @@
       "title": "Count My Lies: The brand new chilling suspense thriller for fans of Lisa Jewell",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -29320,7 +29320,7 @@
       "title": "Maximizing Human Potential Through Behavioural Competencies: 100 Core Competencies",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -29386,7 +29386,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 43",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -29593,7 +29593,7 @@
       "title": "Communicate in English Activity Book 7",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -29840,7 +29840,7 @@
       "title": "MIND TIME: HOW TEN MINDFUL MINUTES CAN ENHANCE YOUR WORK [Paperback] michael chaskalson",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -30062,7 +30062,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 44",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -30386,7 +30386,7 @@
       "title": "CHAKSHUSHALYA (MARATHI)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -30477,7 +30477,7 @@
       "title": "SORATHIYA DUHA",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -30620,7 +30620,7 @@
       "title": "Treasury of Quotations",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -30685,7 +30685,7 @@
       "title": "Arya New Graded English Grammar and Composition Class 2",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -30711,7 +30711,7 @@
       "title": "Executive Presence 2.0 : Leadership in an Age of Inclusion",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -30764,7 +30764,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 45",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -31140,7 +31140,7 @@
       "title": "Suicide Notes",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -31427,7 +31427,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 46",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -31491,7 +31491,7 @@
       "title": "Lughat Nigari Usool wa Qawaid",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -31595,7 +31595,7 @@
       "title": "Introducing Nlp",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -31803,7 +31803,7 @@
       "title": "MTNL Electrical Engg Guide (Popular Master Guide)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -32037,7 +32037,7 @@
       "title": "Cloud Security: A Comprehensive Guide to Secure Cloud Computing",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -32089,7 +32089,7 @@
       "title": "NCERT CLASS 8 Khayaal, Textbook of Urdu for Grade 8 4871 2025-26 Edition ( OLD 2022 EDITION )",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -32115,7 +32115,7 @@
       "title": "How to Play Boxing",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -32154,8 +32154,8 @@
       "title": "The Essense Of Business & Manegement",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
-      "existingCursor": "",
+      "existingReason": "ISBN NOT MATCHED",
+      "existingCursor": "CURSOR - 47",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -32232,7 +32232,7 @@
       "title": "COMPUTERS FOR ALL BOOK 3",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -32310,7 +32310,7 @@
       "title": "Think World Class",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -32844,7 +32844,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 48",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -33272,7 +33272,7 @@
       "title": "TANQEED KI NAYEE LAHAR",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -33507,7 +33507,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 49",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -33545,7 +33545,7 @@
       "title": "Maithili and the Minotaur - Forest of Forgotten Fears: (Book 2 in an Outlandish Graphic Novel Series)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -34130,7 +34130,7 @@
       "title": "In Love Of Soil",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -34183,7 +34183,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 50",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },
@@ -34234,7 +34234,7 @@
       "title": "52 WAKE UP CALLS",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "UNAVAILABLE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -34390,7 +34390,7 @@
       "title": "Natural History of Kanchenjunga",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -34468,7 +34468,7 @@
       "title": "You've Reached Sam: The bestselling heartbreaking YA romance with a touch of magic",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "ISBN NOT MATCHED",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -34546,7 +34546,7 @@
       "title": "The Bitch Switch",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -34702,7 +34702,7 @@
       "title": "Footprints Reader 2024 Class 3 Integrated Social Science Series | NEP & NCF Aligned with SDGs, Heritage, and 21st Century Skills",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -34819,7 +34819,7 @@
       "title": "The Wisdom of Tibetan Buddhism [Paperback] RAY, REGINALD A.",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Exact ISBN",
       "rowColor": "white"
@@ -34911,7 +34911,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 51",
       "matchType": "Exact ISBN",
       "rowColor": "white"
     },

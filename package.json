@@ -21,7 +21,9 @@
     "test:walmart": "node --test test/walmart.test.js",
     "test:shared-browsers": "node --test test/shared-browser.test.js test/mypustak.test.js",
     "verify:shared-browsers": "node scripts/verify-shared-browser.js",
-    "test:resume": "node --test test/resume.test.js"
+    "test:resume": "node --test test/resume.test.js",
+    "test:abebooks-uk": "node --test test/abebooks-co-uk.test.js",
+    "test:amazon-it": "node --test test/amazon-it.test.js"
   },
   "keywords": [],
   "author": "",

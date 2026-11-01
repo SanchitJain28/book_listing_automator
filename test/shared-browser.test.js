@@ -40,7 +40,7 @@ test('pool uses two browsers, caps active contexts, saves private state and rele
   assert.equal(leases[0].context.closed, true); assert.equal(pool.stats().active_contexts, 4);
   assert.equal(fs.statSync(path.join(dir, 'a.json')).mode & 0o777, 0o600);
   await fifth.release(); for (const lease of leases.slice(1)) await lease.release();
-  const resumed = await pool.acquire('a'); assert.equal(resumed.context.options.storageState, path.join(dir, 'a.json'));
+  const resumed = await pool.acquire('a'); assert.equal(resumed.context.options.storageState.cookies[0].name, 'test');
   await resumed.release(); await pool.close();
   assert.ok(fake.browsers.every(browser => !browser.connected));
 }));
@@ -130,3 +130,35 @@ test('context close failure retires its browser before the next lease',async()=>
  assert.equal(fake.browsers[0].connected,false);
  const second=await pool.acquire('b');assert.equal(fake.browsers.length,2);await second.release();await pool.close();
 });
+
+test('oversized session state is preserved without restoring it, and future state excludes IndexedDB',()=>fixture(async dir=>{
+ const {MAX_STATE_BYTES,boundedState}=require('../utils/sharedBrowserPool');const file=path.join(dir,'flipkart.json');fs.writeFileSync(file,Buffer.alloc(MAX_STATE_BYTES+1,32));
+ const fake=fakeLaunch(),pool=new SharedBrowserPool({launch:fake.launch,browserCount:1,concurrency:1,stateDir:dir,logger:()=>{}});
+ const lease=await pool.acquire('flipkart');assert.equal(lease.context.options.storageState,undefined);assert.ok(fs.readdirSync(dir).some(name=>name.startsWith('flipkart.json.oversized-')));
+ const safe=boundedState({cookies:[],origins:[{origin:'https://example.test',indexedDB:[{huge:'cache'}],localStorage:[{name:'small',value:'kept'},{name:'huge',value:'x'.repeat(70000)}]}]});
+ assert.equal(safe.origins[0].indexedDB,undefined);assert.deepEqual(safe.origins[0].localStorage,[{name:'small',value:'kept'}]);await lease.release();await pool.close();
+}));
+test('cleanup failure never closes a browser while a sibling scraper is using it',async()=>{
+ const fake=fakeLaunch(),pool=new SharedBrowserPool({launch:fake.launch,browserCount:1,concurrency:2,logger:()=>{}});
+ const first=await pool.acquire('a'),sibling=await pool.acquire('b');first.context.close=async()=>{throw Error('failed cleanup');};await first.release();
+ assert.equal(fake.browsers[0].connected,true);assert.equal(sibling.page.isClosed(),false);
+ let opened=false;const queued=pool.acquire('c').then(lease=>{opened=true;return lease;});await new Promise(r=>setImmediate(r));assert.equal(opened,false);
+ await sibling.release();const next=await queued;assert.equal(fake.browsers.length,2);await next.release();await pool.close();
+});
+test('runner recovers a closed page and retries only the unsaved ISBN',()=>fixture(async dir=>{
+ const fake=fakeLaunch(),pool=new SharedBrowserPool({launch:fake.launch,browserCount:1,concurrency:1});const calls=[],output=path.join(dir,'flipkart.jsonl');
+ const jobs=[{name:'flipkart',identity:r=>r.searched_isbn,output,scrape:async(page,item)=>{calls.push(item.searched_isbn);if(calls.length===1){await page.close();return {error:'Target page, context or browser has been closed',stock_status:'Error'};}return {found:true,isbn_matched:true,stock_status:'In Stock'};}}];
+ const states=await runShared({jobs,items:[{searched_isbn:'a'},{searched_isbn:'b'}],pool,sleep:async()=>{},logger:()=>{}});
+ assert.deepEqual(calls,['a','a','b']);assert.equal(states.flipkart.state,'Finished');assert.equal(states.flipkart.context_recoveries,1);
+ const records=fs.readFileSync(output,'utf8').trim().split('\n').map(JSON.parse);assert.deepEqual(records.map(r=>r.input_index),[0,1]);assert.equal(records.length,2);
+}));
+test('context startup failure has bounded retries without consuming a pending input',()=>fixture(async dir=>{
+ const fake=fakeLaunch();let calls=0;const launch=async()=>{const b=await fake.launch();b.newContext=async()=>{calls++;throw Error('browser.newContext: Target page, context or browser has been closed');};return b;};
+ const pool=new SharedBrowserPool({launch,browserCount:1,concurrency:1});const output=path.join(dir,'flipkart.jsonl');const jobs=[{name:'flipkart',identity:r=>r.searched_isbn,output,scrape:async()=>assert.fail('No initialized page')}];
+ const states=await runShared({jobs,items:[{searched_isbn:'pending'}],pool,sleep:async()=>{},logger:()=>{}});assert.equal(calls,3);assert.equal(states.flipkart.state,'Failed');assert.equal(states.flipkart.processed,0);assert.equal(fs.existsSync(output),false);
+}));
+test('a genuine block is not retried as browser recovery even if the page also closes',()=>fixture(async dir=>{
+ const fake=fakeLaunch(),pool=new SharedBrowserPool({launch:fake.launch,browserCount:1,concurrency:1});let calls=0;const output=path.join(dir,'blocked.jsonl');
+ const jobs=[{name:'flipkart',identity:r=>r.searched_isbn,output,scrape:async page=>{calls++;await page.close();return {stock_status:'Blocked',error_code:'blocked',error:'HTTP 429'};}}];
+ const states=await runShared({jobs,items:[{searched_isbn:'pending'}],pool,sleep:async()=>{},logger:()=>{}});assert.equal(calls,1);assert.equal(states.flipkart.state,'Blocked');assert.equal(states.flipkart.processed,0);assert.ok(fs.existsSync(output+'.shared-pause.json'));
+}));

@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { getConnectionPool } from './vpsConnectionPool.js';
+import { VpsLiveService } from './vpsLiveService.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -13,61 +14,73 @@ export function serversFromInfo(contents) {
     return { id: match[1], name: `VPS ${match[1]}`, ip, password };
   }).filter(Boolean);
 }
-function safeError(message, code) {
-  if (/host key verification failed|authenticity of host/i.test(message)) return 'SSH host key is not trusted. Verify it in your terminal first.';
-  if (/permission denied|password/i.test(message) || code === 5) return 'SSH authentication failed.';
-  return 'Could not connect to the VPS or execute the management operation.';
-}
 export async function remoteOperation(root, server, request) {
   const source = await fs.readFile(path.join(root, 'scripts/vps-status/manager.py'), 'utf8');
+  const runtime = await fs.readFile(path.join(root, 'utils/runtimeObserver.cjs'), 'utf8');
+  const sink = await fs.readFile(path.join(root, 'utils/consoleSink.py'), 'utf8');
+  const events = await fs.readFile(path.join(root, 'utils/jobEvents.js'), 'utf8');
   const payload = Buffer.from(JSON.stringify(request)).toString('base64url');
-  const executable = ['/opt/homebrew/bin/sshpass', '/usr/local/bin/sshpass', '/usr/bin/sshpass'].find(p => { try { return requireAccess(p); } catch { return false; } }) || 'sshpass';
-  return new Promise((resolve, reject) => {
-    const child = spawn(executable, ['-e', 'ssh', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=10', '-o', 'NumberOfPasswordPrompts=1', `root@${server.ip}`, `python3 - ${payload}`], { env: { ...process.env, SSHPASS: server.password }, stdio: ['pipe', 'pipe', 'pipe'] });
-    let output='', error='', done=false;
-    const finish=(err,value)=>{if(done)return;done=true;clearTimeout(timer);err?reject(err):resolve(value);};
-    const timer=setTimeout(()=>{child.kill('SIGKILL');finish(new Error('VPS request timed out. Check the job status before retrying a launch.'));}, 120000);
-    child.on('error',()=>finish(new Error('Could not start sshpass or SSH.'))); child.stdin.on('error',()=>{});
-    child.stdout.on('data', data=>{output+=data;if(output.length>3_000_000){child.kill();finish(new Error('VPS response exceeded the size limit.'));}});
-    child.stderr.on('data',data=>{if(error.length<2000) error+=data;});
-    child.on('close',code=>{try { const result=JSON.parse(output); if(!result.ok) return finish(new Error(result.error));finish(null,result.result); } catch {finish(new Error(safeError(error,code)));}});
-    child.stdin.end(source);
-  });
+  const prefix = `RUNTIME_SOURCE = ${JSON.stringify(runtime)}\nEVENTS_SOURCE = ${JSON.stringify(events)}\nSINK_SOURCE = ${JSON.stringify(sink)}\nSERVER_ID = ${JSON.stringify(String(server.id))}\n`;
+  const { stdout, code } = await getConnectionPool().exec(server, `python3 - ${payload}`, prefix + source);
+  let result;
+  try { result = JSON.parse(stdout); } catch { throw new Error(`VPS returned an invalid response (exit ${code}). Refresh status before retrying an action.`); }
+  if (!result.ok) throw new Error(result.error || 'VPS management operation failed.');
+  return result.result;
 }
-import { accessSync, constants } from 'node:fs';
-function requireAccess(p) { accessSync(p, constants.X_OK); return true; }
 
-export function vpsManagerMiddleware(root, operate = remoteOperation) {
+export function vpsManagerMiddleware(root, operate = remoteOperation, live = null) {
   let busy = new Set();
   return async (req,res,next) => {
     const url = new URL(req.url, 'http://localhost');
-    if (url.pathname !== '/api/vps-manager') return next();
+    if (!['/api/vps-manager','/api/vps-events'].includes(url.pathname)) return next();
     res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
     try {
       const host=req.headers.host || '';
       if (!/^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host) || req.headers['sec-fetch-site']==='cross-site' || (req.headers.origin && req.headers.origin!==`http://${host}`)) throw Object.assign(new Error('Only the local dashboard can use VPS management.'),{status:403});
       const servers=serversFromInfo(await fs.readFile(path.join(root,'VPSInfo.md'),'utf8'));
+      if(url.pathname==='/api/vps-events') {
+        if(req.method!=='GET'||!live) throw new Error('Live monitoring is unavailable.');
+        return await live.stream(req,res,servers,url);
+      }
       if(req.method==='GET' && !url.search) return res.end(JSON.stringify({servers:servers.map(({id,name})=>({id,name}))}));
       if(req.method!=='POST' || url.search || req.headers.origin!==`http://${host}` || !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) throw Object.assign(new Error('Use the local dashboard to submit this request.'),{status:403});
       let raw='';for await (const chunk of req){raw+=chunk;if(raw.length>8192) throw Object.assign(new Error('Request too large.'),{status:413});}
       const body=JSON.parse(raw); const server=servers.find(s=>s.id===String(body.server));
-      if(!server || !['status','files','sync','launch','stop','resume','retry','clear-pause'].includes(body.op)) throw Object.assign(new Error('Invalid server or operation.'),{status:400});
-      if(busy.has(server.id)) throw Object.assign(new Error('Another operation is already running for this VPS.'),{status:409});
+      if(!server || !['status','files','sync','launch','stop','resume','retry','clear-pause','logs','activity'].includes(body.op)) throw Object.assign(new Error('Invalid server or operation.'),{status:400});
+      const mutation=!['status','files','logs','activity'].includes(body.op);
+      if(mutation && busy.has(server.id)) throw Object.assign(new Error('Another operation is already running for this VPS.'),{status:409});
       const request={op:body.op};
       if(body.op==='files') request.folder=body.folder;
       if(body.op==='launch') {request.input=body.input;request.scraper=body.scraper;}
-      if(['stop','resume','retry','clear-pause'].includes(body.op)) {
+      if(['stop','resume','retry','clear-pause','logs'].includes(body.op)) {
         if(typeof body.job!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(body.job))throw Object.assign(new Error('Choose a listed scraper job.'),{status:400});
         request.job=body.job;
       }
-      if(body.op==='retry'||body.op==='clear-pause') {
+      if(body.op==='retry'||body.op==='clear-pause'||body.op==='logs') {
         if(typeof body.scraper!=='string'||!/^[-a-z0-9]{1,64}$/.test(body.scraper))throw Object.assign(new Error('Choose a scraper in this job.'),{status:400});
         request.scraper=body.scraper;
       }
-      if(body.op==='sync' || body.op==='launch') { const {stdout}=await exec('git',['rev-parse','HEAD'],{cwd:root,timeout:5000}); request.commit=stdout.trim(); }
-      busy.add(server.id);
-      try {res.end(JSON.stringify(await operate(root,server,request)));} finally {busy.delete(server.id);}
+      if(body.op==='logs') {
+        if(!['auto','events','console'].includes(body.source||'auto') || body.cursor && (typeof body.cursor!=='string'||body.cursor.length>1024)) throw new Error('Invalid log request.');
+        if(body.attempt && (typeof body.attempt!=='string'||!/^[\w-]{1,100}$/.test(body.attempt)))throw new Error('Invalid attempt.');
+        request.source=body.source||'auto';request.cursor=body.cursor||null;request.attempt=body.attempt||'current';
+      }
+      if(mutation) busy.add(server.id);
+      try {
+        if(body.op==='status'&&body.reconnect===true&&live)getConnectionPool().reset(server);
+        if(body.op==='sync' || body.op==='launch') { const {stdout}=await exec('git',['rev-parse','HEAD'],{cwd:root,timeout:5000}); request.commit=stdout.trim(); }
+        res.end(JSON.stringify(live ? await live.run(server,request,body.op==='status') : await operate(root,server,request)));} finally {if(mutation) busy.delete(server.id);}
     } catch(error) {res.statusCode=error.status || 400;res.end(JSON.stringify({error:error.message || 'VPS operation failed.'}));}
   };
 }
-export function vpsManagerPlugin(root) { return {name:'local-vps-manager',configureServer(s){s.middlewares.use(vpsManagerMiddleware(root));},configurePreviewServer(s){s.middlewares.use(vpsManagerMiddleware(root));}}; }
+export function vpsManagerPlugin(root) {
+  function install(server) {
+    const pool=getConnectionPool();
+    const live=new VpsLiveService(root,remoteOperation,id=>pool.state(id));
+    const previous=pool.onState;
+    pool.onState=(id,state)=>{previous(id,state);live.connectionChanged(id,state); if(state.state==='Connected'||state.error) { fs.readFile(path.join(root,'VPSInfo.md'),'utf8').then(text=>{const target=serversFromInfo(text).find(s=>s.id===id);if(target)return live.record(target,'connection',state.error||state.state,state.error?'warn':'info');}).catch(()=>{}); }};
+    server.middlewares.use(vpsManagerMiddleware(root,remoteOperation,live));
+    server.httpServer?.once('close',()=>{live.close();pool.close();});
+  }
+  return {name:'local-vps-manager',configureServer:install,configurePreviewServer:install};
+}

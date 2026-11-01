@@ -2,7 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { SharedBrowserPool } = require('../utils/sharedBrowserPool');
+const { createJobLogger } = require('../utils/jobEvents');
+const { SharedBrowserPool, browserLifecycleError } = require('../utils/sharedBrowserPool');
 const { getResumeIndex } = require('../utils/resume');
 const { readSearchTerms, readJsonLines, appendResult } = require('../utils/file');
 const root = path.resolve(__dirname, '..');
@@ -47,10 +48,14 @@ function atomicJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file + '.tmp', JSON.stringify(value, null, 2) + '\n'); fs.renameSync(file + '.tmp', file);
 }
-async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signal, logger = console.log, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
+async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signal, logger = console.log, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), recoveryRetries = 2 }) {
   if (!Number.isInteger(batchSize) || batchSize < 1) throw new Error('batchSize must be positive.');
   if (new Set(jobs.map(job => path.resolve(job.output))).size !== jobs.length) throw new Error('Each scraper needs a separate output file.');
   const states = {}, locks = [];
+  const attemptId = crypto.randomUUID();
+  const logs = new Map(jobs.map(job => [job.name, createJobLogger({ file: job.output + '.events.jsonl', jobId: process.env.BOOK_JOB_ID || 'shared-' + process.pid, attemptId, scraper: job.name })]));
+  const batchEvent = statusFile ? createJobLogger({ file: statusFile.replace(/\.status\.json$/, '') + '.events.jsonl', jobId: process.env.BOOK_JOB_ID || 'shared-' + process.pid, attemptId, scraper: 'shared-batch' }) : () => {};
+  batchEvent('batch_started', { message: 'Shared scraper batch started', pid: process.pid });
   const inputs = new Map(jobs.map(job => [job.name, job.prepareItems ? job.prepareItems(items) : items]));
   function snapshot() {
     const data = { checked_at: new Date().toISOString(), pid: process.pid, runtime: pool.stats(), scrapers: states };
@@ -75,18 +80,22 @@ async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signa
     snapshot();
     await Promise.all(jobs.map(async job => {
       const state = states[job.name];
+      const event = logs.get(job.name);
+      event('scraper_started', { input_index: state.processed, message: 'Resuming scraper from saved progress' });
       const jobItems = inputs.get(job.name);
+      let recoveryIndex = state.processed, recoveryAttempts = 0;
       try {
         const checkpoint = job.output + '.shared-pause.json';
         if (fs.existsSync(checkpoint)) {
           const pause = JSON.parse(fs.readFileSync(checkpoint, 'utf8'));
           if (!Number.isFinite(Date.parse(pause.resume_after))) throw new Error('Invalid shared-runner pause checkpoint.');
-          if (Date.parse(pause.resume_after) > Date.now()) { Object.assign(state, { state: 'Blocked', resume_after: pause.resume_after }); return; }
+          if (Date.parse(pause.resume_after) > Date.now()) { Object.assign(state, { state: 'Blocked', resume_after: pause.resume_after }); event('cooldown_active', { level: 'warn', message: pause.reason, resume_after: pause.resume_after }); return; }
         }
         while (state.processed < items.length && !signal?.aborted) {
           state.state = 'Queued'; snapshot();
-          const lease = await pool.acquire(job.name);
+          let lease;
           try {
+            lease = await pool.acquire(job.name);
             if (signal?.aborted) break;
             state.state = 'Running'; state.context_batches++; snapshot();
             const end = Math.min(items.length, state.processed + batchSize);
@@ -96,30 +105,45 @@ async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signa
               try { result = await job.scrape(lease.page, item); }
               catch (error) { result = { found: false, isbn_matched: false, stock_status: 'Error', error_code: 'scraper_error', error: error.message }; }
               if (signal?.aborted) break;
-              if (lease.page.isClosed()) throw new Error('Browser page closed before saving the result. Resume this pending input after restarting.');
+              if (!blocked(result) && (lease.page.isClosed() || lease.healthy && !lease.healthy() || browserLifecycleError({message:result.error}))) throw Object.assign(new Error(result.error || 'Browser page closed before saving the result.'),{code:'browser_lifecycle'});
               const record = { ...item, ...result, input_index: index, input_url: item.buy_url || item.url || null, scraped_at: new Date().toISOString() };
               if (blocked(result)) {
                 const resume_after = new Date(Math.max(Date.now() + 1800000, Date.parse(result.resume_after) || 0)).toISOString();
                 appendResult(job.output + '.blocked.jsonl', record); atomicJson(checkpoint, { input_index: index, resume_after, reason: result.error || result.stock_status });
-                Object.assign(state, { state: 'Blocked', resume_after });
+                Object.assign(state, { state: 'Blocked', resume_after, input_index: index });
+                event('request_blocked', { level: 'warn', input_index: index, isbn: item.searched_isbn || item.isbn, message: result.error || result.stock_status, error_code: result.error_code, resume_after });
                 logger(`[${job.name}] Blocked at input ${index + 1}; pending input preserved. Resume after ${resume_after}.`);
                 break;
               }
               appendResult(job.output, record); state.processed++;
+              event(result.error ? 'extraction_failed' : 'input_completed', { level: result.error ? 'error' : 'info', input_index: index, isbn: item.searched_isbn || item.isbn, message: result.error || result.stock_status || 'Saved result', error_code: result.error_code });
               logger(`[${job.name} ${state.processed}/${items.length}] ${item.searched_isbn || item.isbn}: ${result.stock_status || 'saved'}`);
               // Close all pages other than the job's main page at every input boundary.
               await lease.clean();
               if (state.processed % 25 === 0) { snapshot(); logger(`[Pool] ${JSON.stringify(pool.stats())}`); }
               if (state.processed < items.length && !signal?.aborted) await sleep(job.name === 'abebooks' ? 2500 + Math.floor(Math.random() * 2501) : 2000 + Math.floor(Math.random() * 2001));
             }
-          } finally { await lease.release(); }
+          } catch (error) {
+            await lease?.release(); lease = null;
+            if (signal?.aborted) { state.state='Stopped'; break; }
+            if (state.processed !== recoveryIndex) { recoveryIndex=state.processed;recoveryAttempts=0; }
+            if (browserLifecycleError(error) && recoveryAttempts < recoveryRetries) {
+              recoveryAttempts++;state.context_recoveries=(state.context_recoveries||0)+1;state.state='Recovering';
+              state.last_recovery_error=error.message;state.input_index=state.processed;
+              event('browser_recovery',{level:'warn',input_index:state.processed,message:error.message,recovery_attempt:recoveryAttempts});
+              logger(`[${job.name}] Browser/context lost; reopening for pending input ${state.processed+1} (recovery ${recoveryAttempts}/${recoveryRetries}).`);
+              snapshot();await sleep(2000*recoveryAttempts);continue;
+            }
+            throw error;
+          } finally { await lease?.release(); }
           snapshot();
           if (state.state === 'Blocked') break;
         }
         if (signal?.aborted && state.state !== 'Blocked') state.state = 'Stopped';
         else if (state.processed === items.length) { state.state = 'Finished'; fs.rmSync(job.output + '.shared-pause.json', { force: true }); }
-      } catch (error) { Object.assign(state, { state: 'Failed', error: error.message }); logger(`[${job.name}] ${error.message}`); }
+      } catch (error) { Object.assign(state, { state: 'Failed', error: error.message, failed_at: new Date().toISOString(), input_index: state.processed }); event('scraper_failed', { level: 'error', input_index: state.processed, message: error.message, stack: error.stack }); logger(`[${job.name}] ${error.message}`); }
       finally {
+        event('scraper_state', { message: state.state, state: state.state, input_index: state.processed });
         if (job.report) try {
           const report = job.report(job.output, jobItems);
           state.report = report.reportPath; state.matched_count = report.report.matched_count;
@@ -128,6 +152,7 @@ async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signa
       }
     }));
   } finally {
+    batchEvent('batch_stopping', { message: signal?.aborted ? 'Stop requested' : 'Batch finished' });
     await pool.close();
     for (const lock of locks) fs.rmSync(lock, { force: true });
     snapshot();

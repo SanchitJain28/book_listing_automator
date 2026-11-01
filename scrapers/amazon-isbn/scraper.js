@@ -13,6 +13,9 @@ const { cleanAndCheckMRP, validateIsbnMatch } = require("./core/validator");
  */
 async function scrapeAmazonBook(page, { directUrl, isbn, domain }) {
   const selectedDomain = domain || (directUrl ? new URL(directUrl).hostname.replace(/^www\./, '') : 'amazon.in');
+  if (selectedDomain === 'amazon.it') {
+    return require('./core/italy').scrapeItaly(page, { directUrl, isbn });
+  }
   if (selectedDomain !== 'amazon.in') {
     return require('./core/international').scrapeInternationalAmazon(page, { directUrl, isbn, domain: selectedDomain });
   }

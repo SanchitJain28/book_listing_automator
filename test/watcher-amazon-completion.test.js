@@ -19,7 +19,7 @@ function checkCompletion(scriptName, exitCode) {
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
 
-for (const script of ['amazon-us-isbn.js', 'amazon-uk-isbn.js']) {
+for (const script of ['amazon-us-isbn.js', 'amazon-uk-isbn.js', 'amazon-it-isbn.js']) {
   test(`${script}: circuit pause stops automatic restarts`, () => {
     assert.match(checkCompletion(script, 3), /no automatic restart/);
   });

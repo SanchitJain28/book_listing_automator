@@ -106,11 +106,15 @@ Was that 4 terms for Day 11, or should Day 12 include the 5th term `+20`? (Our p
 ---
 
 # ========================================================
+
 # FINALIZED SCORE SYSTEM SPECIFICATION
+
 # STATUS: FINALIZED
+
 # ========================================================
 
 ## 1. Mandatory Filter Rules (Before Scoring)
+
 - **Rule 1 (Price Ceiling & Margin Buffer):**
   - Path A (Standard): `itemPrice <= targetPrice`
   - Path B (Margin Buffer): If `itemPrice > targetPrice`, eligible if `sellPrice - itemPrice >= ₹50` (using raw Amazon item price; configurable via `scraper_config.json`).
@@ -120,6 +124,7 @@ Was that 4 terms for Day 11, or should Day 12 include the 5th term `+20`? (Our p
 - **ISBN Check:** If ISBN mismatch -> Disqualified (`ISBN NOT MATCHED`).
 
 ## 2. Progressive Delivery Penalty Table (40-Day Window)
+
 - **Tier 0 (Days 1 to 10):** **₹0 Penalty** (10-day penalty-free grace period).
 - **Tier 1 (Days 11 to 20):** Starts at **₹3.0** on Day 11, adding **+₹0.8** each progressive day:
   - Day 11: +₹3.0 -> Total = **₹3.0**
@@ -145,6 +150,7 @@ Was that 4 terms for Day 11, or should Day 12 include the 5th term `+20`? (Our p
 $$\text{Effective Price} = \text{itemPrice} + \text{Total Penalty}$$
 
 ## 3. Relative Score Formula (Smooth Range between 0.00 and 1.00)
+
 Every qualified offer receives a smooth score representing its cost-efficiency relative to the optimal offer:
 
 $$\text{Score} = \frac{\text{bestEffectivePrice}}{\text{effectivePrice}}$$
@@ -155,6 +161,7 @@ $$\text{Score} = \frac{\text{bestEffectivePrice}}{\text{effectivePrice}}$$
 - **Single Offer:** Automatically receives $\text{Score} = \mathbf{1.00}$.
 
 ## 4. Tie-Breaker Order
+
 1. Highest `Score` (lowest `effectivePrice`).
 2. If scores are tied, lowest `itemPrice` wins.
 3. If scores and item prices are both tied, **earliest `deliveryDate` (lowest `deliveryDays`) wins**.
@@ -162,6 +169,7 @@ $$\text{Score} = \frac{\text{bestEffectivePrice}}{\text{effectivePrice}}$$
 5. If still equal, first listed offer wins.
 
 ## 5. Verification Cases Summary (Smooth Relative Scoring)
+
 - **Live Run `9789381714171` (Target Rs 324):**
   - **ScientificInternational:** Rs 324 in 6d (23 Sept) -> Score = 1.00
   - **Bookstore18:** Rs 324 in 3d (20 Sept) -> Score = 1.00
@@ -172,3 +180,146 @@ $$\text{Score} = \frac{\text{bestEffectivePrice}}{\text{effectivePrice}}$$
   - **Study Lover (Rs 124, 13d -> eff Rs 206.5):** $\text{Score} = 132.5 / 206.5 = \mathbf{0.64}$
 - **Case 1 (Target Rs 150):** Rs 80 in 7d (Score 1.00), Rs 100 in 6d (Score 0.80), Rs 125 in 4d (Score 0.64), Rs 150 in 3d (Score 0.53).
 - **Case 2 (Target Rs 120):** Rs 100 in 8d (eff Rs 107.5 -> Score 1.00), Rs 100 in 10d (eff Rs 130 -> Score 0.83), Rs 80 in 12d (eff Rs 142.5 -> Score 0.75).
+
+## New cases
+
+1. Compare price = 100
+2. Margin price (PO price)= 150
+3. Delivery fee = 40
+
+- Option 1
+- Book price : 100 + delivery fee is 80
+- Effecitive = 180
+
+- Book price : 155 + FREE DELIVERY
+- Effective = 155
+
+-- In this case 155 should be chosen , the rule is in the end choose only in which the effective price is low
+
+---
+
+## EDGE CASES & COMPLEX SCENARIOS (Write your solution below each case)
+
+### CASE A: Live Log Case (Low Book Price + Delivery vs Higher Book Price + Free Delivery)
+
+- **Compare price** = 152
+- **Margin price (PO price)** = 165
+- **Options:**
+  - **Option 1:** Book price = 180 + FREE DELIVERY -> **Effective = 180** (5 days)
+  - **Option 2:** Book price = 152 + 60 delivery -> **Effective = 212** (6 days)
+  - **Option 3:** Book price = 140 + 80 delivery -> **Effective = 220** (6 days)
+- **Question:** Which option should be chosen (Option 1, Option 2, Option 3, or REJECT / HIGH PRICE)?
+- **YOUR SOLUTION:**
+  ANS>> Option 1 is the correct solution here , i am thinking to not including delivery price when comparing with compare price and margin price , but in the end choose the minimum effective price ,here 180 was rejected because it was greater than margin price but in the end the effective price was less than option 2 and option 3 hence option 1 won
+
+---
+
+### CASE B: Same as Case A, but Option 2 & 3 do NOT exist (Only Free Delivery above Margin Price)
+
+- **Compare price** = 152
+- **Margin price (PO price)** = 165
+- **Options:**
+  - **Option 1:** Book price = 180 + FREE DELIVERY -> **Effective = 180** (5 days)
+  - **Option 2:** Book price = 195 + FREE DELIVERY -> **Effective = 195** (5 days)
+- **Question:** Here NO option has Book price <= 165. Should Option 1 (180) still be chosen, or should the book be REJECTED (`HIGH PRICE`)? Why?
+- **YOUR SOLUTION:**
+  ANS >> REJECTED because both prices 180 and 195 are greater than margin price 165
+- ***
+
+### CASE C: Low Book Price matches Compare Price, but CRAZY High Delivery Fee
+
+- **Compare price** = 100
+- **Margin price (PO price)** = 150
+- **Options:**
+  - **Option 1:** Book price = 100 + 250 delivery -> **Effective = 350** (5 days)
+  - **Option 2:** Book price = 280 + FREE DELIVERY -> **Effective = 280** (5 days)
+- **Question:** Option 1 has `Book price = 100` (matches Compare price!), and Option 2 has lower effective price (`280 < 350`). Should we buy Option 2 at ₹280 (even though Margin price is only ₹150), OR should BOTH be REJECTED (`HIGH PRICE`) because ₹280 and ₹350 are too expensive? What is the maximum total/effective price limit?
+- **YOUR SOLUTION:**
+  ANS >> here option 2 will be rejected initially because option price book price is less than margin price , but in the end option 2 has effective price less than option 1 hence option 2 should be chosen
+
+---
+
+### CASE D: Book Price is between Compare Price and Margin Price (How much profit buffer is needed?)
+
+- **Compare price** = 200
+- **Margin price (PO price)** = 250
+- **Sub-case D1 (Only 1 option exists):**
+  - **Option 1:** Book price = 220 + 40 delivery -> **Effective = 260** (5 days)
+  - _(Here `Margin - Book = 250 - 220 = 30`, and `Effective = 260 > 250`)_
+  - **YOUR SOLUTION FOR D1 (Add Option 1 or Reject?):**
+    ANS >> option 1 accepted
+- **Sub-case D2 (Only 1 option exists):**
+  - **Option 1:** Book price = 245 + 40 delivery -> **Effective = 285** (5 days)
+  - _(Here `Margin - Book = 250 - 245 = 5` rs only!)_
+  - **YOUR SOLUTION FOR D2 (Add Option 1 or Reject? What is the minimum difference needed between Margin price and Book price?):**
+    ANS >> option 1 accepted
+    but the final answer is this **Option 1:** Book price = 220 + 40 delivery -> **Effective = 260**
+
+---
+
+### CASE E: Book Price > Margin Price, even with Free Delivery
+
+- **Compare price** = 200
+- **Margin price (PO price)** = 250
+- **Options:**
+  - **Option 1:** Book price = 260 + FREE DELIVERY -> **Effective = 260** (4 days)
+  - **Option 2:** Book price = 270 + FREE DELIVERY -> **Effective = 270** (4 days)
+- **Question:** In Sub-case D1, Book(220) + Del(40) = **260 total**. Here in Case E, Book(260) + FreeDel = **260 total** (exact same ₹260 out of your pocket!). Is Option 1 here Added to Cart or Rejected (`HIGH PRICE`)?
+- **YOUR SOLUTION:**
+
+> ANS : REJECTED because both price is greater than margin price
+
+---
+
+### CASE F: Exact Tie on Effective Price (Free Delivery vs Paid Delivery)
+
+- **Compare price** = 200
+- **Margin price (PO price)** = 250
+- **Options:**
+  - **Option 1:** Book price = 200 + FREE DELIVERY -> **Effective = 200** (5 days)
+  - **Option 2:** Book price = 150 + 50 delivery -> **Effective = 200** (5 days)
+- **Question:** Both cost ₹200 total and deliver in 5 days. Which one should win the tie-breaker: Option 1 (Free Delivery) or Option 2 (Lower Book Price + ₹50 Delivery)?
+- **YOUR SOLUTION:**
+  > > ANS : You could choose any of them
+
+---
+
+### CASE G: Paid Delivery (Fast) vs Free Delivery (Slow with Delay Penalty)
+
+- **Compare price** = 200
+- **Margin price (PO price)** = 250
+- **Options:**
+  - **Option 1:** Book price = 180 + 50 delivery = **230 total** in **5 days** (0 delay penalty -> **Effective = 230**)
+  - **Option 2:** Book price = 190 + FREE DELIVERY = **190 total** in **16 days** (16d delay penalty is +30 -> **Effective = 220**)
+  - **Option 3:** Book price = 190 + FREE DELIVERY = **190 total** in **25 days** (25d delay penalty is +103 -> **Effective = 293**)
+- **Question:** Which option wins here (Option 1 or Option 2)? Does `Effective Price = Book Price + Delivery Fee + Delay Penalty` work as expected here?
+- **YOUR SOLUTION:**
+  > **AI ANS:** **Option 2 wins (Effective = ₹220)!**
+  > - Both Option 1 (Book ₹180) and Option 2 (Book ₹190) are `<= Margin price (₹250)`.
+  > - Using `Effective Price = Book Price + Delivery Fee + Delay Penalty`:
+  >   - Option 1 = `180 + 50 + 0 = ₹230`
+  >   - Option 2 = `190 + 0 + 30 = ₹220` (saving ₹40 on shipping outweighs the ₹30 penalty for waiting 16 days!)
+  >   - Option 3 = `190 + 0 + 103 = ₹293`
+
+---
+
+### CASE H: What does "3. Delivery fee = 40" in your "New cases" header mean?
+
+In your example at line 188, you wrote:
+
+1. Compare price = 100
+2. Margin price (PO price) = 150
+3. Delivery fee = 40
+
+- **Question:** Is `Delivery fee = 40` a fixed standard allowance/buffer you mentally add on top of Compare/Margin price (for example, `Margin 150 + 40 allowance = 190 max effective price`), or what role does that `40` play in your formula?
+- **YOUR SOLUTION:**
+  > **AI ANS:** As confirmed by your answers in Cases A–E, `Delivery fee` is **NOT** included when checking eligibility against `Compare price` and `Margin price`. Instead, the rule works in **2 exact steps**:
+  >
+  > ### THE FINAL 2-STEP RULE (Derived from your answers to Cases A–F):
+  > 1. **Step 1 — Initial Eligibility Check (Book Price Only, Ignore Delivery Fee):**
+  >    - Check all in-stock offers that deliver within the allowed delivery window (`<= 60 days`).
+  >    - Check each offer's **Book Price only** against `Compare price` and `Margin price`.
+  >    - **If NO offer passes Step 1** (like in **Case B** where 180 & 195 > 165, and **Case E** where 260 & 270 > 250) -> **The entire book is REJECTED (`HIGH PRICE`)**.
+  > 2. **Step 2 — Final Winner Selection (Lowest Effective Price Wins Across All Valid-Delivery Offers):**
+  >    - **If AT LEAST ONE offer passes Step 1** (for example, Option 2 in **Case A** with Book ₹152 <= ₹165, or Option 1 in **Case C** with Book ₹100 <= ₹150), the book is **unlocked to buy**!
+  >    - Once unlocked, we compare **ALL** valid-delivery offers (even an offer like Option 1 in Case A `₹180 FreeDel` or Option 2 in Case C `₹280 FreeDel` that was initially above Margin price on book price, as long as its `Effective Price` is lower than the offer that passed Step 1!) and pick the one with the **lowest `Effective Price = Book Price + Delivery Fee + Delay Penalty`**.

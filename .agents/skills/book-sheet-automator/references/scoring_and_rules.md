@@ -2,13 +2,17 @@
 
 ## 1. Filter Rules (Pass/Fail)
 
-### Rule 1: Price Ceiling & Margin Buffer
-An offer qualifies under Rule 1 if EITHER condition is met:
-- **Path A (Standard)**: `itemPrice <= targetPrice` (Compare Price from Google Sheet).
-- **Path B (Margin Buffer)**: `itemPrice > targetPrice`, but `sellPrice - itemPrice >= minMarginBuffer` (Default: ₹1, configured in `scraper_config.json`).
-  - `sellPrice` is taken from `PO Price (INR)` or `Sell (INR)` in the sheet.
-  - `itemPrice` is the raw Amazon item price (excluding shipping/delivery penalty).
-- If neither condition is met, the offer is disqualified with reason: `HIGH PRICE`.
+### Rule 1: 2-Step Price Ceiling, Margin Buffer & Unlocked Effective Price
+1. **Step 1 — Initial Eligibility (Book Price Only):**
+   - **Path A (Standard)**: `itemPrice <= targetPrice` (Compare Price from Google Sheet).
+   - **Path B (Margin Buffer)**: `itemPrice > targetPrice`, but `sellPrice - itemPrice >= minMarginBuffer` (Default: ₹1, configured in `scraper_config.json`).
+     - `sellPrice` is taken from `PO Price (INR)` or `Sell (INR)` in the sheet.
+     - `itemPrice` is the raw Amazon book price (excluding shipping/delivery charges and delivery penalties).
+   - If **no** offer passes Step 1 (and Rule 2), the entire book is disqualified with reason: `HIGH PRICE`.
+2. **Step 2 — Unlocked Effective Price Selection:**
+   - If **at least one** offer passes Step 1 (and Rule 2), its `effectivePrice` (`itemPrice + shippingFee + deliveryPenalty`) unlocks an effective price ceiling (`unlockedEffectiveCeiling`).
+   - Any other valid-delivery offer (`passRule2`) whose `effectivePrice <= unlockedEffectiveCeiling` is also qualified (even if its `itemPrice` alone was above `sellPrice`, e.g., a Free Delivery offer at `₹180` beating a `₹152 + ₹60 = ₹212` offer).
+   - All qualified offers are then scored and ranked by `effectivePrice = itemPrice + shippingFee + deliveryPenalty`, so the lowest effective price always wins.
 
 ### Rule 2: Delivery Window Limit
 - **Max Window**: `deliveryDays <= 60 days` (or `maxDeliveryDays` in `scraper_config.json`).
@@ -22,9 +26,9 @@ An offer qualifies under Rule 1 if EITHER condition is met:
 
 ## 2. Progressive Delivery Penalty Table (60-Day Window)
 
-Delivery penalties are applied on top of raw item price to calculate the **Effective Price**:
+Delivery penalties are applied on top of `totalPrice` (`itemPrice + shippingFee`) to calculate the **Effective Price**:
 
-$$\text{Effective Price} = \text{itemPrice} + \text{Delivery Penalty}$$
+$$\text{Effective Price} = \text{itemPrice} + \text{shippingFee} + \text{Delivery Penalty}$$
 
 - **Tier 0 (Days 1 to 15)**: **₹0 Penalty** (15-day penalty-free grace period).
 - **Tier 1 (Days 16 to 30)**: Starts at **₹3.0** on Day 16, adding **+₹0.8** each progressive day:
@@ -62,7 +66,7 @@ $$\text{Score} = \frac{\text{bestEffectivePrice}}{\text{effectivePrice}}$$
 
 ## 4. Tie-Breaker Precedence
 1. Highest `Score` (lowest `effectivePrice`).
-2. Lowest raw `itemPrice`.
+2. Lowest `totalPrice` (`itemPrice + shippingFee`).
 3. Earliest delivery date (lowest `deliveryDays`).
 4. Condition: `New` preferred over `Used`.
 5. Top/first listed offer in Amazon AOD.

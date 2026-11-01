@@ -73,3 +73,39 @@ The **VPS controls** column provides **Stop** and **Resume** for remote scraper 
 Blocked jobs also provide **Remove pause** and **Retry now**. Remove pause immediately archives only the selected scraper's saved cooldown; it does not stop or start a process. Retry now archives that cooldown and retries the saved command from its current output. For a shared runner, the confirmation explains that the batch must restart; other platforms keep their output and cooldowns. A new block can create a new pause, so Retry now is one user-requested attempt. Pause archives are kept under `~/.book-listing-dashboard/pause-archive/`.
 
 Several platform rows may belong to one shared Node runner. These rows display **Stop batch / Resume batch**, and the confirmation names every affected scraper. Stopping one shared process stops the whole batch; resuming continues each platform's saved output and respects its cooldown. Discovered scraper commands are recorded under `~/.book-listing-dashboard/process-*.json`, so they remain resumable after they exit or the local dashboard restarts. No production job is stopped or restarted until its confirmation is submitted.
+
+### Persistent VPS workspace
+
+The dashboard backend reuses one password-authenticated SSH2 connection per active VPS. The browser receives status, connection state, activity, and selected logs through one multiplexed SSE stream. Existing CLI commands remain available.
+
+- Recent cards remember all previously opened configured servers without a fixed card or history limit, with pinning and cached summaries. Credentials are never saved in browser storage.
+- Selected-server status refreshes about every 10 seconds; other subscribed cards refresh about every 30 seconds. Collectors are shared across browser tabs. Hidden tabs unsubscribe; closing the browser never stops tmux jobs.
+- SSH uses trusted keys from the existing OpenSSH `known_hosts` file, 15-second keepalives, bounded network backoff, four concurrent channels, and a 10-minute idle timeout. Authentication and host-key failures stop automatic reconnection. After correcting credentials or trusted keys, use **Connect / refresh** explicitly.
+- Mutations are serialized per server and never automatically replayed after an uncertain SSH outcome. Refresh status before manually retrying.
+- Incremental remote metrics are stored under `~/.book-listing-dashboard/metrics-cache/`. They reset after output truncation/replacement and ignore incomplete final records. A cold scan still reads existing output once.
+
+**View logs** opens a read-only drawer with the latest recorded failure, message/ISBN search, severity filters, structured-attempt filters, pause/follow controls, auto-scroll, and download of the visible entries. Console source also offers historical dashboard launch attempts. The initial tail and each follow read are capped at 64 KiB/500 entries; the UI retains at most 2,000 entries. Rotation resets are shown explicitly. Older interleaved shared-batch console output is labelled as mixed; it is never presented as a trustworthy per-platform log.
+
+Existing job logs are resolved only from validated job records, verified process stdout, or the known output-directory `run.log`; no arbitrary log paths are accepted. Missing historical logs are reported as unavailable. Recorded snapshot failures and block checkpoints take precedence over generic row errors. Missing process data is not treated as proof of an OOM or a successful run.
+
+Future dashboard launches/resumes automatically install a small trusted runtime observer and console sink over the existing SSH connection. Each attempt has its own raw console log and ID; standalone structured events are appended to `<output>.events.jsonl`. Shared runs using the updated `scripts/run-shared-scrapers.js` also emit separate platform event logs and batch events. Existing running processes are not hot-patched or restarted.
+
+Console and event logs rotate around 10 MiB, keeping the active file plus four archives. Old dashboard attempt logs are pruned after seven days when a new attempt starts; rotated event archives are aged out by the event writer. This does not delete result files or active logs. VPS activity is recorded locally under ignored `logs/vps-activity/`, with a bounded persisted history. Terminal controls and known secrets are removed before data is sent to the browser; log contents are rendered as text.
+
+Verification:
+
+```sh
+npm run dashboard:test
+python3 -B test/vps-manager.test.py
+node --test test/job-events.test.js test/shared-browser.test.js
+npm --prefix dashboard run verify:vps
+npm --prefix dashboard run verify:theme
+```
+
+The browser verification uses mocked VPS responses and performs no remote control actions. Live verification should begin with read-only status/log requests on one server; instrumented launch behavior can be checked in an isolated temporary fixture.
+
+### Shared browser lifecycle recovery
+
+The shared runner distinguishes browser/context loss from HTTP blocking. An unexpectedly closed page or failed context creation retries the same unsaved input at most twice with a new context; repeated failures remain visible as `Failed`. Genuine block responses still stop that platform and retain its cooldown. Context cleanup never closes a shared browser while sibling leases are active.
+
+Session snapshots are bounded to 2 MiB, omit IndexedDB/ad caches, and retain only bounded cookies/localStorage. Oversized or unreadable prior snapshots are preserved beside the original state file as `.oversized-*.bak` or `.invalid-*.bak`; failed restores are preserved as `.restore-failed-*.bak`. Result outputs are unaffected. Pool diagnostics include browser slot/generation, disconnects, and per-platform recovery counts.

@@ -121,6 +121,13 @@ const DEDICATED_DOMAINS = [
       scrapeAmazonBook(page, { directUrl: url, isbn }),
   },
   {
+    match: "amazon.it",
+    platform: "Amazon.it",
+    method: "scraper/amazon-it-isbn",
+    scraper: (page, url, isbn) =>
+      scrapeAmazonBook(page, { directUrl: url, isbn }),
+  },
+  {
     match: "abebooks.co.uk",
     platform: "AbeBooks UK",
     method: "scraper/abebooks",

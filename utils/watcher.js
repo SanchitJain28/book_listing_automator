@@ -136,7 +136,7 @@ function startScraper() {
     // International Amazon: 2 means completed with unverified rows, 3 means
     // deliberately paused after blocks. Neither should trigger crash recovery.
     const internationalStop = [2, 3].includes(code) && !signal &&
-      ["amazon-us-isbn.js", "amazon-uk-isbn.js"].includes(path.basename(targetScript));
+      ["amazon-us-isbn.js", "amazon-uk-isbn.js", "amazon-it-isbn.js"].includes(path.basename(targetScript));
 
     if (internationalStop) {
       if (code === 2) console.log("\n[Watcher] Batch finished with unverified ISBNs. Review its report; automatic retries are stopped.\n");

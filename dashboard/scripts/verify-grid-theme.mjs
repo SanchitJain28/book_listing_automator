@@ -38,10 +38,12 @@ try {
   const page=await browser.newPage({viewport:{width:1600,height:1100}});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/api/vps-manager',route=>route.fulfill({json:route.request().method()==='GET'?{servers:[{id:'6',name:'VPS 6'}]}:{jobs,processes,process_count:1,memory:{MemAvailable:10*1024**3,MemTotal:16*1024**3,SwapTotal:0,SwapFree:0},git:{branch:'main',commit:'a'.repeat(40)},sessions:[]}}));
+  await page.route('**/api/vps-events?**',route=>route.fulfill({contentType:'text/event-stream',body:': fixture only\n\n'}));
   await page.route('**/api/vps-status',route=>route.fulfill({json:monitor}));
   const address=server.httpServer.address();
   await page.goto(`http://127.0.0.1:${address.port}/`);
   await page.getByRole('button',{name:'VPS',exact:true}).click();
+  await page.getByRole('button',{name:'Open VPS 6',exact:true}).click();
   await page.getByRole('button',{name:'Connect / refresh',exact:true}).click();
   await page.getByRole('button',{name:'Resume',exact:true}).waitFor();
   await page.getByRole('button',{name:'Show processes',exact:true}).click();
@@ -53,10 +55,12 @@ try {
   const blocked=page.locator('.MuiChip-root').filter({hasText:/^Blocked$/}).first();
   assert.equal(await running.evaluate(el=>getComputedStyle(el).color),'rgb(155, 225, 181)');
   assert.equal(await blocked.evaluate(el=>getComputedStyle(el).color),'rgb(255, 178, 166)');
-  assert.equal(await page.getByRole('button',{name:'Resume',exact:true}).evaluate(el=>getComputedStyle(el).color),'rgb(155, 225, 181)');
+  assert.equal(await page.getByRole('button',{name:'Resume',exact:true,includeHidden:true}).evaluate(el=>getComputedStyle(el).color),'rgb(155, 225, 181)');
   const screenshot=path.join(os.tmpdir(),'dashboard-vps-dark-grids.png');await page.screenshot({path:screenshot,fullPage:true});
-  await page.getByRole('heading',{name:'Scraper jobs',exact:true}).locator('..').locator('..').screenshot({path:path.join(os.tmpdir(),'dashboard-vps-jobs-dark.png')});
   await page.getByRole('heading',{name:'Scrapers',exact:true}).locator('..').locator('..').locator('..').screenshot({path:path.join(os.tmpdir(),'dashboard-vps-monitor-dark.png')});
+  await page.getByRole('button',{name:'Close batch details',exact:true}).click();
+  await page.getByRole('heading',{name:'Scraper jobs',exact:true}).locator('..').locator('..').screenshot({path:path.join(os.tmpdir(),'dashboard-vps-jobs-dark.png')});
+  await page.getByRole('button',{name:'Close server',exact:true}).click();
   await page.getByRole('button',{name:'Output explorer',exact:true}).click();
   await page.locator('input[type=file]').setInputFiles({name:'theme-fixture.jsonl',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({searched_isbn:'9780091884970',title:'Theme fixture',found:true,isbn_matched:true,stock_status:'In Stock',price:12}))});
   await page.getByRole('gridcell').filter({hasText:'Theme fixture'}).first().waitFor();

@@ -6,6 +6,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
+if (process.argv.includes("--batches") || (!process.argv.includes("--legacy") && fs.existsSync(path.join(__dirname, "keepa_batches", "status.json")))) {
+  require("./scripts/keepa-batches.cjs").showStatus(process.argv[2] === "--ping");
+  return;
+}
+
 const root = __dirname;
 const runDir = path.join(root, "keepa_zero_reviews_under1200");
 const fmt = (n) => Number(n || 0).toLocaleString("en-IN");

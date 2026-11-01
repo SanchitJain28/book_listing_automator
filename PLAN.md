@@ -119,3 +119,31 @@ Ex : SEARCH RESULT PAGE URLs
 5. https://www.abebooks.com/servlet/SearchResults?bi=s&cond=an%20fine%20nf%20vg%20good%20fair%20poor%20uns&ds=5&sortby=17&tn=clara%20zetkin%20letters%20writings
 6. https://www.abebooks.com/servlet/SearchResults?an=ian%20stewart&bi=s&ds=5&sortby=17&tn=flatterland%20flatland
 7. https://www.abebooks.com/servlet/SearchResults?an=david%20bird&bi=s&cond=an%20fine%20nf%20vg%20good%20fair%20poor%20uns&ds=5&sortby=17&tn=winning%20cardplay%20techniques
+
+## Abebooks.co.uk
+
+1. We are changing the strategy for searching
+2. https://www.abebooks.co.uk/servlet/SearchEntry we will use advanced search instead of the normal search
+3. If there are no results found on search result page , we will get the data from the "Closest match to your search"
+
+# Concept of batch
+
+- I want a new feature called as a batch in this dashbaord it will be separate tab in which these will be things
+- Each batch will have name (For ex : Amazon.in scraping)
+- Each batch will have date (default will be today's date : We can use MUI date component , also it should be editable and format should be dd/mm/yyyy)
+- Each batch will have number of scrapers involved (One batch can have one or more scrapers involved)
+- Each batch will have a ISBN file (User can upload from theier local computer in csv format or user can directly paste the file , like text)
+- Each batch will have number of VPS , like on which VPS this will run (if it is assigned like suppose 10 VPS , then the main input file will be split into 10 files and each file will run on each VPS)
+- Each batch will have a download button (It will combine all the results from the VPS and download it in a single file as CSV or JSON , both option would be available)
+- Each batch will have stats (How many is completed , have errors , have blocked)
+- Each batch will show the logs
+- Automatic recovery system (If something is failing , it will be retried and other recovery fixes)
+- Automatic distribution , if a VPS is having more load , it will redistribute to other VPS.
+
+### JUST A IDEA (NOT TO BE IMPLEMENTED YET)
+
+- I am thinking of a system in which , suppose we have a batch called manual scraping batch which have 10 VPS assigned and 10 different scrapers and the file has 10000 isbns in totals , so the effective processing to be done is 10000*10 = 100000 (number of scrapers * length of the input file) then there will be shared pool or a queue of isbns which will be like in rotating way , as there are like 10 different VPS , so any vps can pick up the isbns from the pool or a queue and in this way ,i think blocking will be reduced as each isbns will be to 10 different IPS , let's say we are doing atlantic books , then each scraper can pick up different isbn and process it (NOTE : this is just the idea , i don't if it is possible , so we will first develop a demo , discuss tech stack then only we will implemention production grade system) : THIS IDEA IS SCRAPED , WE ARE NOT DOING THIS
+
+### Amazon -it (italy)
+
+- Same concept as amazon.in , search the isbn -> and get the first listing

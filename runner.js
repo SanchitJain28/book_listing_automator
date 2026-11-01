@@ -195,6 +195,8 @@ function findRecommendedScraper(inputFullPath) {
     return "scrapers/amazon-ca-isbn/amazon-ca-isbn.js";
   if (lowerPath.includes("amazon-uk"))
     return "scrapers/amazon-uk-isbn/amazon-uk-isbn.js";
+  if (lowerPath.includes("amazon-it"))
+    return "scrapers/amazon-it-isbn/amazon-it-isbn.js";
   if (lowerPath.includes("amazon-india"))
     return "scrapers/amazon-isbn/amazon-isbn.js";
   if (lowerPath.includes("flipkart"))

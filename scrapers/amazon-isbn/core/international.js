@@ -2,7 +2,7 @@ const { policyForPage } = require('./requestPolicy');
 const cheerio = require('cheerio');
 const { normalizeIsbn, isValidIsbn, verifyIsbn } = require('./isbn');
 const clean = value => String(value ?? '').replace(/[\u200e\u200f\u202a-\u202e]/g, '').replace(/\s+/g, ' ').trim() || null;
-const markets = { 'amazon.com': { currency: 'USD', store: 'Amazon.com' }, 'amazon.co.uk': { currency: 'GBP', store: 'Amazon.co.uk' } };
+const markets = { 'amazon.com': { currency: 'USD', store: 'Amazon.com' }, 'amazon.co.uk': { currency: 'GBP', store: 'Amazon.co.uk' }, 'amazon.it': { currency: 'EUR', store: 'Amazon.it' } };
 function amazonUrl(value, domain) {
   try { const url = new URL(value, `https://www.${domain}`); if (url.protocol !== 'https:' || ![domain, `www.${domain}`].includes(url.hostname)) return null; url.hash = ''; return url; } catch { return null; }
 }

@@ -3,8 +3,8 @@ import base64, fcntl, hashlib, json, os, re, shlex, signal, subprocess, sys, tim
 from pathlib import Path
 ROOT = Path('/root/book_listing_automator')
 STATE = Path.home() / '.book-listing-dashboard'
-SCRIPTS = {name: 'scrapers/{0}/{0}-isbn.js'.format(name) for name in ['atlanticbooks','bookchor','bookswagon','flipkart','mypustak','ompublication','sapnaonline','abebooks','walmart']}
-SCRIPTS.update({'amazon-in':'scrapers/amazon-isbn/amazon-isbn.js','amazon-com':'scrapers/amazon-us-isbn/amazon-us-isbn.js','amazon-uk':'scrapers/amazon-uk-isbn/amazon-uk-isbn.js'})
+SCRIPTS = {name: 'scrapers/{0}/{0}-isbn.js'.format(name) for name in ['atlanticbooks','bookchor','bookswagon','flipkart','mypustak','ompublication','sapnaonline','abebooks','abebooks-co-uk','walmart']}
+SCRIPTS.update({'amazon-in':'scrapers/amazon-isbn/amazon-isbn.js','amazon-com':'scrapers/amazon-us-isbn/amazon-us-isbn.js','amazon-uk':'scrapers/amazon-uk-isbn/amazon-uk-isbn.js','amazon-it':'scrapers/amazon-it-isbn/amazon-it-isbn.js'})
 SCRIPTS['abebooks-google']='scrapers/abebooks-google/abebooks-google-isbn.js'
 LEGACY = {'abebooks','amazon-in'}
 SHARED = 'scripts/run-shared-scrapers.js'
@@ -49,22 +49,52 @@ def process_info():
     return data
 
 def output_stats(path):
-    rows=0; matches=0; errors=0; blocks=0; bad=0; last=None
-    if path.exists():
+    """Read appended complete records only; cache identity and counters across SSH channels."""
+    empty=dict(processed=0,matched=0,errors=0,blocked=0,invalid_lines=0,last_isbn=None,last_failure=None)
+    if not path.exists(): return empty
+    folder=STATE/'metrics-cache';folder.mkdir(parents=True,exist_ok=True,mode=0o700)
+    key=hashlib.sha256(str(path).encode()).hexdigest()
+    cache_file=folder/(key+'.json')
+    with (folder/(key+'.lock')).open('a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        stat=path.stat()
         with path.open('rb') as f:
-            for raw in f:
-                if not raw.endswith(b'\n'): break
+            signature=hashlib.sha256(f.read(min(4096,stat.st_size))).hexdigest()
+            try: cached=json.loads(cache_file.read_text())
+            except (OSError,ValueError): cached={}
+            valid=(cached.get('inode')==[stat.st_dev,stat.st_ino] and cached.get('offset',0)<=stat.st_size and cached.get('signature')==signature
+                   and (cached.get('size')!=stat.st_size or cached.get('mtime')==stat.st_mtime_ns))
+            metrics={**empty,**cached.get('metrics',{})} if valid else dict(empty)
+            offset=cached.get('offset',0) if valid else 0
+            f.seek(offset)
+            while True:
+                position=f.tell();raw=f.readline(1024*1024)
+                if not raw: break
+                if not raw.endswith(b'\n'):
+                    # A partial append is pending. Oversized completed records count as invalid.
+                    if len(raw)==1024*1024:
+                        while raw and not raw.endswith(b'\n'): raw=f.readline(1024*1024)
+                        if raw.endswith(b'\n'): metrics['invalid_lines']+=1;offset=f.tell();continue
+                    f.seek(position);break
+                offset=f.tell()
                 if not raw.strip(): continue
                 try:
-                    row=json.loads(raw); rows+=1
+                    row=json.loads(raw)
+                    if not isinstance(row,dict): raise ValueError('Non-object result')
+                    metrics['processed']+=1
                     listings=[entry for entry in row.get('listings',[]) if isinstance(entry,dict)] if isinstance(row.get('listings'),list) else []
-                    matches += row.get('isbn_matched') is True or row.get('isbn_match') is True or any(entry.get('isbn_match') is True or entry.get('isbn_matched') is True for entry in listings)
+                    metrics['matched']+=row.get('isbn_matched') is True or row.get('isbn_match') is True or any(entry.get('isbn_match') is True or entry.get('isbn_matched') is True for entry in listings)
                     status=' '.join(str(entry.get(key) or '') for entry in [row]+listings for key in ('stock_status','error','error_code'))
                     block=bool(re.search(r'blocked|captcha|robot|rate.limit|http\s*(403|429|503)',status,re.I))
                     failure=bool(row.get('error')) or str(row.get('title','')).lower()=='error' or str(row.get('stock_status','')).lower()=='error' or any(entry.get('error') or str(entry.get('price','')).lower()=='error' for entry in listings)
-                    blocks+=block; errors+=not block and bool(failure);last=row.get('searched_isbn') or row.get('isbn')
-                except (ValueError,UnicodeDecodeError,AttributeError): bad+=1
-    return dict(processed=rows,matched=matches,errors=errors,blocked=blocks,invalid_lines=bad,last_isbn=last)
+                    metrics['blocked']+=block;metrics['errors']+=not block and bool(failure)
+                    metrics['last_isbn']=row.get('searched_isbn') or row.get('isbn')
+                    if block or failure: metrics['last_failure']={'message':str(row.get('error') or row.get('stock_status') or 'Recorded extraction error')[:2000],'timestamp':row.get('scraped_at'),'isbn':metrics['last_isbn'],'input_index':row.get('input_index'),'error_code':row.get('error_code')}
+                except (ValueError,UnicodeDecodeError,AttributeError,TypeError): metrics['invalid_lines']+=1
+        temporary=cache_file.with_suffix('.tmp')
+        temporary.write_text(json.dumps({'inode':[stat.st_dev,stat.st_ino],'offset':offset,'size':stat.st_size,'mtime':stat.st_mtime_ns,'signature':signature,'metrics':metrics}))
+        temporary.chmod(0o600);temporary.replace(cache_file)
+        return metrics
 
 def process_identity(pid):
     """Kernel identity prevents stale PIDs from controlling unrelated processes."""
@@ -208,11 +238,13 @@ def discover_jobs():
             elif cooling: state='Blocked'
             elif live and shared: state=snapshot.get(row['scraper'],{}).get('state','Running')
             elif live: state='Running'
+            elif snapshot.get(row['scraper'],{}).get('state')=='Failed': state='Failed'
+            elif failure_details(record,row,{},pause,metrics).get('exit_code') not in (None,0,2,3): state='Failed'
             else: state='Stopped'
             result.append({**row,**metrics,'id':record['id']+'-'+row['scraper'],'control_id':record['id'],'state':state,'running':live and state=='Running',
                            'process_running':live,'shared':shared,'group_scrapers':[r['scraper'] for r in record['rows']],
                            'can_stop':live,'can_resume':not live and pending and (shared or not cooling),'resume_after':until,
-                           'can_clear_pause':has_pause,'can_retry':not finished and (has_pause or state in ('Blocked','Failed')),'pause_reason':pause.get('reason')})
+                           'can_clear_pause':has_pause,'can_retry':not finished and (has_pause or state in ('Blocked','Failed')),'pause_reason':pause.get('reason'),'failure':failure_details(record,row,snapshot.get(row['scraper'],{}),pause,metrics)})
     return result
 
 def iso_timestamp(value):
@@ -235,7 +267,7 @@ def control_record(identifier):
     spec=process_spec(executable,str(ROOT),command)
     if not spec or spec['output']!=job['output']: raise ValueError('Saved job does not match the scraper output path.')
     record={'kind':'scraper-process','id':'process-'+hashlib.sha256(identifier.encode()).hexdigest()[:20],**spec,
-            'rows':[{key:job[key] for key in ('scraper','input','output','total')}],'pid':None,'start':None,'created_at':int(time.time())}
+            'rows':[{key:job[key] for key in ('scraper','input','output','total')}],'pid':None,'start':None,'created_at':int(time.time()),'legacy_job_id':job['id'],'log':job.get('log'),'attempts':job.get('attempts',[])}
     save_record(record);return record
 
 def browser_children(root):
@@ -300,6 +332,43 @@ def validate_resume(record,ignore_identity=None,skip_cooldown=False):
     for row in record['rows']: safe_path(row['output'],'output')
     return command
 
+def build_launcher(record,command,launcher,exitfile,attempt):
+    """Each attempt owns a bounded console log; process command identity stays unchanged."""
+    if not globals().get('RUNTIME_SOURCE'):
+        log=STATE/(record['id']+'.log')
+        launcher.write_text('#!/bin/sh\ncd '+shlex.quote(str(ROOT))+' || exit 1\n'+shlex.join(command)+' >> '+shlex.quote(str(log))+' 2>&1\nresult=$?\nprintf "%s\\n" "$result" > '+shlex.quote(str(exitfile))+'\nexit "$result"\n')
+        launcher.chmod(0o700);record['log']=str(log);return
+    for name,source in [('runtimeObserver.cjs',RUNTIME_SOURCE),('jobEvents.js',EVENTS_SOURCE),('consoleSink.py',SINK_SOURCE)]:
+        file=STATE/name
+        if file.is_symlink(): raise ValueError('Runtime file cannot be a symlink.')
+        file.write_text(source);file.chmod(0o600)
+    log=STATE/'logs'/record['id']/(attempt+'.log');log.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+    rows=record.get('rows') or [record]
+    events=str(safe_path(rows[0]['output'],'output'))+'.events.jsonl' if not record.get('shared') else str(STATE/(record['id']+'.batch.events.jsonl'))
+    scraper='shared-batch' if record.get('shared') else (record.get('scraper') or rows[0].get('scraper'))
+    env={'BOOK_JOB_ID':record['id'],'BOOK_ATTEMPT_ID':attempt,'BOOK_EVENTS_FILE':events,'BOOK_SCRAPER':scraper,
+         'BOOK_SERVER_ID':str(globals().get('SERVER_ID','')),'NODE_OPTIONS':'--require='+str(STATE/'runtimeObserver.cjs')}
+    for key,value in env.items():
+        if not isinstance(value,str): raise ValueError('Cannot start scraper: invalid runtime metadata for '+key+'. Refresh the job record.')
+    launcher.write_text('#!/bin/bash\nset -o pipefail\ncd '+shlex.quote(str(ROOT))+' || exit 1\n'+shlex.join(['env']+[key+'='+value for key,value in env.items()]+command)+' 2>&1 | python3 '+shlex.quote(str(STATE/'consoleSink.py'))+' '+shlex.quote(str(log))+'\nresult=${PIPESTATUS[0]}\nprintf "%s\\n" "$result" > '+shlex.quote(str(exitfile))+'\nexit "$result"\n')
+    launcher.chmod(0o700)
+    attempts=record.get('attempts') or []
+    if not isinstance(attempts,list): attempts=[]
+    retained=[]
+    for old in attempts:
+        if not isinstance(old,dict): continue
+        old_file=registered_log_path(old.get('log'))
+        started_at=old.get('started_at')
+        if isinstance(started_at,(int,float)) and started_at<time.time()-7*86400 and old_file and old_file.is_relative_to(STATE/'logs'):
+            for suffix in ['', '.1', '.2', '.3', '.4']:
+                candidate=Path(str(old_file)+suffix)
+                if not candidate.is_symlink(): candidate.unlink(missing_ok=True)
+        else: retained.append(old)
+    attempts=retained
+    if record.get('log') and not attempts: attempts.append({'id':'legacy','log':record['log']})
+    attempts.append({'id':attempt,'started_at':int(time.time()),'log':str(log)})
+    record.update(log=str(log),attempts=attempts,attempt_id=attempt)
+
 def resume_job(identifier):
     record=control_record(identifier)
     if live_record(record): raise ValueError('This scraper process is already running.')
@@ -307,10 +376,10 @@ def resume_job(identifier):
     STATE.mkdir(mode=0o700,parents=True,exist_ok=True)
     attempt=str(time.time_ns());session='dashboard_resume_'+record['id'].replace('-','_')+'_'+attempt
     log=STATE/(record['id']+'.log');exitfile=STATE/(record['id']+'.exit');launcher=STATE/(record['id']+'.sh')
+    build_launcher(record,command,launcher,exitfile,attempt)
     exitfile.unlink(missing_ok=True)
-    launcher.write_text('#!/bin/sh\ncd '+shlex.quote(str(ROOT))+' || exit 1\n'+shlex.join(command)+' >> '+shlex.quote(str(log))+' 2>&1\nresult=$?\nprintf "%s\\n" "$result" > '+shlex.quote(str(exitfile))+'\nexit "$result"\n');launcher.chmod(0o700)
-    run('tmux','new-session','-d','-s',session,'sh '+shlex.quote(str(launcher)))
-    record.update(session=session,resumed_at=int(time.time()),log=str(log),pid=None,start=None);save_record(record)
+    run('tmux','new-session','-d','-s',session,'bash '+shlex.quote(str(launcher)))
+    record.update(session=session,resumed_at=int(time.time()),pid=None,start=None);save_record(record)
     deadline=time.monotonic()+3
     while time.monotonic()<deadline:
         found=next(((identity,active) for identity,active in known_processes() if active['command_key']==record['command_key']),None)
@@ -376,7 +445,7 @@ def status():
                        'can_resume':not running and metrics['processed']<job.get('total',0) and not cooling,
                        'can_clear_pause':any(file.exists() for file in pause_files(output)),
                        'can_retry':metrics['processed']<job.get('total',0) and (bool(pause) or state in ('Blocked','Failed')),'pause_reason':pause.get('reason') if pause else None,
-                       'running':running,'state':state,'exit_code':exit_code,'resume_after':pause.get('resume_after') if pause else None,**metrics})
+                       'running':running,'state':state,'exit_code':exit_code,'resume_after':pause.get('resume_after') if pause else None,**metrics,'failure':failure_details(job,job,{},pause or {},metrics)})
     discovered=discover_jobs()
     tracked_pairs={(j['scraper'],j['input'],j['output']) for j in discovered}
     result=[job for job in result if (job['scraper'],job['input'],job['output']) not in tracked_pairs]+discovered
@@ -385,7 +454,91 @@ def status():
     for line in Path('/proc/meminfo').read_text().splitlines():
         k,_,v=line.partition(':')
         if k in ('MemTotal','MemAvailable','SwapTotal','SwapFree'): memory[k]=int(v.split()[0])*1024
-    return {'jobs':result,'process_count':len(processes),'processes':processes[:100], 'memory':memory, 'sessions':sorted(sessions), 'git':git_state()}
+    return {'checked_at':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),'jobs':result,'process_count':len(processes),'processes':processes[:100], 'memory':memory, 'sessions':sorted(sessions), 'git':git_state()}
+
+def failure_details(record,row,snapshot,pause,metrics):
+    last=metrics.get('last_failure')
+    reason=snapshot.get('error') or pause.get('reason')
+    exit_code=None
+    for file in [STATE/((record.get('legacy_job_id') or record['id'])+'.exit'),safe_path(row['output'],'output').parent/'exit-code.txt']:
+        if file.is_file() and not file.is_symlink():
+            try: exit_code=int(file.read_text().strip())
+            except (OSError,ValueError): pass
+            break
+    return {'message':reason or (last or {}).get('message'),'timestamp':snapshot.get('failed_at') or (last or {}).get('timestamp'),
+            'isbn':(last or {}).get('isbn'),'input_index':snapshot.get('input_index',pause.get('input_index',(last or {}).get('input_index'))),
+            'error_code':(last or {}).get('error_code'),'exit_code':exit_code,'signal':snapshot.get('signal'),
+            'scope':'shared_batch' if record.get('shared') else 'scraper','source':'snapshot' if snapshot.get('error') else 'pause' if pause.get('reason') else 'result' if last else 'unavailable'}
+
+def registered_log_path(candidate):
+    """No caller-supplied paths. Registered project logs only, with symlink checks."""
+    if not candidate: return None
+    file=Path(candidate)
+    if not file.is_absolute(): file=ROOT/file
+    if file.suffix not in ('.log','.jsonl'): return None
+    if '..' in file.parts or not any(file.resolve().is_relative_to(base.resolve()) for base in (STATE,ROOT/'output',ROOT/'logs')): return None
+    for parent in [file,*file.parents]:
+        if parent.is_symlink(): return None
+    return file if file.is_file() else None
+
+def job_logs(req):
+    record=control_record(req.get('job'));name=req.get('scraper')
+    row=selected_row(record,name) if record.get('rows') else record
+    if not record.get('rows') and name!=record.get('scraper'): raise ValueError('Scraper does not belong to this job.')
+    source=req.get('source','auto')
+    if source not in ('auto','events','console'): raise ValueError('Unknown log source.')
+    output=safe_path(row['output'],'output')
+    events=registered_log_path(str(output)+'.events.jsonl')
+    attempts=[{'id':a['id'],'started_at':a.get('started_at')} for a in (record.get('attempts') or []) if isinstance(a,dict) and a.get('id') and registered_log_path(a.get('log'))]
+    chosen=req.get('attempt','current')
+    if chosen!='current':
+        attempt=next((a for a in (record.get('attempts') or []) if a.get('id')==chosen),None)
+        if not attempt: raise ValueError('Unknown console attempt.')
+        console=registered_log_path(attempt.get('log'))
+    else: console=registered_log_path(record.get('log'))
+    if chosen=='current' and not console and live_record(record):
+        try: console=registered_log_path(os.readlink('/proc/'+str(record['pid'])+'/fd/1'))
+        except OSError: pass
+    console=console or registered_log_path(output.parent/'run.log')
+    file=events if source=='events' or source=='auto' and events else console
+    if not file:
+        return {'available':False,'message':'Historical logs unavailable for this job. Structured events are recorded on future launches.','entries':[],'cursor':None,'mixed':bool(record.get('shared'))}
+    stat=file.stat();fingerprint=hashlib.sha256(str(file).encode()).hexdigest()[:16]
+    cursor=req.get('cursor');previous={}
+    if cursor:
+        if not isinstance(cursor,str) or len(cursor)>1024: raise ValueError('Invalid log cursor.')
+        try: previous=json.loads(base64.urlsafe_b64decode(cursor+'='*(-len(cursor)%4)))
+        except (ValueError,TypeError): raise ValueError('Invalid log cursor.')
+        if not isinstance(previous,dict) or not isinstance(previous.get('offset'),int) or previous['offset']<0: raise ValueError('Invalid log cursor.')
+    identity=[stat.st_dev,stat.st_ino]
+    with file.open('rb') as prefix_file:
+        prefix=prefix_file.read(1024)
+    prefix_length=previous.get('prefix_length',0)
+    prefix_changed=bool(prefix_length and (prefix_length>len(prefix) or hashlib.sha256(prefix[:prefix_length]).hexdigest()!=previous.get('prefix')))
+    reset=bool(previous and (previous.get('file')!=fingerprint or previous.get('inode')!=identity or previous['offset']>stat.st_size or prefix_changed))
+    start=previous['offset'] if previous and not reset else max(0,stat.st_size-65536)
+    entries=[]
+    with file.open('rb') as stream:
+        stream.seek(start)
+        if start and (not previous or reset): stream.readline();start=stream.tell()
+        raw=stream.read(65536)
+        end=raw.rfind(b'\n')+1
+        if end==0 and len(raw)==65536:
+            entries=[{'id':str(start),'text':'[Oversized log line skipped; showing next chunk]','level':'warn'}];end=len(raw)
+        raw=raw[:end];offset=start
+        for line in raw.splitlines(keepends=True):
+            text=line.decode('utf8',errors='replace').rstrip('\r\n')[:8192]
+            entry={'id':fingerprint+':'+str(stat.st_ino)+':'+str(offset),'text':text,'level':'info'}
+            if file==events:
+                try:
+                    event=json.loads(text)
+                    if isinstance(event,dict):
+                        for key in ('timestamp','event','message','level','input_index','isbn','attempt_id','error_code','exit_code','signal'):
+                            if key in event and isinstance(event[key],(str,int,float,bool,type(None))): entry[key]=event[key]
+                except ValueError: pass
+            entries.append(entry);offset+=len(line)
+    token=base64.urlsafe_b64encode(json.dumps({'file':fingerprint,'inode':identity,'offset':start+end,'prefix_length':len(prefix),'prefix':hashlib.sha256(prefix).hexdigest()}).encode()).decode().rstrip('=')
+    return {'available':True,'source':'events' if file==events else 'console','mixed':bool(record.get('shared') and file!=events),'entries':entries[-500:],'cursor':token,'reset':reset,'truncated':len(entries)>500,'has_more':start+end<stat.st_size,'attempts':attempts}
 
 def git_state():
     return {'branch':run('git','branch','--show-current',check=False),'commit':run('git','rev-parse','HEAD',check=False),'dirty':bool(run('git','status','--porcelain',check=False))}
@@ -447,16 +600,17 @@ def launch(req):
     job_id=f'{int(time.time())}-{ident}'; session='dashboard_'+job_id.replace('-','_'); log=STATE/(job_id+'.log'); exitfile=STATE/(job_id+'.exit'); launcher=STATE/(job_id+'.sh')
     command=['node',SCRIPTS[name],rel,'--headless']
     if name not in LEGACY: command+=['--output',output]
-    launcher.write_text('#!/bin/sh\ncd '+shlex.quote(str(ROOT))+' || exit 1\n'+shlex.join(command)+' >> '+shlex.quote(str(log))+' 2>&1\nresult=$?\nprintf "%s\\n" "$result" > '+shlex.quote(str(exitfile))+'\nexit "$result"\n');launcher.chmod(0o700)
-    job={'id':job_id,'scraper':name,'input':rel,'input_sha256':digest,'total':total,'output':output,'session':session,'started_at':int(time.time()),'log':str(log)}
+    job={'id':job_id,'scraper':name,'input':rel,'input_sha256':digest,'total':total,'output':output,'session':session,'started_at':int(time.time())}
+    build_launcher(job,command,launcher,exitfile,str(time.time_ns()))
     record=STATE/(job_id+'.json'); record.write_text(json.dumps(job)); record.chmod(0o600)
-    try: run('tmux','new-session','-d','-s',session,'sh '+shlex.quote(str(launcher)))
+    try: run('tmux','new-session','-d','-s',session,'bash '+shlex.quote(str(launcher)))
     except Exception: record.unlink(); raise
     return job
 
 def main():
     encoded = sys.argv[1]; req=json.loads(base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4)).decode()); op=req.get('op')
-    if op=='files': result={'items':list_inputs(req.get('folder','input-data'))}
+    if op=='logs': result=job_logs(req)
+    elif op=='files': result={'items':list_inputs(req.get('folder','input-data'))}
     elif op in ('status','sync','launch','stop','resume','retry','clear-pause'):
         STATE.mkdir(mode=0o700,parents=True,exist_ok=True)
         with (STATE / 'management.lock').open('a') as lock:

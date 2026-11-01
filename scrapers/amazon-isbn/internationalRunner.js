@@ -89,7 +89,7 @@ async function runBatch({ items, output, page, domain = 'amazon.com', retryFaile
 
 async function main(domain) {
   if (!markets[domain]) throw Error('Unsupported Amazon marketplace');
-  const folder = domain === 'amazon.com' ? 'amazon-us-isbn' : 'amazon-uk-isbn';
+  const folder = domain === 'amazon.it' ? 'amazon-it-isbn' : domain === 'amazon.com' ? 'amazon-us-isbn' : 'amazon-uk-isbn';
   const { inputFile, isHeadless, outputFilePath } = initScraper(`scrapers/${folder}/${folder}.js`, folder, '.json');
   const outputIndex = process.argv.indexOf('--output');
   if (outputIndex !== -1 && (!process.argv[outputIndex + 1] || process.argv[outputIndex + 1].startsWith('--'))) throw new Error('--output requires a file path.');
@@ -108,9 +108,10 @@ async function main(domain) {
     return;
   }
   try {
-    context = await chromium.launchPersistentContext(profile, { headless: isHeadless, viewport: { width: 1440, height: 1000 }, locale: domain === 'amazon.com' ? 'en-US' : 'en-GB', timezoneId: 'Asia/Kolkata' });
+    context = await chromium.launchPersistentContext(profile, { headless: isHeadless, viewport: { width: 1440, height: 1000 }, locale: domain === 'amazon.it' ? 'it-IT' : domain === 'amazon.com' ? 'en-US' : 'en-GB', timezoneId: domain === 'amazon.it' ? 'Europe/Rome' : 'Asia/Kolkata' });
     await context.addCookies([{ name: 'i18n-prefs', value: markets[domain].currency, domain: `.${domain}`, path: '/' }]);
-    await context.route('**/*', route => ['image', 'media', 'font'].includes(route.request().resourceType()) ? route.abort() : route.continue());
+    // Amazon.it's AOD drawer does not hydrate reliably with resource routing.
+    if (domain !== 'amazon.it') await context.route('**/*', route => ['image', 'media', 'font'].includes(route.request().resourceType()) ? route.abort() : route.continue());
     const page = context.pages()[0] || await context.newPage();
     if (slow) setPolicyForPage(page, SLOW_DEFAULTS);
     const delay = () => page.waitForTimeout(slow ? getRandomDelay(4000, 10000) : getRandomDelay(2000, 5000));

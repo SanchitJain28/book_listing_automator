@@ -1,15 +1,16 @@
-import { execFile } from 'node:child_process';
+import fs from 'node:fs/promises';
 import path from 'node:path';
-import { promisify } from 'node:util';
+import { getConnectionPool } from './vpsConnectionPool.js';
+import { serversFromInfo } from './vpsManager.js';
 
-const runFile = promisify(execFile);
 export function vpsStatusMiddleware(root, getStatus = async () => {
-  try {
-    const { stdout } = await runFile(process.execPath, [path.join(root, 'scripts/vps-status.js'), '--json'], { timeout: 45000, maxBuffer: 2_000_000 });
-    return JSON.parse(stdout);
-  } catch (error) {
-    throw new Error(error.killed ? 'VPS status request timed out.' : (error.stderr?.trim() || 'Could not fetch VPS status.'));
-  }
+  const servers = serversFromInfo(await fs.readFile(path.join(root, 'VPSInfo.md'), 'utf8'));
+  const server = servers.find(value => value.id === '6');
+  if (!server) throw new Error('VPS 6 is not configured.');
+  const source = await fs.readFile(path.join(root, 'scripts/vps-status/collector.py'), 'utf8');
+  const { stdout, code } = await getConnectionPool().exec(server, 'python3 -', source, { timeout: 40000, maxBytes: 2000000 });
+  if (code !== 0) throw new Error('Could not collect the existing VPS 6 batch.');
+  try { return JSON.parse(stdout); } catch { throw new Error('VPS returned an invalid status response.'); }
 }) {
   let pending = null;
   return async (req, res, next) => {
