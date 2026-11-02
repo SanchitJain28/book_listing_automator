@@ -1,0 +1,23 @@
+{
+  "created_at": "20261102T043421Z",
+  "rows": 17606,
+  "unique_isbns": 17593,
+  "duplicates_preserved": true,
+  "sources": [
+    {
+      "date": "2026-10-27",
+      "file": "/Users/sanchitjain/vscode_files/book_listing_automator/input-data/manual-search/2026-10-27/input.txt",
+      "rows": 14777,
+      "offset": 0,
+      "sha256": "e008d9ea66de595d8feda6c22d4f766468baf75cefeefd33e9df732d2eae2b75"
+    },
+    {
+      "date": "2026-10-31",
+      "file": "/Users/sanchitjain/vscode_files/book_listing_automator/input-data/manual-search/2026-10-31/input.txt",
+      "rows": 2829,
+      "offset": 14777,
+      "sha256": "15a5d65feaef28a1a4b9050399db4dde6a2830e6adb6308096874dcad25a8c57"
+    }
+  ],
+  "sha256": "96c49b30c67a0d825e8cf7b332e2ef7da81824343b3065b5d590fb31fa17992d"
+}

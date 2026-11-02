@@ -134,12 +134,17 @@ async function generateConfig(
     );
   }
 
-  const matchIdx = headers.findIndex((h) =>
-    h.toLowerCase().includes("isbn match"),
+  const matchIdx = headers.findIndex(
+    (h) =>
+      h.toLowerCase().includes("isbn match") ||
+      h.toLowerCase() === "match type" ||
+      h.toLowerCase().includes("match type"),
   );
 
   const groupIdx = headers.findIndex((h) => h.toLowerCase() === "group");
-  let cursorIdx = headers.findIndex((h) => h.toLowerCase() === "cursor");
+  let cursorIdx = headers.findIndex(
+    (h) => h.toLowerCase() === "cursor" || h.toLowerCase() === "curosr",
+  );
   let sellIdx = headers.findIndex(
     (h) =>
       h.toLowerCase() === "po value (inr @ rate)" ||
@@ -149,14 +154,17 @@ async function generateConfig(
       h.toLowerCase().includes("po price (inr)") ||
       h.toLowerCase().includes("po (inr)") ||
       h.toLowerCase().includes("sell (inr)") ||
-      h.toLowerCase() === "sell (inr)",
+      h.toLowerCase() === "sell (inr)" ||
+      h.toLowerCase() === "sell value (inr)" ||
+      h.toLowerCase().includes("sell value"),
   );
   if (sellIdx === -1) {
     sellIdx = headers.findIndex(
       (h) =>
-        h.toLowerCase() === "sell" ||
-        h.toLowerCase().includes("sell") ||
-        h.toLowerCase().includes("po price"),
+        !h.toLowerCase().includes("seller") &&
+        (h.toLowerCase() === "sell" ||
+          h.toLowerCase().includes("sell") ||
+          h.toLowerCase().includes("po price")),
     );
   }
 
