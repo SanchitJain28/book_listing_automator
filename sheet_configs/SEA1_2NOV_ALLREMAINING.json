@@ -7,10 +7,10 @@
   "yellowItemsCount": 0,
   "redItemsCount": 0,
   "latestCursor": {
-    "batchNumber": 1,
-    "sheetRowNumber": 52,
-    "isbn": "9788124314074",
-    "cursorText": "CURSOR - 1"
+    "batchNumber": 2,
+    "sheetRowNumber": 103,
+    "isbn": "9788120751965",
+    "cursorText": "CURSOR - 2"
   },
   "columns": {
     "status": -1,
@@ -1253,7 +1253,7 @@
       "title": "Dimensions of Spiritual Education (Integral Education)",
       "group": "",
       "status": "Pending",
-      "existingReason": "",
+      "existingReason": "HIGH PRICE",
       "existingCursor": "",
       "matchType": "Yes",
       "rowColor": "white"
@@ -1358,7 +1358,7 @@
       "group": "",
       "status": "Pending",
       "existingReason": "",
-      "existingCursor": "",
+      "existingCursor": "CURSOR - 2",
       "matchType": "Yes",
       "rowColor": "white"
     },
