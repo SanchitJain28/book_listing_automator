@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test src/lib/*.test.js server/*.test.js",
+    "verify:amazon": "node scripts/verify-amazon-cart.mjs",
     "verify:theme": "node scripts/verify-grid-theme.mjs",
     "verify:vps": "node scripts/verify-vps-workspace.mjs"
   },

@@ -6,7 +6,7 @@ import { createServer } from 'vite';
 import { chromium } from 'playwright';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const server=await createServer({root,configFile:path.join(root,'vite.config.js'),server:{host:'127.0.0.1',port:0},clearScreen:false});
+const server=await createServer({root,configFile:path.join(root,'vite.config.js'),cacheDir:path.join(root,'node_modules','.vite-verify-theme'),server:{host:'127.0.0.1',port:0},clearScreen:false});
 let browser;
 const counts={matched:21,blocked:1,errors:2,not_listed:60,in_stock:4};
 const platforms=['atlanticbooks','bookswagon','flipkart'];

@@ -1,0 +1,112 @@
+## The problem with current implementation with different edition is that when the script choose the 
+cheaper book the isbns changes ,but it regiseters as correct isbns , there is also a fundamental problem like in the current implementation it directly clicks on REFERENCE[test/data/amazon-cart/different-edition/9780813507699/images/image-3.png] but we have to choose correct button first REFERENCE[test/data/amazon-cart/different-edition/9780813507699/images/image-4.png] 
+
+## This problem does not come for same isbns book because when choosing the cheaper book does not changes
+
+## Solution for this : We have to make some function , which will check the title match , if isbns get changed we don't have to directly mark it as "ISBN NOT MATCHED" , what we have to do is , check the title with the title feild 
+
+Example : title is \"Corvey (DKV-Kunstführer, 364)\"
+{
+  "sheetRowNumber": 6,
+  "isbn": "9783422020801",
+  "targetPrice": 245,
+  "sellPrice": 306,
+  "title": "\"Corvey (DKV-Kunstführer, 364)\"",
+  "group": "",
+  "status": "Pending",
+  "existingReason": "",
+  "existingCursor": "",
+  "matchType": "Exact ISBN",
+  "rowColor": "white"
+}
+
+What is correct match for this title : RULES 
+1. We don't want exact title match 
+2. like most title should match , if this book is in hindi title , then it is also correct,we can use LLM to check this , like very ligh request to gemini 3.8 flash , it will return JSON object as {isMatching : true/false} , if title is not matched , don't write "ISBN NOT MATCHED / TITLE NOT MATCHED" , then write "FOR REVIEW" , then i will review it manually. 
+
+and the title to compare from is 
+<h5 id="aod-asin-title-text" class="b2b-aod-asin-title-text-class"> Early Recollections and Life of Dr. James Still (Classic Reprint) </h5>
+
+<div class="a-column a-span7">    <h5 id="aod-asin-title-text" class="b2b-aod-asin-title-text-class"> "Eclipse" Refrigerating Machines for Use in Cold Storage Depots, Packing Houses, Breweries, Ice Factories, Etc. </h5>    <span class="a-size-base"> Hardcover </span>  </div>
+
+this title (under the sidebar)
+
+## Add your questions here (I will try to answer them)
+
+Questions after reviewing all four screenshots, reference.txt, and the current script:
+
+1. Can we buy a different edition for a WHITE row too?
+   Example: A WHITE row asks for ISBN 9780813507699. Amazon has a cheaper
+   paperback with ISBN 9781331337805. The title check confirms it is the same book,
+   and it passes the price and delivery rules.
+   Should the script:
+   A) Allow buying that paperback for BOTH white and yellow rows?
+   B) Allow buying that paperback ONLY for yellow rows, while white rows must
+      always keep the requested ISBN?
+   This question is about which rows allow a different edition. It is separate
+   from checking whether the two titles describe the same book.
+   Answer: B) Allow buying that paperback ONLY for yellow rows, while white rows must
+      always keep the requested ISBN
+
+2. Which format button should be selected first?
+   Should the script inspect each physical format button (Paperback, Hardcover,
+   etc.), open its offers, verify its identity/title, and then choose the lowest
+   effective price across the accepted offers using the existing pricing and
+   delivery rules? Or should it select only the physical format with the lowest
+   displayed book price and inspect that format's offers? Displayed prices alone
+   do not include the final shipping charges and delivery penalties.
+   I would exclude Kindle, ebooks, and audiobooks from physical-book purchases.
+   Answer: Please check how amazon-in scraper works , it avoids any ebooks / audiobooks and other things
+
+3. What differences are acceptable in a matching title?
+   You already allow non-exact wording and a Hindi title for the same book.
+   Should reprints, different publishers, publication years, and paperback versus
+   hardcover also be accepted? Should abridged/adapted versions, study guides,
+   workbooks, and a different volume/part be rejected even if most words match?
+   My suggested rule is to accept the same work across ordinary editions and
+   translations, but send those substantive content/volume differences FOR REVIEW.
+   Answer: Different Publishers : Allowed , Publication years : Allowed , Paperback / Hardcover doesn't matter : Allowed
+   >> Different volume / part -> NOT Allowed
+
+4. When exactly should the title model be called?
+   Should title verification run only when the candidate ASIN/ISBN differs from
+   the searched ISBN, with equivalent ISBN-10/ISBN-13 treated as the same ISBN?
+   Or should every candidate drawer title be verified, including exact ISBN matches?
+   Answer:
+   >> It should only run when ASIN/ISBN differs from
+   the searched ISBN (including 10 vs 13) 
+
+5. Missing information or model failure
+   If #aod-asin-title-text is missing, may the script use the product-page title
+   after explicitly selecting that candidate's format? If the expected sheet title
+   is missing, or the model times out / returns invalid JSON, should the item be
+   marked FOR REVIEW and skipped without adding it to the cart? This is my
+   suggested fallback when identity cannot be established.
+   Answer: if #aod-asin-title-text is missing use the product page title after explicitly selecting that candidate's format
+   If the expected sheet title
+   is missing, or the model times out / returns invalid JSON, should the item be
+   marked FOR REVIEW and skipped without adding it to the cart : YES
+
+6. One mismatching candidate versus the whole book
+   If one format/title fails verification but another verified format passes the
+   normal price and delivery rules, should the script buy the verified offer?
+   Suggested behavior: discard the mismatching candidate, continue evaluating
+   verified candidates, and write FOR REVIEW only if no identity-verified candidate
+   remains. If verified candidates exist but fail price/delivery, keep the existing
+   HIGH PRICE / DELIVERY DATE reasons. Is this what you want?
+   Answer: >> yes buy the verified offer
+
+7. Gemini configuration
+   You mentioned "gemini 3.8 flash". What exact API model ID and provider endpoint
+   should be used (Google Gemini API, Vertex AI, or another provider)? Is there an
+   existing environment variable for its API key? Please give only the variable
+   name here, not the key itself. Should the model receive just the two titles,
+   or also author/language/format metadata when available?
+   Answer: >> Use Google Gemini API or we can use verce ai sdk for structured ouputs , there is already GEMINI_API_KEY= in .env
+
+Fixture detail: reference.txt currently contains the original hardcover format
+buttons (ASIN 0813507693) and its paperback alternative (ASIN 1331337801), but no
+#aod-asin-title-text or sidebar offer list. To validate extraction against this
+example, we will also need a saved sidebar HTML fragment after selecting the
+paperback format and opening its offers. The screenshots show paperback ISBN-13
+9781331337805, while the original hardcover is ISBN-13 9780813507699.

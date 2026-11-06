@@ -36,3 +36,9 @@ for (const code of [2, 3]) {
     assert.match(checkCompletion('walmart-isbn.js', code), /no automatic restart/);
   });
 }
+
+for (const code of [2, 3]) {
+  test(`eBay deliberate exit ${code} does not restart`, () => {
+    assert.match(checkCompletion('ebay-com-isbn.js', code), /eBay batch stopped/);
+  });
+}

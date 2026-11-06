@@ -10,13 +10,14 @@ import {
   CloseRounded, CloudUploadOutlined, DataObjectRounded, DescriptionOutlined,
   FilterAltOffRounded, FolderOpenOutlined, GridViewRounded, HelpOutlineRounded,
   LibraryBooksOutlined, MenuRounded, SearchRounded, ShieldOutlined,
-  StorefrontOutlined, TableRowsRounded, VerifiedOutlined, WarningAmberRounded, DnsOutlined,
+  StorefrontOutlined, TableRowsRounded, VerifiedOutlined, WarningAmberRounded, DnsOutlined, ShoppingCartOutlined,
 } from '@mui/icons-material';
 import DataGrid from './DashboardDataGrid';
 import { formatMoney, normalizeRecords } from './lib/output';
 import { parseDataFile } from './lib/dataFile';
 import ProjectFileDialog from './ProjectFileDialog';
 import VpsManager from './VpsManager';
+import AmazonCart from './AmazonCart';
 import { demoRecords } from './demo';
 import { listRecentOutputs, saveRecentOutput, readRecentOutput, removeRecentOutput } from './lib/recentOutputs';
 
@@ -96,7 +97,8 @@ function RecordDrawer({ row, onClose }) {
 export default function App() {
   const inputRef = useRef(null);
   const loadId = useRef(0);
-  const [workspaceView, setWorkspaceView] = useState('outputs');
+  const [workspaceView, setWorkspaceView] = useState(() => ['amazon', 'vps'].includes(window.location.hash.slice(1)) ? window.location.hash.slice(1) : 'outputs');
+  useEffect(() => { window.history.replaceState(null, '', `#${workspaceView}`); }, [workspaceView]);
   const [records, setRecords] = useState([]);
   const [file, setFile] = useState(null);
   const [error, setError] = useState(null);
@@ -211,7 +213,7 @@ export default function App() {
   const sidebar = <Stack sx={{ height: '100%', p: 2, overflowY: 'auto' }}>
     <Stack direction="row" spacing={1.2} alignItems="center" sx={{ px: 1, py: 2.3, mb: 3 }}><Avatar variant="rounded" sx={{ bgcolor: '#363636', color: '#ededed', width: 34, height: 34 }}><LibraryBooksOutlined fontSize="small" /></Avatar><Box><Typography sx={{ fontWeight: 700, fontSize: '0.9rem', letterSpacing: '-0.3px' }}>Book Listing</Typography><Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', letterSpacing: 1.5 }}>SCRAPER WORKSPACE</Typography></Box></Stack>
     <Typography variant="overline" color="text.secondary" sx={{ px: 1.5, mb: 1 }}>Workspace</Typography>
-    <List disablePadding><ListItemButton selected={workspaceView === 'outputs'} onClick={() => { setWorkspaceView('outputs'); setMobileNav(false); }} sx={{ borderRadius: 2, '&.Mui-selected': { bgcolor: '#323232', color: 'primary.main' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}><GridViewRounded sx={{ fontSize: 19 }} /></ListItemIcon><ListItemText primary="Output explorer" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }} /></ListItemButton><ListItemButton selected={workspaceView === 'vps'} onClick={() => { setWorkspaceView('vps'); setMobileNav(false); }} sx={{ borderRadius: 2, mt: .5, '&.Mui-selected': { bgcolor: '#323232', color: 'primary.main' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}><DnsOutlined sx={{ fontSize: 19 }} /></ListItemIcon><ListItemText primary="VPS" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }} /></ListItemButton></List>
+    <List disablePadding><ListItemButton selected={workspaceView === 'outputs'} onClick={() => { setWorkspaceView('outputs'); setMobileNav(false); }} sx={{ borderRadius: 2, '&.Mui-selected': { bgcolor: '#323232', color: 'primary.main' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}><GridViewRounded sx={{ fontSize: 19 }} /></ListItemIcon><ListItemText primary="Output explorer" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }} /></ListItemButton><ListItemButton selected={workspaceView === 'vps'} onClick={() => { setWorkspaceView('vps'); setMobileNav(false); }} sx={{ borderRadius: 2, mt: .5, '&.Mui-selected': { bgcolor: '#323232', color: 'primary.main' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}><DnsOutlined sx={{ fontSize: 19 }} /></ListItemIcon><ListItemText primary="VPS" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }} /></ListItemButton><ListItemButton selected={workspaceView === 'amazon'} onClick={() => { setWorkspaceView('amazon'); setMobileNav(false); }} sx={{ borderRadius: 2, mt: .5, '&.Mui-selected': { bgcolor: '#332b20', color: '#f2bb67' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}><ShoppingCartOutlined sx={{ fontSize: 19 }} /></ListItemIcon><ListItemText primary="Amazon" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }} /></ListItemButton></List>
     <Button startIcon={<FolderOpenOutlined />} onClick={() => { setMobileNav(false); setProjectBrowserOpen(true); }} sx={{ mt: 1, justifyContent: 'flex-start', color: 'text.secondary', px: 1.5, fontSize: '0.8rem' }}>Browse project files</Button>
     <Box sx={{ mt: 3, mb: 2, flex: 1 }}>
       <Typography variant="overline" color="text.secondary" sx={{ px: 1.5 }}>Recent outputs</Typography>
@@ -235,12 +237,12 @@ export default function App() {
     <Drawer open={mobileNav} onClose={() => setMobileNav(false)} PaperProps={{ sx: { width: SIDEBAR, bgcolor: '#1c1c1c' } }}>{sidebar}</Drawer>
     <Box sx={{ width: { xs: '100%', md: `calc(100% - ${SIDEBAR}px)` }, ml: { md: `${SIDEBAR}px` }, minWidth: 0 }}>
       <Box component="header" sx={{ height: 66, px: { xs: 2, lg: 4.5 }, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Stack direction="row" spacing={1} alignItems="center"><IconButton aria-label="Open navigation" onClick={() => setMobileNav(true)} sx={{ display: { md: 'none' } }}><MenuRounded /></IconButton><Breadcrumbs sx={{ fontSize: '0.75rem' }}><Typography color="text.secondary" sx={{ fontSize: 'inherit' }}>Workspace</Typography><Typography sx={{ fontSize: 'inherit' }}>{workspaceView === 'vps' ? 'VPS' : 'Output explorer'}</Typography></Breadcrumbs></Stack>
+        <Stack direction="row" spacing={1} alignItems="center"><IconButton aria-label="Open navigation" onClick={() => setMobileNav(true)} sx={{ display: { md: 'none' } }}><MenuRounded /></IconButton><Breadcrumbs sx={{ fontSize: '0.75rem' }}><Typography color="text.secondary" sx={{ fontSize: 'inherit' }}>Workspace</Typography><Typography sx={{ fontSize: 'inherit' }}>{workspaceView === 'amazon' ? 'Amazon' : workspaceView === 'vps' ? 'VPS' : 'Output explorer'}</Typography></Breadcrumbs></Stack>
         <Chip icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'secondary.main', ml: '10px !important' }} />} label="Local workspace" size="small" variant="outlined" sx={{ fontSize: '0.67rem' }} />
       </Box>
       <Box component="main" sx={{ p: { xs: 2, sm: 3, lg: 4.5 }, maxWidth: 1920, mx: 'auto' }}>
         <Box component="input" ref={inputRef} type="file" accept=".json,.jsonl,.ndjson,.csv,.tsv,.txt,application/json,text/csv,text/plain" aria-label="Choose scraper output file" sx={{ display: 'none' }} onChange={event => { importFile(event.target.files?.[0]); event.target.value = ''; }} />
-        {workspaceView === 'vps' ? <VpsManager /> : <>
+        {workspaceView === 'amazon' ? <AmazonCart /> : workspaceView === 'vps' ? <VpsManager /> : <>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3.5 }}>
           <Box><Stack direction="row" spacing={1.2} alignItems="center" sx={{ mb: 1 }}><Typography variant="overline" color="primary">DATA WORKSPACE</Typography><Chip label="v0.1" size="small" sx={{ height: 18, fontSize: '0.6rem', color: 'text.secondary' }} /></Stack><Typography variant="h4">A clearer view of every result.</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.82rem' }}>Explore book listings, compare sellers, and check what your scraper found.</Typography></Box>
           <Button variant="contained" startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <FolderOpenOutlined />} onClick={() => setProjectBrowserOpen(true)} disabled={loading} sx={{ flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'center' }, px: 2.3, py: 1 }}>Open output file</Button>

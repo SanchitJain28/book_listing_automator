@@ -133,6 +133,11 @@ function startScraper() {
       process.exit(code);
     }
 
+    if (!signal && [2, 3].includes(code) && path.basename(targetScript) === "ebay-com-isbn.js") {
+      console.log("[Watcher] eBay batch stopped. Review its report before resuming.");
+      process.exit(code);
+    }
+
     // International Amazon: 2 means completed with unverified rows, 3 means
     // deliberately paused after blocks. Neither should trigger crash recovery.
     const internationalStop = [2, 3].includes(code) && !signal &&

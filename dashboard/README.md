@@ -109,3 +109,25 @@ The browser verification uses mocked VPS responses and performs no remote contro
 The shared runner distinguishes browser/context loss from HTTP blocking. An unexpectedly closed page or failed context creation retries the same unsaved input at most twice with a new context; repeated failures remain visible as `Failed`. Genuine block responses still stop that platform and retain its cooldown. Context cleanup never closes a shared browser while sibling leases are active.
 
 Session snapshots are bounded to 2 MiB, omit IndexedDB/ad caches, and retain only bounded cookies/localStorage. Oversized or unreadable prior snapshots are preserved beside the original state file as `.oversized-*.bak` or `.invalid-*.bak`; failed restores are preserved as `.restore-failed-*.bak`. Result outputs are unaffected. Pool diagnostics include browser slot/generation, disconnects, and per-platform recovery counts.
+
+### Amazon cart workspace
+
+Open **Amazon** in the sidebar, or go directly to `http://127.0.0.1:5173/#amazon` after starting `npm run dashboard` from the repository root.
+
+Choose a configured Google Sheet tab, Profile 1 or 2, an optional cursor, and **Manual review** or **Auto mode**. A blank cursor uses the tab's saved checkpoint. **Sign in to this profile** opens the saved local browser profile for manual sign-in. Close a CLI cart session using the same profile before opening it here.
+
+The cart script remains the engine. It always searches PO ISBNs, keeps the existing pricing and delivery rules, and restricts title-based edition substitution to yellow rows. The browser UI receives structured book, offer, Gemini-reason, prompt, and cart-result events over a local IPC/SSE bridge. Feedback, Add/Skip, Next/Retry/Menu, row/ISBN jumps, login confirmation, and batch continuation are answered in the web page. Actual Amazon sign-in and checkout still happen in the separate automation browser.
+
+Auto mode adds qualified offers without per-book approval and requires confirmation before launch. Pause takes effect at the next safe checkpoint, before a book or cart addition. Stop closes only the dashboard-owned automation process/browser. Normal queue exhaustion ends the session instead of processing the last ISBN again.
+
+Only one dashboard cart session can run at a time. Navigating away or reloading reconnects to that same backend process and pending prompt; it never resubmits an action. If the live event stream closes (for example, on a large snapshot), the page switches to read-only JSON updates every two seconds while keeping the same session and prompt controls. Stopping the dashboard server stops its owned cart session. Existing terminal-only sessions are not adopted or controlled. Session snapshots, the last 100 decision summaries, and the last 300 activity lines remain available while that backend is running; the engine continues writing the existing feedback log and batch checkpoints to disk. API keys, opaque offer IDs, and signed product URLs are not sent to the page.
+
+The local service uses fixed script/config paths, validates every launch and prompt response, rejects stale prompt/session IDs, and restricts mutations to same-origin JSON requests on loopback. Production builds need `npm --prefix dashboard run preview` for the local control API; a static file server cannot run cart sessions.
+
+Verification (all account actions mocked):
+
+```sh
+npm run dashboard:test
+npm run dashboard:build
+npm --prefix dashboard run verify:amazon
+```

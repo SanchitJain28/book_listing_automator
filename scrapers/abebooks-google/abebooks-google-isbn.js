@@ -3,6 +3,7 @@ require('dotenv').config();
 const fs=require('fs');
 const path=require('path');
 const {chromium}=require('playwright');
+const {connectProfile,stopProfile}=require('../../utils/kameleo');
 const {readSearchTerms,readJsonLines,appendResult}=require('../../utils/file');
 const {getResumeIndex}=require('../../utils/resume');
 const {normalizeIsbn,isValidIsbn}=require('../atlanticbooks/core/isbn');
@@ -13,13 +14,13 @@ const {getRandomDelay}=require('../../utils/browser');
 
 function options(argv) {
   const args=[...argv];const input=args.shift();if(!input || input.startsWith('--')) throw new Error('Usage: node scrapers/abebooks-google/abebooks-google-isbn.js input.txt [--headless] [--retry-zero-links] [--no-clearance-reuse] [--output results.jsonl]');
-  let output=null,headless=false,retryZeroLinks=false,reuseClearance=true;
-  while(args.length) {const flag=args.shift();if(flag==='--headless') headless=true;else if(flag==='--retry-zero-links') retryZeroLinks=true;else if(flag==='--no-clearance-reuse') reuseClearance=false;else if(flag==='--output' && args[0] && !args[0].startsWith('--')) output=args.shift();else throw new Error(`Unknown or incomplete option: ${flag}`);}
+  let output=null,headless=false,retryZeroLinks=false,reuseClearance=true,kameleoProfile=null,detectCaptchaOnly=false;
+  while(args.length) {const flag=args.shift();if(flag==='--headless') headless=true;else if(flag==='--retry-zero-links') retryZeroLinks=true;else if(flag==='--no-clearance-reuse') reuseClearance=false;else if(flag==='--kameleo-profile' && args[0] && !args[0].startsWith('--')) kameleoProfile=args.shift();else if(flag==='--detect-captcha-only') detectCaptchaOnly=true;else if(flag==='--output' && args[0] && !args[0].startsWith('--')) output=args.shift();else throw new Error(`Unknown or incomplete option: ${flag}`);}
   const absolute=path.resolve(input);
   if(!fs.existsSync(absolute)) throw new Error(`Input file not found: ${absolute}`);
   if(!/\.(?:txt|jsonl?|ndjson)$/i.test(absolute)) throw new Error('Input must be TXT or JSON Lines.');
   const base=path.parse(absolute);
-  return {input:absolute,headless,retryZeroLinks,reuseClearance,output:path.resolve(output || path.join('output/abebooks-google',base.name==='input'?path.basename(base.dir):base.name,'results.jsonl'))};
+  return {input:absolute,headless,retryZeroLinks,reuseClearance,kameleoProfile,detectCaptchaOnly,output:path.resolve(output || path.join('output/abebooks-google',base.name==='input'?path.basename(base.dir):base.name,'results.jsonl'))};
 }
 function itemsFrom(file) {
   const items=/\.txt$/i.test(file) ? readSearchTerms(file).map(searched_isbn=>({searched_isbn})) : readJsonLines(file);
@@ -62,12 +63,15 @@ function writeRecords(output,records) {
 function isBrowserClosedError(error) {
   return /Target page, context or browser has been closed|Browser has been closed/i.test(error?.message||'');
 }
-async function scrapeWithContext(browser,isbn,{clientKey,clearanceCookie=null,onProgress=()=>{},allowManualChallenge=false,blockedScreenshotPath=null,backgroundSession=null}={}) {
+async function scrapeWithContext(browser,isbn,{clientKey,clearanceCookie=null,onProgress=()=>{},allowManualChallenge=false,blockedScreenshotPath=null,backgroundSession=null,existingContext=null,detectCaptchaOnly=false}={}) {
   const settings={viewport:{width:1280,height:800}};
   if(clearanceCookie) settings.storageState={cookies:[clearanceCookie],origins:[]};
-  const {context,page}=await createContextPage(browser,settings,{backgroundSession});
+  const contextPage=existingContext
+    ? {context:existingContext,page:await existingContext.newPage()}
+    : await createContextPage(browser,settings,{backgroundSession});
+  const {context,page}=contextPage;
   try {
-    const result=await scrapeIsbn(page,isbn,{clientKey,onProgress,allowManualChallenge});
+    const result=await scrapeIsbn(page,isbn,{clientKey,onProgress,allowManualChallenge,detectCaptchaOnly});
     if(result.status==='blocked') {
       result.diagnostic_url=page.url();
       result.diagnostic_title=await page.title().catch(()=>null);
@@ -78,9 +82,10 @@ async function scrapeWithContext(browser,isbn,{clientKey,clearanceCookie=null,on
     }
     const cookies=await context.cookies('https://www.google.com');
     return {result,clearanceCookie:clearanceCookieFrom(cookies)};
-  } finally {await context.close();}
+  } finally {if(existingContext) await page.close().catch(()=>{});else await context.close();}
 }
-async function run({input,output,headless,retryZeroLinks=false,reuseClearance=true}) {
+async function run({input,output,headless,retryZeroLinks=false,reuseClearance=true,kameleoProfile=null,detectCaptchaOnly=false}) {
+  if(kameleoProfile) reuseClearance=false;
   const items=itemsFrom(input);if(!items.length) throw new Error('Input contains no ISBNs.');
   fs.mkdirSync(path.dirname(output),{recursive:true});
   getResumeIndex(output,items,identity);
@@ -89,7 +94,7 @@ async function run({input,output,headless,retryZeroLinks=false,reuseClearance=tr
   const pauseFile=output+'.pause.json';
   if(fs.existsSync(pauseFile)) {const pause=JSON.parse(fs.readFileSync(pauseFile));if(Date.parse(pause.resume_after)>Date.now()) {console.log(`Paused until ${pause.resume_after}. Output preserved.`);process.exitCode=3;return;}}
   if(!pending.length) {console.log(`All ${items.length} inputs already saved in ${output}.`);return;}
-  let browser,backgroundSession,clearanceCookie=reuseClearance?loadGoogleClearance():null;
+  let browser,backgroundSession,existingContext,clearanceCookie=reuseClearance?loadGoogleClearance():null;
   function rememberClearance(cookie) {
     if(!reuseClearance || !cookie) return;
     const changed=!clearanceCookie || clearanceCookie.value!==cookie.value || clearanceCookie.expires!==cookie.expires;
@@ -102,8 +107,14 @@ async function run({input,output,headless,retryZeroLinks=false,reuseClearance=tr
   const stop={requested:false};const signal=()=>{stop.requested=true;console.log('Stopping after current ISBN.');};
   process.on('SIGINT',signal);process.on('SIGTERM',signal);
   try {
-    browser=await chromium.launch({headless,args:['--no-sandbox','--disable-setuid-sandbox','--disable-blink-features=AutomationControlled']});
-    if(!headless) backgroundSession=await browser.newBrowserCDPSession();
+    if(kameleoProfile) {
+      browser=await connectProfile(kameleoProfile);
+      existingContext=browser.contexts()[0];
+      if(!existingContext) throw new Error('Kameleo did not provide an existing browser context');
+    } else {
+      browser=await chromium.launch({headless,args:['--no-sandbox','--disable-setuid-sandbox','--disable-blink-features=AutomationControlled']});
+      if(!headless) backgroundSession=await browser.newBrowserCDPSession();
+    }
     if(clearanceCookie) console.log(`Loaded Google clearance profile: ${DEFAULT_SESSION_FILE}`);
     console.log(`AbeBooks Google input: ${input}\nOutput: ${output}\nPending: ${pending.length}/${items.length}; starting at ${pending[0]+1}.`);
     for(const index of pending) {
@@ -115,13 +126,13 @@ async function run({input,output,headless,retryZeroLinks=false,reuseClearance=tr
         if(!isbn || !isValidIsbn(isbn)) throw new Error('Invalid ISBN.');
         const activeClearance=reuseClearance?clearanceCookieFrom([clearanceCookie]):null;
         if(activeClearance) progress('Reusing saved Google challenge clearance in a fresh context.');
-        const first=await scrapeWithContext(browser,isbn,{clientKey:process.env.CAP_SOLVER||null,clearanceCookie:activeClearance,onProgress:progress,allowManualChallenge:!headless,blockedScreenshotPath:`${output}.blocked-${index+1}.png`,backgroundSession});
+        const first=await scrapeWithContext(browser,isbn,{clientKey:process.env.CAP_SOLVER||null,clearanceCookie:activeClearance,onProgress:progress,allowManualChallenge:!headless,blockedScreenshotPath:`${output}.blocked-${index+1}.png`,backgroundSession,existingContext,detectCaptchaOnly});
         result=first.result;
         const usedClearance=!!activeClearance;
         rememberClearance(first.clearanceCookie);
         if(usedClearance && result.status==='not_found' && !result.google_links?.length) {
           progress('No AbeBooks links with shared Google clearance; checking once in a clean context.');
-          const second=await scrapeWithContext(browser,isbn,{clientKey:process.env.CAP_SOLVER||null,onProgress:progress,allowManualChallenge:!headless,blockedScreenshotPath:`${output}.blocked-${index+1}.png`,backgroundSession});
+          const second=await scrapeWithContext(browser,isbn,{clientKey:process.env.CAP_SOLVER||null,onProgress:progress,allowManualChallenge:!headless,blockedScreenshotPath:`${output}.blocked-${index+1}.png`,backgroundSession,existingContext,detectCaptchaOnly});
           result=second.result;
           rememberClearance(second.clearanceCookie);
         }
@@ -159,7 +170,7 @@ async function run({input,output,headless,retryZeroLinks=false,reuseClearance=tr
       console.log(`[${index+1}/${items.length}] ${isbn}: ${result.status} | ${listings.length} listing(s) | ${result.google_links.length} AbeBooks link(s)`);
       if(index!==pending.at(-1) && !stop.requested) await new Promise(resolve=>setTimeout(resolve,getRandomDelay(3000,6000)));
     }
-  } finally {process.off('SIGINT',signal);process.off('SIGTERM',signal);await backgroundSession?.detach().catch(()=>{});await browser?.close();}
+  } finally {process.off('SIGINT',signal);process.off('SIGTERM',signal);await backgroundSession?.detach().catch(()=>{});try {if(kameleoProfile && browser) await stopProfile(kameleoProfile);} finally {await browser?.close();}}
   if(stop.requested) process.exitCode=130;
   console.log(`Saved results: ${output}`);
 }

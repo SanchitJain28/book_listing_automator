@@ -212,3 +212,28 @@ test('headed page creation asks Chromium to keep the new context in the backgrou
   assert.equal(created.context,context);
   assert.deepEqual(targetOptions,{url:'about:blank',browserContextId:'context-1',background:true,focus:false});
 });
+
+test('Kameleo profile and CAPTCHA observation flags are accepted', () => {
+  const parsed = options([
+    path.join(__dirname, 'data/abebooks-google/input-16.txt'),
+    '--kameleo-profile', '0b9b00a5-bf78-46e2-abc3-35959dcc1985',
+    '--detect-captcha-only',
+  ]);
+  assert.equal(parsed.kameleoProfile, '0b9b00a5-bf78-46e2-abc3-35959dcc1985');
+  assert.equal(parsed.detectCaptchaOnly, true);
+});
+
+test('CAPTCHA observation stops before invoking a solver', async () => {
+  let solves = 0;
+  const page = {
+    goto: async () => ({ status: () => 200 }),
+    url: () => 'https://www.google.com/sorry/index',
+    content: async () => '<form id="captcha-form"></form>',
+  };
+  const result = await scrapeIsbn(page, isbn, {
+    detectCaptchaOnly: true,
+    solveChallenge: async () => { solves++; return { solved: true }; },
+  });
+  assert.equal(result.status, 'blocked');
+  assert.equal(solves, 0);
+});

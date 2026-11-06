@@ -30,13 +30,14 @@ async function navigateAbe(page,url) {
   if (status>=400) return {status:'error',http_status:status};
   return {status:'ok',http_status:status};
 }
-async function scrapeIsbn(page,isbn,{clientKey=null,solveChallenge=solveGoogleChallenge,scrapePage=scrapeAbePage,delay=ms=>page.waitForTimeout(ms),maxLinks=Infinity,onProgress=()=>{},allowManualChallenge=false}={}) {
+async function scrapeIsbn(page,isbn,{clientKey=null,solveChallenge=solveGoogleChallenge,scrapePage=scrapeAbePage,delay=ms=>page.waitForTimeout(ms),maxLinks=Infinity,onProgress=()=>{},allowManualChallenge=false,detectCaptchaOnly=false}={}) {
   const googleUrl=`https://www.google.com/search?q=${encodeURIComponent(isbn)}&hl=en`;
   onProgress(`Searching Google for ${isbn}.`);
   let response=await page.goto(googleUrl,{waitUntil:'domcontentloaded',timeout:45000});
   let html=await page.content();
   if (googleChallenge(html,page.url(),response?.status())) {
     onProgress('Google reCAPTCHA detected.');
+    if (detectCaptchaOnly) return {status:'blocked',error:'Google CAPTCHA detected during observation-only check.',google_url:googleUrl,google_links:[],pages:[]};
     const resolution=await solveChallenge(page,html,clientKey,onProgress,undefined,{allowManual:allowManualChallenge});
     if (!resolution.solved) return {status:'blocked',error:resolution.reason,google_url:googleUrl,google_links:[],pages:[]};
     html=await readyGoogleHtml(page);

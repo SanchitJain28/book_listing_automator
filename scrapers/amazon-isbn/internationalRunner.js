@@ -10,6 +10,7 @@ const { normalizeIsbn } = require('./core/isbn');
 const { scrapeAmazonBook } = require('./scraper');
 const { markets } = require('./core/international');
 const { DEFAULTS, SLOW_DEFAULTS, setPolicyForPage } = require('./core/requestPolicy');
+const { connectProfile, stopProfile } = require('../../utils/kameleo');
 
 function identity(item) {
   const inputUrl = Object.hasOwn(item, 'input_url') ? item.input_url : item.buy_url || item.url || null;
@@ -97,8 +98,17 @@ async function main(domain) {
   const items = inputFile.toLowerCase().endsWith('.txt') ? readSearchTerms(inputFile).map(searched_isbn => ({ searched_isbn })) : readJsonLines(inputFile);
   if (!items.length) throw new Error('Input contains no records.');
   const slow = process.argv.includes('--slow');
+  const kameleoIndex = process.argv.indexOf('--kameleo-profile');
+  const kameleoProfile = kameleoIndex === -1 ? null : process.argv[kameleoIndex + 1];
+  if (kameleoIndex !== -1 && (!kameleoProfile || kameleoProfile.startsWith('--'))) {
+    throw new Error('--kameleo-profile requires a profile ID');
+  }
+  if (kameleoProfile && domain !== 'amazon.it') {
+    throw new Error('Kameleo mode is currently supported for Amazon.it');
+  }
   const profile = path.resolve(__dirname, `../../profiles/${folder}`, crypto.createHash('sha256').update(output).digest('hex').slice(0, 12));
   let context;
+  let kameleoBrowser;
   console.log(`${markets[domain].store} input: ${inputFile}\nOutput: ${output}`);
   if (slow) console.log('[Amazon] Slow mode: 4–10 seconds between page requests and between ISBNs; pause at the first block for at least 30 minutes.');
   const activePause = readPause(output);
@@ -108,7 +118,13 @@ async function main(domain) {
     return;
   }
   try {
-    context = await chromium.launchPersistentContext(profile, { headless: isHeadless, viewport: { width: 1440, height: 1000 }, locale: domain === 'amazon.it' ? 'it-IT' : domain === 'amazon.com' ? 'en-US' : 'en-GB', timezoneId: domain === 'amazon.it' ? 'Europe/Rome' : 'Asia/Kolkata' });
+    if (kameleoProfile) {
+      kameleoBrowser = await connectProfile(kameleoProfile);
+      context = kameleoBrowser.contexts()[0];
+      if (!context) throw new Error('Kameleo did not provide an existing browser context');
+    } else {
+      context = await chromium.launchPersistentContext(profile, { headless: isHeadless, viewport: { width: 1440, height: 1000 }, locale: domain === 'amazon.it' ? 'it-IT' : domain === 'amazon.com' ? 'en-US' : 'en-GB', timezoneId: domain === 'amazon.it' ? 'Europe/Rome' : 'Asia/Kolkata' });
+    }
     await context.addCookies([{ name: 'i18n-prefs', value: markets[domain].currency, domain: `.${domain}`, path: '/' }]);
     // Amazon.it's AOD drawer does not hydrate reliably with resource routing.
     if (domain !== 'amazon.it') await context.route('**/*', route => ['image', 'media', 'font'].includes(route.request().resourceType()) ? route.abort() : route.continue());
@@ -120,7 +136,14 @@ async function main(domain) {
     console.log(`Verified ${report.matched_count}/${report.input_count} ISBNs. Report: ${reportPath}`);
     if (stopped) process.exitCode = 3;
     else if (report.matched_count !== report.input_count) process.exitCode = 2;
-  } finally { await context?.close(); }
+  } finally {
+    if (kameleoBrowser) {
+      try { await stopProfile(kameleoProfile); }
+      finally { await kameleoBrowser.close(); }
+    } else {
+      await context?.close();
+    }
+  }
 }
 
 module.exports = { main, identity, isComplete, latestRecords, writeReport, runBatch, readPause };
