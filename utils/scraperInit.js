@@ -1,6 +1,6 @@
 const path = require("path");
 
-function initScraper(scriptName, scraperFolder, stageSuffix) {
+function initScraper(scriptName, scraperFolder, stageSuffix, { namespaceOutput = false } = {}) {
   const inputFile = process.argv[2];
   if (!inputFile) {
     console.error(`Usage: node ${scriptName} <path-to-input.txt> [--headless]`);
@@ -20,6 +20,7 @@ function initScraper(scriptName, scraperFolder, stageSuffix) {
   } else {
     const parsedPath = path.parse(relativePath);
     relativePath = path.join(parsedPath.dir, parsedPath.name);
+    if (namespaceOutput) relativePath = path.join(scraperFolder, relativePath);
     stageSuffix = ".json";
   }
 

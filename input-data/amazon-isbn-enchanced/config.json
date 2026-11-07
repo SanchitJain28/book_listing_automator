@@ -1,0 +1,5 @@
+{
+  "platform": "amazon-isbn-enchanced",
+  "recommended_scraper": "scrapers/amazon-isbn-enchanced/amazon-isbn-enchanced.js"
+}
+

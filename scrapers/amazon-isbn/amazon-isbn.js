@@ -12,11 +12,18 @@ const { setAmazonLocation } = require("../../utils/amazon");
 const { startSpinner, stopSpinner } = require("../../utils/spinner");
 const { scrapeAmazonBook } = require("./scraper");
 
-(async () => {
+async function runAmazonIsbn({
+  name = "amazon-isbn",
+  scrape = scrapeAmazonBook,
+  emptyFields = {},
+  blockResources = true,
+} = {}) {
+  const isStandard = name === "amazon-isbn";
   const { inputFile, isHeadless, outputFilePath } = initScraper(
-    "amazon-isbn.js",
-    "amazon-isbn",
+    `${name}.js`,
+    name,
     ".json",
+    { namespaceOutput: !isStandard },
   );
 
   const isTxt = inputFile.endsWith(".txt");
@@ -30,11 +37,13 @@ const { scrapeAmazonBook } = require("./scraper");
   }
 
   const startIndex = getResumeIndex(outputFilePath, inputItems);
+  if (!isStandard && startIndex === inputItems.length) return;
 
   const profileSuffix = path.basename(inputFile, path.extname(inputFile)).replace(/[^a-zA-Z0-9_-]/g, '_');
-  const profileName = `amazon_isbn_profile_${profileSuffix}`;
+  const profileName = `${name.replace(/-/g, "_")}_profile_${profileSuffix}`;
+  const openBrowser = () => initBrowser(isHeadless, profileName, blockResources);
 
-  let { context, page } = await initBrowser(isHeadless, profileName);
+  let { context, page } = await openBrowser();
 
   // Set delivery location to Gurgaon (122101)
   startSpinner("Checking Amazon delivery location (Gurgaon 122101)...");
@@ -65,7 +74,7 @@ const { scrapeAmazonBook } = require("./scraper");
     if (i > 0 && i % 500 === 0) {
       stopSpinner(`Flushing browser memory after ${i} items...`, "info");
       await context.close();
-      const newBrowser = await initBrowser(isHeadless, profileName);
+      const newBrowser = await openBrowser();
       context = newBrowser.context;
       page = newBrowser.page;
       await setAmazonLocation(page, "122101");
@@ -79,7 +88,7 @@ const { scrapeAmazonBook } = require("./scraper");
     try {
       startSpinner(`Searching Amazon for ISBN ${isbn}...`);
 
-      const result = await scrapeAmazonBook(page, { directUrl, isbn });
+      const result = await scrape(page, { directUrl, isbn });
       const finalData = {
         ...item,
         ...result,
@@ -99,6 +108,7 @@ const { scrapeAmazonBook } = require("./scraper");
 
       const errorData = {
         ...item,
+        ...emptyFields,
         title: "Error",
         found_isbn: "Error",
         isbn_matched: false,
@@ -113,7 +123,7 @@ const { scrapeAmazonBook } = require("./scraper");
       };
       appendResult(outputFilePath, errorData);
 
-      const debugFolder = path.join(__dirname, "..", "..", "debug");
+      const debugFolder = path.join(__dirname, "..", "..", "debug", isStandard ? "" : name);
       if (!fs.existsSync(debugFolder))
         fs.mkdirSync(debugFolder, { recursive: true });
       await page
@@ -128,4 +138,8 @@ const { scrapeAmazonBook } = require("./scraper");
 
   await context.close();
   console.log("\n🎉 ISBN Scraper completed.");
-})();
+}
+
+if (require.main === module) runAmazonIsbn();
+
+module.exports = { runAmazonIsbn };

@@ -40,14 +40,15 @@ async function initBrowser(
     ])
     .catch(() => {});
 
-  if (blockResources) {
+  const blockedTypes = Array.isArray(blockResources)
+    ? blockResources
+    : blockResources ? ["image", "media", "font", "stylesheet"] : [];
+
+  if (blockedTypes.length) {
     await context.route("**/*", (route) => {
-      const requestType = route.request().resourceType();
-      if (["image", "media", "font", "stylesheet"].includes(requestType)) {
-        route.abort();
-      } else {
-        route.continue();
-      }
+      return blockedTypes.includes(route.request().resourceType())
+        ? route.abort()
+        : route.continue();
     });
   }
 

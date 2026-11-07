@@ -8,10 +8,11 @@ const { cleanAndCheckMRP, validateIsbnMatch } = require("./core/validator");
 /**
  * Scrapes a single Amazon book page using all core modules.
  * @param {import('playwright').Page} page
- * @param {Object} params - { directUrl, isbn }
+ * @param {Object} params - { directUrl, isbn, domain }
+ * @param {Function} extract - Product page extractor used after format selection.
  * @returns {Promise<Object>}
  */
-async function scrapeAmazonBook(page, { directUrl, isbn, domain }) {
+async function scrapeAmazonBook(page, { directUrl, isbn, domain }, extract = extractProductData) {
   const selectedDomain = domain || (directUrl ? new URL(directUrl).hostname.replace(/^www\./, '') : 'amazon.in');
   if (selectedDomain === 'amazon.it') {
     return require('./core/italy').scrapeItaly(page, { directUrl, isbn });
@@ -79,7 +80,7 @@ async function scrapeAmazonBook(page, { directUrl, isbn, domain }) {
   }
 
   // 4. Extract Main Product Page Data
-  let scrapedData = await extractProductData(page);
+  const scrapedData = await extract(page);
 
   // 5. Fallback to "See All Buying Options" side drawer if needed
   if (scrapedData.price === "N/A" || scrapedData.hasUsedOptions) {
