@@ -7,7 +7,7 @@ import VpsLogs, { VpsActivity } from './VpsLogs';
 import { initialVps, useVpsWorkspace } from './lib/useVpsWorkspace';
 import { vpsStateStyle, vpsStopStyle, vpsResumeStyle } from './lib/vpsStyles';
 
-const scrapers = ['atlanticbooks','bookchor','bookswagon','flipkart','mypustak','ompublication','sapnaonline','abebooks','abebooks-co-uk','abebooks-google','walmart','amazon-in','amazon-com','amazon-uk','amazon-it'];
+const scrapers = ['atlanticbooks','bookchor','bookswagon','flipkart','mypustak','ompublication','sapnaonline','abebooks','abebooks-co-uk','abebooks-google','walmart','amazon-in','amazon-isbn-enchanced','amazon-com','amazon-uk','amazon-it'];
 const gib = value => value == null ? '—' : `${(value / 1024 ** 3).toFixed(1)} GiB`;
 async function api(body) {
   const response=await fetch('/api/vps-manager',body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {});

@@ -6,8 +6,16 @@ STATE = Path.home() / '.book-listing-dashboard'
 SCRIPTS = {name: 'scrapers/{0}/{0}-isbn.js'.format(name) for name in ['atlanticbooks','bookchor','bookswagon','flipkart','mypustak','ompublication','sapnaonline','abebooks','abebooks-co-uk','walmart']}
 SCRIPTS.update({'amazon-in':'scrapers/amazon-isbn/amazon-isbn.js','amazon-com':'scrapers/amazon-us-isbn/amazon-us-isbn.js','amazon-uk':'scrapers/amazon-uk-isbn/amazon-uk-isbn.js','amazon-it':'scrapers/amazon-it-isbn/amazon-it-isbn.js'})
 SCRIPTS['abebooks-google']='scrapers/abebooks-google/abebooks-google-isbn.js'
-LEGACY = {'abebooks','amazon-in'}
+ENHANCED_AMAZON = 'amazon-isbn-enchanced'
+SCRIPTS[ENHANCED_AMAZON] = f'scrapers/{ENHANCED_AMAZON}/{ENHANCED_AMAZON}.js'
+LEGACY = {'abebooks','amazon-in',ENHANCED_AMAZON}
 SHARED = 'scripts/run-shared-scrapers.js'
+
+def default_json_output(scraper, input_path):
+    folder = Path('output')
+    if scraper == ENHANCED_AMAZON:
+        folder /= ENHANCED_AMAZON
+    return str(folder / Path(input_path).relative_to('input-data').with_suffix('.json'))
 
 def run(*args, check=True, timeout=30):
     p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
@@ -134,7 +142,7 @@ def process_spec(executable,cwd,args):
         if not shared:
             if not output and name=='walmart': output=f'output/walmart/{Path(rel).parent.name}-{Path(rel).stem}.jsonl'
             elif not output and name=='abebooks-google': output=f'output/abebooks-google/{Path(rel).parent.name if Path(rel).stem=="input" else Path(rel).stem}/results.jsonl'
-            elif name in LEGACY or not output: output='output/'+str(Path(rel).relative_to('input-data').with_suffix('.json'))
+            elif name in LEGACY or not output: output=default_json_output(name,rel)
             safe_path(output,'output')
         command=[executable,script,rel]+tail
         return {'command':command,'command_key':hashlib.sha256(json.dumps(command).encode()).hexdigest(),'input':rel,
@@ -582,7 +590,7 @@ def launch(req):
     if not script.is_file(): raise ValueError('Scraper is not present on this VPS. Sync the repository first.')
     digest=hashlib.sha256(inp.read_bytes()).hexdigest()
     ident=hashlib.sha256((name+'\0'+rel).encode()).hexdigest()[:16]
-    if name in LEGACY: output='output/'+str(Path(rel).relative_to('input-data').with_suffix('.json'))
+    if name in LEGACY: output=default_json_output(name,rel)
     else: output=f'output/dashboard/{name}/{ident}/results.jsonl'
     out=safe_path(output,'output'); sessions=live_sessions()
     for j in jobs():

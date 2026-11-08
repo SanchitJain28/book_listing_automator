@@ -59,6 +59,26 @@ class ManagerTests(unittest.TestCase):
         data=manager['output_stats'](f)
         self.assertEqual((data['processed'],data['matched'],data['blocked'],data['errors']),(3,1,1,1))
 
+    def test_enhanced_amazon_job_is_running_with_namespaced_output(self):
+        name = 'amazon-isbn-enchanced'
+        script = f'scrapers/{name}/{name}.js'
+        input_path = f'input-data/{name}/isbns/chunk-vps3.txt'
+        output_path = f'output/{name}/{name}/isbns/chunk-vps3.json'
+        for relative, contents in (
+            (script, '// fixture'),
+            (input_path, '9781234567890\n9781234567891\n'),
+            (output_path, '{"isbn_matched":true}\n'),
+        ):
+            file = self.root / relative
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text(contents)
+        identity = {'pid': 123, 'start': '456', 'state': 'S', 'executable': '/usr/bin/node', 'parent': 1}
+        spec = manager['process_spec']('/usr/bin/node', str(self.root), ['node', script, input_path, '--headless'])
+        with patch.dict(manager, {'known_processes': lambda: [(identity, spec)], 'live_record': lambda record: identity}):
+            job, = manager['discover_jobs']()
+        self.assertEqual((job['scraper'], job['state'], job['output']), (name, 'Running', output_path))
+        self.assertEqual((job['processed'], job['total']), (1, 2))
+
     def test_only_exact_project_node_scrapers_can_be_controlled(self):
         args=['node','scrapers/flipkart/flipkart-isbn.js','input-data/sample.txt','--output','output/flipkart/results.jsonl','--headless']
         spec=manager['process_spec']('/usr/bin/node',str(self.root),args)
