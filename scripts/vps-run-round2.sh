@@ -20,13 +20,15 @@ fi
 LINE_COUNT=$(wc -l < "$CHUNK_FILE" | tr -d ' ')
 echo "📄 Found chunk for VPS $VPS_ID: $CHUNK_FILE ($LINE_COUNT ISBNs)"
 
+bash scripts/run-amazon-india-headed.sh --check
+
 echo "🛑 Stopping any existing scrape_round2 tmux sessions and processes..."
 tmux kill-session -t scrape_round2 2>/dev/null || true
 pkill -f "amazon-isbn" 2>/dev/null || true
 sleep 1
 
 echo "🚀 Starting scrape_round2 session..."
-tmux new-session -d -s scrape_round2 -c "$PROJECT_DIR" "node utils/watcher.js scrapers/amazon-isbn/amazon-isbn.js $CHUNK_FILE --headless"
+tmux new-session -d -s scrape_round2 -c "$PROJECT_DIR" bash scripts/run-amazon-india-headed.sh "$CHUNK_FILE"
 
 sleep 3
 

@@ -143,7 +143,10 @@ function startScraper() {
     const internationalStop = [2, 3].includes(code) && !signal &&
       ["amazon-us-isbn.js", "amazon-uk-isbn.js", "amazon-it-isbn.js"].includes(path.basename(targetScript));
 
-    if (internationalStop) {
+    const indiaPause = code === 3 && !signal &&
+      ["amazon-isbn.js", "amazon-isbn-enchanced.js"].includes(path.basename(targetScript));
+
+    if (internationalStop || indiaPause) {
       if (code === 2) console.log("\n[Watcher] Batch finished with unverified ISBNs. Review its report; automatic retries are stopped.\n");
       if (code === 3) console.log("[Watcher] Amazon circuit paused. Resume manually after the saved cooldown; no automatic restart.");
       process.exit(code);

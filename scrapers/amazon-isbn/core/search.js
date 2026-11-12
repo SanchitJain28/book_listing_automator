@@ -1,25 +1,37 @@
-const { checkDogPage } = require("../../../utils/amazon");
+const { navigateAmazon } = require("./navigation");
 
 /**
- * Searches Amazon for an ISBN and navigates to the first product (/dp/) result.
+ * Searches Amazon for an ISBN and returns the first product (/dp/) link.
  * @param {import('playwright').Page} page
  * @param {string} isbn
- * @returns {Promise<{ found: boolean, productUrl: string|null }>}
+ * @returns {Promise<{ found: boolean, productUrl: string|null, block?: { reason: string, status: number|null, retryAfter?: string } }>}
  */
 async function searchAmazonForIsbn(page, isbn, domain = "amazon.in") {
   if (!["amazon.in", "amazon.com", "amazon.co.uk"].includes(domain)) throw new Error("Unsupported Amazon domain");
   const searchUrl = `https://www.${domain}/s?k=${encodeURIComponent(isbn)}`;
-
-  await page.goto(searchUrl, {
-    timeout: 15000,
-    waitUntil: "domcontentloaded",
-  });
-
-  let isDogPage = await checkDogPage(page);
-  if (isDogPage) {
-    await page.waitForTimeout(5000);
-    await page.reload({ waitUntil: "domcontentloaded" });
+  let submitSearch;
+  if (new URL(page.url()).hostname.replace(/^www\./, "") === domain) {
+    const searchBox = page.locator("#twotabsearchtextbox");
+    const searchButton = page.locator("#nav-search-submit-button");
+    if (await searchBox.isVisible() && await searchButton.isVisible()) {
+      submitSearch = async (options) => {
+        await searchBox.fill(isbn, { timeout: options.timeout });
+        const [response] = await Promise.all([
+          page.waitForNavigation(options),
+          searchButton.click({ timeout: options.timeout }),
+        ]);
+        return response;
+      };
+    }
   }
+
+  const block = await navigateAmazon(page, searchUrl, {
+    timeout: 15000,
+    readySelector: ".s-search-results, .s-no-results-result",
+    readyTimeout: 3000,
+    submitSearch,
+  });
+  if (block) return { found: false, productUrl: null, block };
 
   // Get first search result link with /dp/
   const firstResult = await page.$(

@@ -1,5 +1,5 @@
 """Dashboard VPS operations. Invoked over SSH with a validated JSON request."""
-import base64, fcntl, hashlib, json, os, re, shlex, signal, subprocess, sys, time
+import base64, fcntl, hashlib, json, os, re, shlex, shutil, signal, subprocess, sys, time
 from pathlib import Path
 ROOT = Path('/root/book_listing_automator')
 STATE = Path.home() / '.book-listing-dashboard'
@@ -7,7 +7,9 @@ SCRIPTS = {name: 'scrapers/{0}/{0}-isbn.js'.format(name) for name in ['atlanticb
 SCRIPTS.update({'amazon-in':'scrapers/amazon-isbn/amazon-isbn.js','amazon-com':'scrapers/amazon-us-isbn/amazon-us-isbn.js','amazon-uk':'scrapers/amazon-uk-isbn/amazon-uk-isbn.js','amazon-it':'scrapers/amazon-it-isbn/amazon-it-isbn.js'})
 SCRIPTS['abebooks-google']='scrapers/abebooks-google/abebooks-google-isbn.js'
 ENHANCED_AMAZON = 'amazon-isbn-enchanced'
+KEEP_RESOURCES = '--no-blocked-resources'
 SCRIPTS[ENHANCED_AMAZON] = f'scrapers/{ENHANCED_AMAZON}/{ENHANCED_AMAZON}.js'
+HEADED_AMAZON = {'amazon-in', ENHANCED_AMAZON}
 LEGACY = {'abebooks','amazon-in',ENHANCED_AMAZON}
 SHARED = 'scripts/run-shared-scrapers.js'
 
@@ -127,6 +129,8 @@ def process_spec(executable,cwd,args):
         while index<len(tail):
             flag=tail[index]
             if flag in ('--headless','--slow','--retry-failed','--retry-zero-links','--no-clearance-reuse'): flags[flag]=True
+            elif flag=='--chrome' and script in {SCRIPTS[name] for name in HEADED_AMAZON}: flags[flag]=True
+            elif flag==KEEP_RESOURCES and script==SCRIPTS[ENHANCED_AMAZON]: flags[flag]=True
             elif flag in ('--output','--platforms','--concurrency','--browsers','--batch-size','--resources','--output-subdir') and index+1<len(tail) and not tail[index+1].startswith('--'):
                 index+=1;flags[flag]=tail[index]
             else: return None
@@ -207,7 +211,12 @@ def discover_groups():
         bound.add(existing['id'])
         if existing.get('pid')!=identity['pid'] or existing.get('start')!=identity['start']:
             existing.update(pid=identity['pid'],start=identity['start']);save_record(existing)
-    return records
+    # A corrected enhanced run replaces the old run at the same output path.
+    def enhanced_job_key(record):
+        return record.get('input'),record.get('input_sha256'),record.get('output')
+    corrected={enhanced_job_key(r) for r in records if r.get('scraper')==ENHANCED_AMAZON and KEEP_RESOURCES in r.get('command',[])}
+    return [r for r in records if r.get('scraper')!=ENHANCED_AMAZON or r['id'] in bound
+            or KEEP_RESOURCES in r.get('command',[]) or enhanced_job_key(r) not in corrected]
 
 def live_record(record):
     identity=process_identity(record.get('pid',0))
@@ -270,7 +279,7 @@ def control_record(identifier):
     inp=safe_path(job['input'],'input-data');safe_path(job['output'],'output')
     if hashlib.sha256(inp.read_bytes()).hexdigest()!=job.get('input_sha256'): raise ValueError('Input changed since this job was created.')
     executable=run('which','node')
-    command=[executable,SCRIPTS[job['scraper']],job['input'],'--headless']
+    command=[executable,SCRIPTS[job['scraper']],job['input'],*job.get('browser_flags',['--headless'])]
     if job['scraper'] not in LEGACY: command+=['--output',job['output']]
     spec=process_spec(executable,str(ROOT),command)
     if not spec or spec['output']!=job['output']: raise ValueError('Saved job does not match the scraper output path.')
@@ -342,6 +351,11 @@ def validate_resume(record,ignore_identity=None,skip_cooldown=False):
 
 def build_launcher(record,command,launcher,exitfile,attempt):
     """Each attempt owns a bounded console log; process command identity stays unchanged."""
+    if '--chrome' in command[3:] and '--headless' not in command[3:]:
+        for dependency in ('xvfb-run','xauth'):
+            if not shutil.which(dependency): raise ValueError('Headed Amazon scraping requires '+dependency+'.')
+        if not os.access('/opt/google/chrome/chrome',os.X_OK): raise ValueError('Headed Amazon scraping requires Google Chrome Stable. Install it with npx playwright install chrome.')
+        command=['xvfb-run','-a',*command]
     if not globals().get('RUNTIME_SOURCE'):
         log=STATE/(record['id']+'.log')
         launcher.write_text('#!/bin/sh\ncd '+shlex.quote(str(ROOT))+' || exit 1\n'+shlex.join(command)+' >> '+shlex.quote(str(log))+' 2>&1\nresult=$?\nprintf "%s\\n" "$result" > '+shlex.quote(str(exitfile))+'\nexit "$result"\n')
@@ -606,9 +620,10 @@ def launch(req):
     if not total: raise ValueError('Input file is empty.')
     STATE.mkdir(mode=0o700,parents=True,exist_ok=True); out.parent.mkdir(parents=True,exist_ok=True)
     job_id=f'{int(time.time())}-{ident}'; session='dashboard_'+job_id.replace('-','_'); log=STATE/(job_id+'.log'); exitfile=STATE/(job_id+'.exit'); launcher=STATE/(job_id+'.sh')
-    command=['node',SCRIPTS[name],rel,'--headless']
+    browser_flags=['--chrome'] if name in HEADED_AMAZON else ['--headless']
+    command=['node',SCRIPTS[name],rel,*browser_flags]
     if name not in LEGACY: command+=['--output',output]
-    job={'id':job_id,'scraper':name,'input':rel,'input_sha256':digest,'total':total,'output':output,'session':session,'started_at':int(time.time())}
+    job={'id':job_id,'scraper':name,'input':rel,'input_sha256':digest,'total':total,'output':output,'session':session,'started_at':int(time.time()),'browser_flags':browser_flags}
     build_launcher(job,command,launcher,exitfile,str(time.time_ns()))
     record=STATE/(job_id+'.json'); record.write_text(json.dumps(job)); record.chmod(0o600)
     try: run('tmux','new-session','-d','-s',session,'bash '+shlex.quote(str(launcher)))

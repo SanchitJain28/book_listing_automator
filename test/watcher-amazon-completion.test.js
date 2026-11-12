@@ -27,6 +27,11 @@ for (const script of ['amazon-us-isbn.js', 'amazon-uk-isbn.js', 'amazon-it-isbn.
     assert.match(checkCompletion(script, 2), /automatic retries are stopped/);
   });
 }
+for (const script of ['amazon-isbn.js', 'amazon-isbn-enchanced.js']) {
+  test(`${script}: circuit pause stops automatic restarts`, () => {
+    assert.match(checkCompletion(script, 3), /no automatic restart/);
+  });
+}
 test('successful completion still exits normally', () => {
   assert.match(checkCompletion('amazon-us-isbn.js', 0), /completed all items successfully/);
 });

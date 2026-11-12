@@ -3,11 +3,11 @@ const { scrapeAmazonBook, emptyBookDetails } = require("./scraper");
 
 const blockResources = process.argv.slice(3).includes("--no-blocked-resources")
   ? false
-  : ["stylesheet", "image"];
+  : ["media"];
 
 runAmazonIsbn({
   name: "amazon-isbn-enchanced",
   scrape: scrapeAmazonBook,
   emptyFields: emptyBookDetails,
   blockResources,
-});
+}).then(code => { process.exitCode = code ?? 0; });

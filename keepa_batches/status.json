@@ -1,9 +1,9 @@
 {
   "state": "running",
-  "pid": 6248,
+  "pid": 40106,
   "currentBatch": "keepa_zero_reviews_1200_1600",
   "completed": [
     "keepa_reviews21plus_under1200"
   ],
-  "updatedAt": "2026-11-05T10:12:11.883Z"
+  "updatedAt": "2026-11-11T17:08:23.777Z"
 }

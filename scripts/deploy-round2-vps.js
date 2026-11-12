@@ -33,11 +33,12 @@ for (const vps of vpsList) {
     "git pull origin main",
     `ls -lh ${chunkRelativePath}`,
     `wc -l ${chunkRelativePath}`,
+    "bash scripts/run-amazon-india-headed.sh --check",
     "tmux kill-session -t scrape_round2 2>/dev/null || true",
     "tmux kill-session -t scrape 2>/dev/null || true",
     "pkill -f amazon-isbn 2>/dev/null || true",
     "sleep 1",
-    `tmux new-session -d -s scrape_round2 -c /root/book_listing_automator "node utils/watcher.js scrapers/amazon-isbn/amazon-isbn.js ${chunkRelativePath} --headless"`,
+    `tmux new-session -d -s scrape_round2 -c /root/book_listing_automator bash scripts/run-amazon-india-headed.sh ${chunkRelativePath}`,
     "sleep 2",
     "tmux ls",
     "pgrep -a node || true"

@@ -8,20 +8,23 @@ async function initBrowser(
   headless = true,
   profileName = "amazon_search_profile",
   blockResources = true,
+  { nativeBrowser = false, channel } = {},
 ) {
-  const userDataDir = path.join(__dirname, "..", "..", "..", profileName);
-  const context = await chromium.launchPersistentContext(userDataDir, {
+  const userDataDir = profileName === null ? "" : path.join(__dirname, "..", "..", "..", profileName);
+  const browser = nativeBrowser ? require("playwright").chromium : chromium;
+  const context = await browser.launchPersistentContext(userDataDir, {
     headless,
+    ...(channel && { channel }),
     args: [
       "--disable-dev-shm-usage",
       "--no-sandbox",
       "--disable-setuid-sandbox",
-      "--disable-blink-features=AutomationControlled",
-      "--disable-gpu",
+      ...(!nativeBrowser ? ["--disable-blink-features=AutomationControlled", "--disable-gpu"] : []),
       "--lang=en-IN,en-GB,en-US",
     ],
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    ...(!nativeBrowser && {
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    }),
     viewport: { width: 1440, height: 900 },
     locale: "en-IN",
     timezoneId: "Asia/Kolkata",

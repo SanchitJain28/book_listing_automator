@@ -1,9 +1,37 @@
-const { checkDogPage } = require("../../utils/amazon");
 const { searchAmazonForIsbn } = require("./core/search");
+const { navigateAmazon } = require("./core/navigation");
 const { getCheaperPhysicalFormat } = require("./core/swatches");
 const { extractProductData } = require("./core/productExtractor");
 const { extractBuyingOptionsDrawer } = require("./core/buyingOptions");
 const { cleanAndCheckMRP, validateIsbnMatch } = require("./core/validator");
+
+function emptyResult(isbn, url, block, stage) {
+  return {
+    searched_isbn: isbn,
+    title: block ? null : "N/A",
+    found_isbn: "N/A",
+    isbn_matched: false,
+    price: block ? null : "N/A",
+    mrp: "N/A",
+    delivery: "N/A",
+    seller: "N/A",
+    used_available: "No Used Options",
+    reviews_count: "0",
+    publisher: "N/A",
+    publication_date: "N/A",
+    found: false,
+    in_stock: block ? null : false,
+    stock_status: block ? "Blocked by Amazon" : "Not Found",
+    url,
+    ...(block && {
+      error_code: "blocked",
+      error: block.reason,
+      http_status: block.status,
+      block_stage: stage,
+      ...(block.retryAfter && { retry_after: block.retryAfter }),
+    }),
+  };
+}
 
 /**
  * Scrapes a single Amazon book page using all core modules.
@@ -33,50 +61,28 @@ async function scrapeAmazonBook(page, { directUrl, isbn, domain }, extract = ext
   if (!targetUrl && isbn) {
     const searchRes = await searchAmazonForIsbn(page, isbn);
     if (!searchRes.found || !searchRes.productUrl) {
-      return {
-        searched_isbn: isbn,
-        title: "N/A",
-        found_isbn: "N/A",
-        isbn_matched: false,
-        price: "N/A",
-        mrp: "N/A",
-        delivery: "N/A",
-        seller: "N/A",
-        used_available: "No Used Options",
-        reviews_count: "0",
-        publisher: "N/A",
-        publication_date: "N/A",
-        found: false,
-        in_stock: false,
-        stock_status: "Not Found",
-        url: page.url(),
-      };
+      return emptyResult(isbn, page.url(), searchRes.block, "search");
     }
     targetUrl = searchRes.productUrl;
   }
 
   // 2. Navigate to product page
-  await page.goto(targetUrl, {
+  const productBlock = await navigateAmazon(page, targetUrl, {
     timeout: 20000,
-    waitUntil: "domcontentloaded",
+    readySelector: "#productTitle",
+    readyTimeout: 4000,
   });
-
-  let isDogPage = await checkDogPage(page);
-  if (isDogPage) {
-    await page.waitForTimeout(10000);
-    await page.reload({ waitUntil: "domcontentloaded" });
-  }
-
-  await page.waitForSelector("#productTitle", { timeout: 4000 }).catch(() => {});
+  if (productBlock) return emptyResult(isbn, page.url(), productBlock, "product");
 
   // 3. Smart Format Switch: Check if cheaper physical format swatch exists
   const cheaperTarget = await getCheaperPhysicalFormat(page);
   if (cheaperTarget && cheaperTarget.url) {
-    await page.goto(cheaperTarget.url, {
+    const formatBlock = await navigateAmazon(page, cheaperTarget.url, {
       timeout: 15000,
-      waitUntil: "domcontentloaded",
+      readySelector: "#productTitle",
+      readyTimeout: 3000,
     });
-    await page.waitForSelector("#productTitle", { timeout: 3000 }).catch(() => {});
+    if (formatBlock) return emptyResult(isbn, page.url(), formatBlock, "format");
   }
 
   // 4. Extract Main Product Page Data

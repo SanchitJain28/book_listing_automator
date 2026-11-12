@@ -21,15 +21,16 @@ function cleanAndCheckMRP(priceStr, mrpStr) {
   return mrpStr;
 }
 
-async function setAmazonLocation(page, pincode = "122101") {
+async function setAmazonLocation(page, pincode = "122101", { startupDelayMs = 0 } = {}) {
   try {
     const url = page.url();
-    if (!url.includes("amazon.in")) {
+    if (startupDelayMs > 0 || !url.includes("amazon.in")) {
       await page.goto("https://www.amazon.in", {
         timeout: 30000,
         waitUntil: "domcontentloaded",
       });
     }
+    if (startupDelayMs > 0) await page.waitForTimeout(startupDelayMs);
 
     // Check if location is already set to the desired pincode
     const currentLocation = await page

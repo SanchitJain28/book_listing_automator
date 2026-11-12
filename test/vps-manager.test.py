@@ -73,11 +73,21 @@ class ManagerTests(unittest.TestCase):
             file.parent.mkdir(parents=True, exist_ok=True)
             file.write_text(contents)
         identity = {'pid': 123, 'start': '456', 'state': 'S', 'executable': '/usr/bin/node', 'parent': 1}
-        spec = manager['process_spec']('/usr/bin/node', str(self.root), ['node', script, input_path, '--headless'])
-        with patch.dict(manager, {'known_processes': lambda: [(identity, spec)], 'live_record': lambda record: identity}):
+        old_spec = manager['process_spec']('/usr/bin/node', str(self.root), ['node', script, input_path, '--headless'])
+        with patch.dict(manager, {'known_processes': lambda: [(identity, old_spec)], 'live_record': lambda record: identity}):
+            old_job, = manager['discover_jobs']()
+        flags = ['--no-blocked-resources', '--headless']
+        spec = manager['process_spec']('/usr/bin/node', str(self.root), ['node', script, input_path, *flags])
+        self.assertEqual(spec['command'][-2:], flags)
+        replacement = {**identity, 'pid': 124, 'start': '457'}
+        with patch.dict(manager, {'known_processes': lambda: [(replacement, spec)], 'live_record': lambda record: replacement if record['pid']==124 else None}):
             job, = manager['discover_jobs']()
         self.assertEqual((job['scraper'], job['state'], job['output']), (name, 'Running', output_path))
         self.assertEqual((job['processed'], job['total']), (1, 2))
+        self.assertNotEqual(old_job['control_id'], job['control_id'])
+        with patch.dict(manager, {'known_processes': lambda: [], 'live_record': lambda record: None}):
+            stopped_job, = manager['discover_jobs']()
+        self.assertEqual((stopped_job['control_id'], stopped_job['can_resume']), (job['control_id'], True))
 
     def test_only_exact_project_node_scrapers_can_be_controlled(self):
         args=['node','scrapers/flipkart/flipkart-isbn.js','input-data/sample.txt','--output','output/flipkart/results.jsonl','--headless']
@@ -87,6 +97,7 @@ class ManagerTests(unittest.TestCase):
         self.assertIsNone(manager['process_spec']('/usr/bin/node','/tmp',args))
         self.assertIsNone(manager['process_spec']('/usr/bin/node',str(self.root),['node','-e','input-data/sample.txt']))
         self.assertIsNone(manager['process_spec']('/usr/bin/node',str(self.root),args+['--eval','bad']))
+        self.assertIsNone(manager['process_spec']('/usr/bin/node',str(self.root),args+['--no-blocked-resources']))
         self.assertIsNone(manager['process_spec']('/usr/bin/node',str(self.root),args[:3]+['--output','/etc/native.json']))
         for name,expected in [('walmart','output/walmart/input-data-sample.jsonl'),('abebooks-google','output/abebooks-google/sample/results.jsonl')]:
             folder=self.root/'scrapers'/name;folder.mkdir();(folder/(name+'-isbn.js')).write_text('// fixture')
@@ -239,6 +250,21 @@ class MonitoringTests(unittest.TestCase):
 class LauncherRegressionTests(unittest.TestCase):
     setUp=ManagerTests.setUp
     tearDown=ManagerTests.tearDown
+
+    def test_amazon_india_headed_launch_preserves_the_node_command_for_resume(self):
+        name='amazon-in'; script=manager['SCRIPTS'][name]
+        (self.root/script).parent.mkdir(parents=True); (self.root/script).write_text('// fixture')
+        req={'scraper':name,'input':'input-data/sample.txt','commit':'a'*40}
+        with patch.dict(manager, {'run':lambda *args,**kwargs:'/usr/bin/node' if args==('which','node') else '',
+                                  'discover_groups':lambda:[], 'live_sessions':lambda:set(),
+                                  'git_state':lambda:{'commit':'a'*40,'dirty':False}}):
+            with patch.object(manager['shutil'],'which',side_effect=lambda executable:'/usr/bin/'+executable), \
+                 patch.object(manager['os'],'access',return_value=True):
+                job=manager['launch'](req)
+            record=manager['control_record'](job['id'])
+        launcher=(self.state/(job['id']+'.sh')).read_text()
+        self.assertIn('xvfb-run -a node '+script+' '+req['input']+' --chrome',launcher)
+        self.assertEqual(record['command'],['/usr/bin/node',script,req['input'],'--chrome'])
 
     def test_shared_resume_with_null_scraper_and_runtime_logging(self):
         args=['node','scripts/run-shared-scrapers.js','input-data/sample.txt','--headless','--concurrency','10']
