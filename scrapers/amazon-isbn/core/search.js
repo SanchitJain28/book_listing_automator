@@ -1,4 +1,5 @@
 const { navigateAmazon } = require("./navigation");
+const { closeBuyingOptionsDrawer } = require("./buyingOptions");
 
 /**
  * Searches Amazon for an ISBN and returns the first product (/dp/) link.
@@ -10,10 +11,13 @@ async function searchAmazonForIsbn(page, isbn, domain = "amazon.in") {
   if (!["amazon.in", "amazon.com", "amazon.co.uk"].includes(domain)) throw new Error("Unsupported Amazon domain");
   const searchUrl = `https://www.${domain}/s?k=${encodeURIComponent(isbn)}`;
   let submitSearch;
-  if (new URL(page.url()).hostname.replace(/^www\./, "") === domain) {
+  if (new URL(page.url()).hostname.replace(/^www\./, "") === domain &&
+      await closeBuyingOptionsDrawer(page)) {
     const searchBox = page.locator("#twotabsearchtextbox");
     const searchButton = page.locator("#nav-search-submit-button");
-    if (await searchBox.isVisible() && await searchButton.isVisible()) {
+    const canSubmit = await searchBox.isVisible() && await searchButton.isVisible()
+      && await searchButton.click({ trial: true, timeout: 1050 }).then(() => true, () => false);
+    if (canSubmit) {
       submitSearch = async (options) => {
         await searchBox.fill(isbn, { timeout: options.timeout });
         const [response] = await Promise.all([
@@ -26,9 +30,9 @@ async function searchAmazonForIsbn(page, isbn, domain = "amazon.in") {
   }
 
   const block = await navigateAmazon(page, searchUrl, {
-    timeout: 15000,
+    timeout: 10500,
     readySelector: ".s-search-results, .s-no-results-result",
-    readyTimeout: 3000,
+    readyTimeout: 2100,
     submitSearch,
   });
   if (block) return { found: false, productUrl: null, block };

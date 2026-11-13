@@ -1,3 +1,25 @@
+const DRAWER_CLOSE_SELECTOR = '#aod-close .aod-close-button, #aod-close [aria-label="aod-close"]';
+const DRAWER_SELECTOR = "#aod-container, #aod-close, #all-offers-display-scroller";
+
+async function closeBuyingOptionsDrawer(page) {
+  const drawer = page.locator(DRAWER_SELECTOR).filter({ visible: true });
+  if (await drawer.count() === 0) return true;
+
+  const closeButton = page.locator(DRAWER_CLOSE_SELECTOR).filter({ visible: true }).first();
+  try {
+    if (await closeButton.isVisible()) {
+      await closeButton.click({ timeout: 700 });
+    } else {
+      await page.keyboard.press("Escape");
+    }
+    await drawer.first().waitFor({ state: "hidden", timeout: 1050 });
+    return true;
+  } catch {
+    // Search can navigate directly if Amazon leaves the overlay in place.
+    return false;
+  }
+}
+
 /**
  * Clicks the "See All Buying Options" button if available and extracts marketplace prices, MRP, and used options from #aod-offer-list.
  * @param {import('playwright').Page} page
@@ -16,7 +38,7 @@ async function extractBuyingOptionsDrawer(page) {
         );
         if (el1) el1.click();
       });
-      await page.waitForTimeout(600);
+      await page.waitForTimeout(420);
       await page.evaluate(() => {
         const el2 = document.querySelector(
           ".mm-grid-aod-popover-format-entry, #mediaMatrixGridAODPopoverEntries a, [data-action='show-all-offers-display'] a",
@@ -25,7 +47,7 @@ async function extractBuyingOptionsDrawer(page) {
       });
       await page
         .waitForSelector("#aod-offer-list #aod-offer, #aod-offer", {
-          timeout: 3500,
+          timeout: 2450,
         })
         .catch(() => {});
     } catch (e) {}
@@ -161,7 +183,9 @@ async function extractBuyingOptionsDrawer(page) {
     });
   } catch (e) {
     return null;
+  } finally {
+    if (seeAllBtn) await closeBuyingOptionsDrawer(page).catch(() => false);
   }
 }
 
-module.exports = { extractBuyingOptionsDrawer };
+module.exports = { closeBuyingOptionsDrawer, extractBuyingOptionsDrawer };

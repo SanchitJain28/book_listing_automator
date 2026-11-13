@@ -18,13 +18,18 @@ function colIndexToLetter(idx) {
   return letter;
 }
 
+const KNOWN_SPREADSHEET_IDS = [
+  "15MqxbfFEkS-6ZPlw-sLGBPY2CcfMxbePPglYksVSgC8",
+  "1jNGgr6d5mOZzHTpHiVlEyVBSACBdwL81VYNcUrSSOZY",
+];
+
 async function generateConfig(
   urlOrId,
   tabName,
   customCompareColName = "Amazon Price (INR)",
   outputFile = "sheet_config.json",
 ) {
-  const spreadsheetId = getSpreadsheetId(urlOrId);
+  let spreadsheetId = getSpreadsheetId(urlOrId);
   console.log(
     `📥 Reading Google Sheet: ${spreadsheetId} [Tab: ${tabName}] via API...`,
   );
@@ -35,10 +40,33 @@ async function generateConfig(
   });
   const sheets = google.sheets({ version: "v4", auth });
 
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `'${tabName}'!A1:Z`,
-  });
+  let res;
+  try {
+    res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${tabName}'!A1:Z`,
+    });
+  } catch (err) {
+    const fallbackIds = KNOWN_SPREADSHEET_IDS.filter(
+      (id) => id !== spreadsheetId,
+    );
+    let loaded = false;
+    for (const candidateId of fallbackIds) {
+      try {
+        console.log(
+          `   🔄 Tab not found in ${spreadsheetId}, trying spreadsheet ${candidateId}...`,
+        );
+        res = await sheets.spreadsheets.values.get({
+          spreadsheetId: candidateId,
+          range: `'${tabName}'!A1:Z`,
+        });
+        spreadsheetId = candidateId;
+        loaded = true;
+        break;
+      } catch (e) {}
+    }
+    if (!loaded) throw err;
+  }
 
   const rows = res.data.values || [];
   if (rows.length === 0) {
@@ -224,6 +252,7 @@ async function generateConfig(
   const yellowItems = [];
   const redItems = [];
   let latestCursor = null;
+  let latestReverseCursor = null;
 
   for (let i = headerRowIdx + 1; i < rows.length; i++) {
     const row = rows[i] || [];
@@ -278,16 +307,34 @@ async function generateConfig(
       rowColor,
     };
 
-    if (existingCursor) {
+    if (
+      existingCursor &&
+      (existingCursor.toLowerCase().includes("cursor") ||
+        existingCursor.toLowerCase().includes("curosr") ||
+        /^r?\d+$/i.test(existingCursor.trim()))
+    ) {
+      const isRevCursor =
+        /\br\s*\d+/i.test(existingCursor) ||
+        existingCursor.toLowerCase().includes("reverse");
       const matchNum = existingCursor.match(/(\d+)/);
       const batchNum = matchNum ? parseInt(matchNum[1], 10) : 1;
-      if (!latestCursor || batchNum >= latestCursor.batchNumber) {
-        latestCursor = {
-          batchNumber: batchNum,
-          sheetRowNumber: i + 1,
-          isbn: cleanIsbn,
-          cursorText: existingCursor,
-        };
+      const cursorObj = {
+        batchNumber: batchNum,
+        sheetRowNumber: i + 1,
+        isbn: cleanIsbn,
+        cursorText: existingCursor,
+      };
+      if (isRevCursor) {
+        if (
+          !latestReverseCursor ||
+          batchNum >= latestReverseCursor.batchNumber
+        ) {
+          latestReverseCursor = cursorObj;
+        }
+      } else {
+        if (!latestCursor || batchNum >= latestCursor.batchNumber) {
+          latestCursor = cursorObj;
+        }
       }
     }
 
@@ -303,6 +350,44 @@ async function generateConfig(
   // GROUPING RULE: Whites first, then Yellows, then Reds!
   const sortedItems = [...whiteItems, ...yellowItems, ...redItems];
 
+  // If this sheet has no sell/margin column (e.g. 34_4-2_13NOV_ALLAM_RISZNREMAINIG in 15MqxbfFEkS-6ZPlw-sLGBPY2CcfMxbePPglYksVSgC8),
+  // enrich sellPrice from equivalent tab ZB344-2_13NOV_ALLAMZNREMAINING (1jNGgr6d5mOZzHTpHiVlEyVBSACBdwL81VYNcUrSSOZY)
+  if (sellIdx === -1) {
+    const refConfigPath = path.join(
+      __dirname,
+      "..",
+      "sheet_configs",
+      "ZB344-2_13NOV_ALLAMZNREMAINING.json",
+    );
+    if (fs.existsSync(refConfigPath)) {
+      try {
+        const refConfig = JSON.parse(fs.readFileSync(refConfigPath, "utf8"));
+        const refByIsbn = new Map();
+        (refConfig.items || []).forEach((it) => {
+          if (it.isbn && it.sellPrice > 0) {
+            refByIsbn.set(it.isbn, it.sellPrice);
+          }
+        });
+        let enrichedCount = 0;
+        sortedItems.forEach((it, idx) => {
+          const refItem = (refConfig.items || [])[idx];
+          if (refItem && refItem.isbn === it.isbn && refItem.sellPrice > 0) {
+            it.sellPrice = refItem.sellPrice;
+            enrichedCount++;
+          } else if (refByIsbn.has(it.isbn)) {
+            it.sellPrice = refByIsbn.get(it.isbn);
+            enrichedCount++;
+          }
+        });
+        console.log(
+          `   💵 Enriched sellPrice for ${enrichedCount}/${sortedItems.length} rows from ZB344-2_13NOV_ALLAMZNREMAINING`,
+        );
+      } catch (e) {
+        console.warn(`   ⚠️ Could not enrich sellPrice from reference config: ${e.message}`);
+      }
+    }
+  }
+
   const config = {
     spreadsheetId,
     tabName,
@@ -312,6 +397,7 @@ async function generateConfig(
     yellowItemsCount: yellowItems.length,
     redItemsCount: redItems.length,
     latestCursor,
+    latestReverseCursor,
     columns: {
       status: statusIdx,
       statusName: headers[statusIdx] || "Status",

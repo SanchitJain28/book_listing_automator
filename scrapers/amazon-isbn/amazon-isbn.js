@@ -14,15 +14,15 @@ const { startSpinner, stopSpinner } = require("../../utils/spinner");
 const { scrapeAmazonBook } = require("./scraper");
 const { retryAfterMs } = require("./core/requestPolicy");
 
-const MIN_ISBN_DELAY_MS = 18_000;
-const MAX_ISBN_DELAY_MS = 42_000;
+const MIN_ISBN_DELAY_MS = 12_600;
+const MAX_ISBN_DELAY_MS = 29_400;
 const BASE_COOLDOWN_MS = 15 * 60_000;
 const MAX_CONSECUTIVE_BLOCKS = 4;
 const COOLDOWN_LOG_INTERVAL_MS = 60 * 1000;
-const HOMEPAGE_DELAY_MS = 3000;
+const HOMEPAGE_DELAY_MS = 2100;
 
 function nextIsbnDelay(processed) {
-  return processed % 35 === 0 ? getRandomDelay(120_000, 240_000) : getRandomDelay(MIN_ISBN_DELAY_MS, MAX_ISBN_DELAY_MS);
+  return processed % 35 === 0 ? getRandomDelay(84_000, 168_000) : getRandomDelay(MIN_ISBN_DELAY_MS, MAX_ISBN_DELAY_MS);
 }
 
 async function waitForBlockCooldown(resumeAt) {

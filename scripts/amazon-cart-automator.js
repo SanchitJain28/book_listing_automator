@@ -672,6 +672,7 @@ function loadTargetData(csvPath = DEFAULT_CSV_PATH) {
 function loadIsbnQueue(
   isbnFilePath = DEFAULT_ISBN_PATH,
   targetMap = new Map(),
+  isReverse = false,
 ) {
   let isbns = [];
   if (fs.existsSync(isbnFilePath)) {
@@ -687,7 +688,7 @@ function loadIsbnQueue(
     isbns = Array.from(targetMap.keys());
   }
 
-  return isbns;
+  return isReverse ? [...isbns].reverse() : isbns;
 }
 
 function applyPoIsbnRows(config, rows) {
@@ -736,10 +737,11 @@ async function loadPoIsbnConfig(config, sheetsClient = null) {
   return loaded;
 }
 
-function buildSheetQueue(config) {
+function buildSheetQueue(config, isReverse = false) {
   const targetMap = new Map();
   const isbnQueue = [];
-  for (const item of config.items) {
+  const items = isReverse ? [...config.items].reverse() : config.items;
+  for (const item of items) {
     // A row, not an ISBN, is the unit of work. Repeated PO ISBNs retain their
     // own prices, titles, cursor positions, and rejection cells.
     const key = `sheet-row:${item.sheetRowNumber}`;
@@ -1974,11 +1976,14 @@ async function main() {
   let isAutoMode = false;
   let requestedProfile = "1";
   let isLoginMode = false;
+  let isReverseMode = false;
 
   for (let a = 2; a < process.argv.length; a++) {
     const arg = process.argv[a];
     if (arg === "--auto" || arg === "-auto" || arg === "-a") {
       isAutoMode = true;
+    } else if (arg === "--reverse" || arg === "-reverse" || arg === "-r") {
+      isReverseMode = true;
     } else if (arg.startsWith("--profile=") || arg.startsWith("-profile=")) {
       requestedProfile = arg.split("=")[1].trim();
     } else if (
@@ -2183,7 +2188,7 @@ async function main() {
       );
 
       sheetConfig = await loadPoIsbnConfig(sheetConfig);
-      ({ targetMap, isbnQueue } = buildSheetQueue(sheetConfig));
+      ({ targetMap, isbnQueue } = buildSheetQueue(sheetConfig, isReverseMode));
     } catch (e) {
       throw new Error(`Cannot load PO ISBN queue from ${configPath}: ${e.message}`);
     }
@@ -2203,7 +2208,7 @@ async function main() {
       : DEFAULT_CSV_PATH;
 
     targetMap = loadTargetData(customCsvFile);
-    isbnQueue = loadIsbnQueue(customIsbnFile, targetMap);
+    isbnQueue = loadIsbnQueue(customIsbnFile, targetMap, isReverseMode);
 
     console.log(
       `📁 Input ISBN File: ${path.relative(process.cwd(), customIsbnFile)}`,
@@ -2212,6 +2217,15 @@ async function main() {
   }
 
   if (!isbnQueue.length) throw new Error("No books are available in this input queue.");
+  if (isReverseMode) {
+    const previewIsbns = isbnQueue
+      .slice(0, 4)
+      .map((k) => targetMap.get(k)?.isbn || k)
+      .join(" -> ");
+    console.log(
+      `\x1b[1;35m🔄 REVERSE MODE ACTIVATED (--reverse): Starting from END -> BEGIN (${previewIsbns} ...)\x1b[0m`,
+    );
+  }
   console.log(`📋 Total ISBNs in queue: ${isbnQueue.length}\n`);
 
   let cursorRow = null;
@@ -2222,17 +2236,24 @@ async function main() {
     console.log(
       `🔍 Searching for requested cursor: "CURSOR - ${requestedCursor}"...`,
     );
-    // First search in loaded sheetConfig
-    let matchedItem = sheetConfig?.items?.find((it) => {
+    const matchCursorText = (it) => {
       if (!it.existingCursor) return false;
       const c = it.existingCursor.toLowerCase();
+      const req = String(requestedCursor).toLowerCase();
+      const reqWithR = isReverseMode && /^\d+$/.test(req) ? `r${req}` : req;
       return (
-        c === `cursor - ${requestedCursor}`.toLowerCase() ||
-        c === `cursor-${requestedCursor}`.toLowerCase() ||
-        c.includes(`cursor - ${requestedCursor}`) ||
-        c.endsWith(` ${requestedCursor}`)
+        c === `cursor - ${req}` ||
+        c === `cursor-${req}` ||
+        c.includes(`cursor - ${req}`) ||
+        c.endsWith(` ${req}`) ||
+        c === `cursor - ${reqWithR}` ||
+        c === `cursor-${reqWithR}` ||
+        c.includes(`cursor - ${reqWithR}`) ||
+        c.endsWith(` ${reqWithR}`)
       );
-    });
+    };
+    // First search in loaded sheetConfig
+    let matchedItem = sheetConfig?.items?.find(matchCursorText);
 
     // If not found locally in sheetConfig, refresh live from Google Sheet
     if (!matchedItem && sheetConfig?.spreadsheetId && sheetConfig?.tabName) {
@@ -2246,17 +2267,11 @@ async function main() {
         );
         if (freshConfig) {
           sheetConfig = await loadPoIsbnConfig(freshConfig);
-          ({ targetMap, isbnQueue } = buildSheetQueue(sheetConfig));
-          matchedItem = sheetConfig.items.find((it) => {
-            if (!it.existingCursor) return false;
-            const c = it.existingCursor.toLowerCase();
-            return (
-              c === `cursor - ${requestedCursor}`.toLowerCase() ||
-              c === `cursor-${requestedCursor}`.toLowerCase() ||
-              c.includes(`cursor - ${requestedCursor}`) ||
-              c.endsWith(` ${requestedCursor}`)
-            );
-          });
+          ({ targetMap, isbnQueue } = buildSheetQueue(
+            sheetConfig,
+            isReverseMode,
+          ));
+          matchedItem = sheetConfig.items.find(matchCursorText);
         }
       } catch (err) {
         console.warn(
@@ -2267,7 +2282,12 @@ async function main() {
 
     if (matchedItem) {
       cursorRow = matchedItem.sheetRowNumber;
-      cursorBatch = parseInt(requestedCursor, 10) || 1;
+      const parsedCursorNum = parseInt(
+        String(requestedCursor).replace(/\D+/g, ""),
+        10,
+      );
+      cursorBatch =
+        !isNaN(parsedCursorNum) && parsedCursorNum > 0 ? parsedCursorNum : 1;
       const foundIdx = isbnQueue.findIndex((isbn) => {
         const info = targetMap.get(isbn);
         return info && info.sheetRowNumber === cursorRow;
@@ -2299,10 +2319,13 @@ async function main() {
     }
   }
 
-  // If no specific cursor requested or not found, fall back to auto-detecting latestCursor
-  if (!cursorRow && sheetConfig?.latestCursor) {
-    cursorRow = sheetConfig.latestCursor.sheetRowNumber;
-    cursorBatch = sheetConfig.latestCursor.batchNumber || 0;
+  // If no specific cursor requested or not found, fall back to auto-detecting latestCursor (or latestReverseCursor in --reverse mode)
+  const autoCursor = isReverseMode
+    ? sheetConfig?.latestReverseCursor
+    : sheetConfig?.latestCursor;
+  if (!cursorRow && autoCursor) {
+    cursorRow = autoCursor.sheetRowNumber;
+    cursorBatch = autoCursor.batchNumber || 0;
     const foundIdx = isbnQueue.findIndex((isbn) => {
       const info = targetMap.get(isbn);
       return info && info.sheetRowNumber === cursorRow;
@@ -2310,7 +2333,7 @@ async function main() {
     if (foundIdx !== -1) {
       defaultStartIndex = foundIdx;
       console.log(
-        `\x1b[1;32m🚩 Existing Cursor detected:\x1b[0m "${sheetConfig.latestCursor.cursorText}" at Sheet Row #${cursorRow} (Queue Item ${foundIdx + 1}/${isbnQueue.length})`,
+        `\x1b[1;32m🚩 Existing Cursor detected:\x1b[0m "${autoCursor.cursorText}" at Sheet Row #${cursorRow} (Queue Item ${foundIdx + 1}/${isbnQueue.length})`,
       );
       console.log(
         `   📦 Next Batch (Batch ${cursorBatch + 1}) will automatically start from Row #${cursorRow}\n`,
@@ -2798,7 +2821,9 @@ async function main() {
         const nextIsbn = nextTarget?.isbn || nextKey;
         const nextRowNumber = nextTarget ? nextTarget.sheetRowNumber : null;
         const cursorCol = sheetConfig.columns?.cursorColLetter || "E";
-        const cursorTag = `CURSOR - ${currentBatchNumber}`;
+        const cursorTag = isReverseMode
+          ? `CURSOR - R${currentBatchNumber}`
+          : `CURSOR - ${currentBatchNumber}`;
 
         console.log(
           "\n================================================================",
@@ -2824,13 +2849,18 @@ async function main() {
             `📍 Cursor successfully written to Row #${nextRowNumber} for Batch ${currentBatchNumber + 1}!`,
           );
 
-          // Update local JSON cache immediately so subsequent commands know latestCursor
-          sheetConfig.latestCursor = {
+          // Update local JSON cache immediately so subsequent commands know latestCursor / latestReverseCursor
+          const cursorPayload = {
             batchNumber: currentBatchNumber,
             sheetRowNumber: nextRowNumber,
             isbn: nextIsbn,
             cursorText: cursorTag,
           };
+          if (isReverseMode) {
+            sheetConfig.latestReverseCursor = cursorPayload;
+          } else {
+            sheetConfig.latestCursor = cursorPayload;
+          }
           if (nextTarget) {
             nextTarget.existingCursor = cursorTag;
           }

@@ -79,3 +79,38 @@
 
 - IP : 162.35.171.250
 - PASSWORD : Sanchit@282930
+
+## VPS 17
+
+- IP : 162.35.44.39
+- PASSWORD : Sanchit@282930
+
+## VPS 18
+
+- IP : 162.35.16.197
+- PASSWORD : Sanchit@282930
+
+## VPS 19
+
+- IP : 162.35.44.38
+- PASSWORD : Sanchit@282930
+
+## VPS 20
+
+- IP : 162.35.16.241
+- PASSWORD : Sanchit@282930
+
+## VPS 21
+
+- IP : 162.35.44.37
+- PASSWORD : Sanchit@282930
+
+## VPS 22
+
+- IP : 162.35.44.36
+- PASSWORD : Sanchit@282930
+
+## VPS 23
+
+- IP : 162.35.44.34
+- PASSWORD : Sanchit@282930
