@@ -13,10 +13,12 @@ function emptyResult(isbn, url, status, code = null, error = null) {
 }
 
 /** Existing public interface used by the master scraper. */
-async function scrapeFlipkart(page, directUrl, targetIsbn) {
+async function scrapeFlipkart(page, directUrl, targetIsbn, options = {}) {
   const isbn = normalizeIsbn(targetIsbn);
   let targetUrl = isbn ? searchUrl(isbn) : null;
   const attempts = [];
+  const failFastOnBlock = options.failFastOnBlock ?? process.env.FLIPKART_FAIL_FAST_ON_BLOCK === '1';
+  const interPageDelay = options.interPageDelay ?? process.env.FLIPKART_INTER_PAGE_DELAY === '1';
   try {
     if (targetIsbn && !isValidIsbn(isbn)) return emptyResult(isbn || String(targetIsbn), null, 'Invalid ISBN', 'invalid_isbn', 'A valid ISBN-10 or ISBN-13 is required.');
     const direct = directUrl ? flipkartUrl(directUrl) : null;
@@ -25,7 +27,10 @@ async function scrapeFlipkart(page, directUrl, targetIsbn) {
 
     async function productResult(url, candidate = null) {
       targetUrl = url;
-      await navigate(page, url);
+      if (candidate && interPageDelay && typeof page.waitForTimeout === 'function') {
+        await page.waitForTimeout(1500 + Math.floor(Math.random() * 1501));
+      }
+      await navigate(page, url, { failFastOnBlock });
       const data = await extractProduct(page);
       if (!data.author && candidate?.author) data.author = candidate.author;
       if (!data.binding && candidate?.binding) data.binding = candidate.binding;
@@ -50,7 +55,7 @@ async function scrapeFlipkart(page, directUrl, targetIsbn) {
 
     for (let number = 1; number <= 3; number++) {
       targetUrl = number === 1 && direct && !direct.pathname.includes('/p/') ? direct.href : searchUrl(isbn, number);
-      const html = await navigate(page, targetUrl);
+      const html = await navigate(page, targetUrl, { failFastOnBlock });
       const search = parseSearch(html, isbn, page.url());
       if (!search.candidates.length && !search.empty && !search.hasResults) throw Object.assign(new Error('Search page did not expose results or an explicit empty state.'), { code: 'extraction_error' });
       for (const candidate of search.candidates) {

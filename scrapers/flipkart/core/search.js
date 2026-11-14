@@ -51,7 +51,7 @@ function pageFailure(html, status = 200) {
   return null;
 }
 
-async function navigate(page, url) {
+async function navigate(page, url, { failFastOnBlock = false } = {}) {
   let last;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -61,8 +61,11 @@ async function navigate(page, url) {
       const failure = pageFailure(html, response?.status() || 200);
       if (!failure) return html;
       last = Object.assign(new Error(failure.message), { code: failure.code });
-      if (failure.code !== 'blocked') throw last;
-    } catch (error) { last = error; }
+      if (failure.code !== 'blocked' || failFastOnBlock) throw last;
+    } catch (error) {
+      last = error;
+      if (error?.code === 'blocked' && failFastOnBlock) throw last;
+    }
     if (attempt < 2) await page.waitForTimeout(3000 * (attempt + 1));
   }
   throw last;

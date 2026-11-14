@@ -8,11 +8,11 @@ async function closeBuyingOptionsDrawer(page) {
   const closeButton = page.locator(DRAWER_CLOSE_SELECTOR).filter({ visible: true }).first();
   try {
     if (await closeButton.isVisible()) {
-      await closeButton.click({ timeout: 700 });
+      await closeButton.click({ timeout: 490 });
     } else {
       await page.keyboard.press("Escape");
     }
-    await drawer.first().waitFor({ state: "hidden", timeout: 1050 });
+    await drawer.first().waitFor({ state: "hidden", timeout: 735 });
     return true;
   } catch {
     // Search can navigate directly if Amazon leaves the overlay in place.
@@ -38,7 +38,7 @@ async function extractBuyingOptionsDrawer(page) {
         );
         if (el1) el1.click();
       });
-      await page.waitForTimeout(420);
+      await page.waitForTimeout(294);
       await page.evaluate(() => {
         const el2 = document.querySelector(
           ".mm-grid-aod-popover-format-entry, #mediaMatrixGridAODPopoverEntries a, [data-action='show-all-offers-display'] a",
@@ -47,7 +47,7 @@ async function extractBuyingOptionsDrawer(page) {
       });
       await page
         .waitForSelector("#aod-offer-list #aod-offer, #aod-offer", {
-          timeout: 2450,
+          timeout: 1715,
         })
         .catch(() => {});
     } catch (e) {}

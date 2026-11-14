@@ -16,7 +16,7 @@ async function searchAmazonForIsbn(page, isbn, domain = "amazon.in") {
     const searchBox = page.locator("#twotabsearchtextbox");
     const searchButton = page.locator("#nav-search-submit-button");
     const canSubmit = await searchBox.isVisible() && await searchButton.isVisible()
-      && await searchButton.click({ trial: true, timeout: 1050 }).then(() => true, () => false);
+      && await searchButton.click({ trial: true, timeout: 735 }).then(() => true, () => false);
     if (canSubmit) {
       submitSearch = async (options) => {
         await searchBox.fill(isbn, { timeout: options.timeout });
@@ -30,9 +30,9 @@ async function searchAmazonForIsbn(page, isbn, domain = "amazon.in") {
   }
 
   const block = await navigateAmazon(page, searchUrl, {
-    timeout: 10500,
+    timeout: 7350,
     readySelector: ".s-search-results, .s-no-results-result",
-    readyTimeout: 2100,
+    readyTimeout: 1470,
     submitSearch,
   });
   if (block) return { found: false, productUrl: null, block };

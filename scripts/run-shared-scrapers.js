@@ -60,7 +60,7 @@ function atomicJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file + '.tmp', JSON.stringify(value, null, 2) + '\n'); fs.renameSync(file + '.tmp', file);
 }
-async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signal, logger = console.log, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), recoveryRetries = 2 }) {
+async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signal, logger = console.log, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), recoveryRetries = 2, delayMinMs = null, delayMaxMs = null, cooldownEvery = null, cooldownMinMs = 45000, cooldownMaxMs = 90000 }) {
   if (!Number.isInteger(batchSize) || batchSize < 1) throw new Error('batchSize must be positive.');
   if (new Set(jobs.map(job => path.resolve(job.output))).size !== jobs.length) throw new Error('Each scraper needs a separate output file.');
   const states = {}, locks = [];
@@ -133,7 +133,16 @@ async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signa
               // Close all pages other than the job's main page at every input boundary.
               await lease.clean();
               if (state.processed % 25 === 0) { snapshot(); logger(`[Pool] ${JSON.stringify(pool.stats())}`); }
-              if (state.processed < items.length && !signal?.aborted) await sleep(job.name === 'abebooks' ? 2500 + Math.floor(Math.random() * 2501) : 2000 + Math.floor(Math.random() * 2001));
+              if (state.processed < items.length && !signal?.aborted) {
+                const minDelay = delayMinMs ?? (job.name === 'abebooks' ? 2500 : 2000);
+                const maxDelay = delayMaxMs ?? (job.name === 'abebooks' ? 5000 : 4000);
+                await sleep(minDelay + Math.floor(Math.random() * (Math.max(maxDelay, minDelay) - minDelay + 1)));
+                if (cooldownEvery && state.processed % cooldownEvery === 0 && !signal?.aborted) {
+                  const cooldownMs = cooldownMinMs + Math.floor(Math.random() * (Math.max(cooldownMaxMs, cooldownMinMs) - cooldownMinMs + 1));
+                  logger(`[${job.name}] Cooldown pause (${Math.round(cooldownMs / 1000)}s) after ${state.processed} items...`);
+                  await sleep(cooldownMs);
+                }
+              }
             }
           } catch (error) {
             await lease?.release(); lease = null;
@@ -180,21 +189,30 @@ async function main() {
   while (args.length) {
     const flag = args.shift();
     if (flag === '--headless') options.headless = true;
-    else if (['--platforms', '--concurrency', '--browsers', '--batch-size', '--resources', '--output-subdir'].includes(flag)) {
+    else if (['--platforms', '--concurrency', '--browsers', '--batch-size', '--resources', '--output-subdir', '--delay-min', '--delay-max', '--cooldown-every', '--cooldown-min', '--cooldown-max'].includes(flag)) {
       const value = args.shift(); if (!value || value.startsWith('--')) throw new Error(`${flag} needs a value.`); options[flag.slice(2)] = value;
     } else throw new Error(`Unknown option: ${flag}`);
   }
   // Keep the original default so resuming a command without --platforms does not add jobs.
   const platforms = registry(), names = options.platforms ? options.platforms.split(',') : Object.keys(platforms).filter(name => !additionalPlatforms.includes(name));
   if (!names.length || new Set(names).size !== names.length || names.some(name => !platforms[name])) throw new Error('Choose supported, distinct platform names. Amazon scrapers are not part of this runner.');
-  const numeric = (name, fallback) => { const value = options[name] === undefined ? fallback : Number(options[name]); if (!Number.isInteger(value) || value < 1 || value > 10000) throw new Error(`Invalid --${name}.`); return value; };
+  const numeric = (name, fallback, max = 10000) => { const value = options[name] === undefined ? fallback : Number(options[name]); if (!Number.isInteger(value) || value < 1 || value > max) throw new Error(`Invalid --${name}.`); return value; };
   const concurrency = numeric('concurrency', 4), browsers = numeric('browsers', 2), batchSize = numeric('batch-size', 100);
+  const delayMinMs = options['delay-min'] === undefined ? null : numeric('delay-min', 2000, 600000);
+  const delayMaxMs = options['delay-max'] === undefined ? delayMinMs : numeric('delay-max', delayMinMs || 4000, 600000);
+  const cooldownEvery = options['cooldown-every'] === undefined ? null : numeric('cooldown-every', 50, 10000);
+  const cooldownMinMs = numeric('cooldown-min', 45000, 600000);
+  const cooldownMaxMs = numeric('cooldown-max', Math.max(90000, cooldownMinMs), 600000);
   const relativeInput = path.relative(path.join(root, 'input-data'), path.resolve(input));
   const folder = options['output-subdir'] || (relativeInput.startsWith('..') ? `shared/${path.basename(path.dirname(input))}-${path.parse(input).name}` : path.dirname(relativeInput));
   if (path.isAbsolute(folder) || folder.split(/[\\/]/).some(part => part === '..') || folder.includes('\0')) throw new Error('Output subdirectory must stay inside output/.');
   const items = /\.txt$/i.test(input) ? readSearchTerms(input).map(searched_isbn => ({ searched_isbn })) : readJsonLines(input);
   if (!items.length) throw new Error('Input is empty.');
   const jobs = names.map(name => ({ ...platforms[name], output: name === 'abebooks' ? path.join(root, 'output', folder, path.parse(input).name + '.json') : path.join(root, 'output', name, folder, 'results.jsonl') }));
+  if (names.includes('flipkart')) {
+    process.env.FLIPKART_FAIL_FAST_ON_BLOCK ??= '1';
+    process.env.FLIPKART_INTER_PAGE_DELAY ??= '1';
+  }
   const key = crypto.createHash('sha256').update(JSON.stringify(jobs.map(job => job.output))).digest('hex').slice(0, 12);
   const statusFile = path.join(root, 'output/shared-runs', key + '.status.json');
   const pool = new SharedBrowserPool({ browserCount: browsers, concurrency, stateDir: path.join(root, 'profiles/shared-scrapers', key), headless: !!options.headless, resources: options.resources || 'cache' });
@@ -203,7 +221,7 @@ async function main() {
   const onSignal = () => { console.log('Stopping after current scraper calls finish; pending inputs remain resumable.'); stop.abort(); };
   process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
   try {
-    const states = await runShared({ items, jobs, pool, batchSize, statusFile, signal: stop.signal });
+    const states = await runShared({ items, jobs, pool, batchSize, statusFile, signal: stop.signal, delayMinMs, delayMaxMs, cooldownEvery, cooldownMinMs, cooldownMaxMs });
     process.exitCode = stop.signal.aborted ? 130 : Object.values(states).some(state => state.state === 'Failed' || state.report_error) ? 1 : Object.values(states).some(state => state.state === 'Blocked') ? 3 : Object.values(states).some(state => (state.verified_count ?? state.matched_count) < state.total) ? 2 : 0;
   } finally { process.removeListener('SIGINT', onSignal); process.removeListener('SIGTERM', onSignal); }
 }

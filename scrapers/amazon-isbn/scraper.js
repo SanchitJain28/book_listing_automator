@@ -68,9 +68,9 @@ async function scrapeAmazonBook(page, { directUrl, isbn, domain }, extract = ext
 
   // 2. Navigate to product page
   const productBlock = await navigateAmazon(page, targetUrl, {
-    timeout: 14000,
+    timeout: 9800,
     readySelector: "#productTitle",
-    readyTimeout: 2800,
+    readyTimeout: 1960,
   });
   if (productBlock) return emptyResult(isbn, page.url(), productBlock, "product");
 
@@ -78,9 +78,9 @@ async function scrapeAmazonBook(page, { directUrl, isbn, domain }, extract = ext
   const cheaperTarget = await getCheaperPhysicalFormat(page);
   if (cheaperTarget && cheaperTarget.url) {
     const formatBlock = await navigateAmazon(page, cheaperTarget.url, {
-      timeout: 10500,
+      timeout: 7350,
       readySelector: "#productTitle",
-      readyTimeout: 2100,
+      readyTimeout: 1470,
     });
     if (formatBlock) return emptyResult(isbn, page.url(), formatBlock, "format");
   }

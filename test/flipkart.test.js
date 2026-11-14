@@ -148,6 +148,10 @@ test('blocked pages are not treated as empty results or unavailable books', asyn
   assert.equal(result.stock_status, 'Blocked');
   assert.equal(result.error_code, 'blocked');
   assert.equal(page.visits, 3);
+  const fastBlocked = fakePage({ [searchUrl(isbn)]: html('Verify you are human') }, 429);
+  const fastResult = await scrapeFlipkart(fastBlocked, null, isbn, { failFastOnBlock: true });
+  assert.equal(fastResult.error_code, 'blocked');
+  assert.equal(fastBlocked.visits, 1);
 });
 
 test('blank successful HTTP response is an extraction error, not not-found', async () => {
