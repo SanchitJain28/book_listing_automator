@@ -10,8 +10,8 @@ const { runShared, registry } = require('../scripts/run-shared-scrapers');
 
 function fakeLaunch() {
   const browsers = [];
-  const launch = async () => {
-    const browser = { connected: true, contexts: [], isConnected() { return this.connected; }, async close() { this.connected = false; for (const context of this.contexts) await context.close(); },
+  const launch = async (options) => {
+    const browser = { options, connected: true, contexts: [], isConnected() { return this.connected; }, async close() { this.connected = false; for (const context of this.contexts) await context.close(); },
       async newContext(options) {
         const context = Object.assign(new EventEmitter(), { options, live: [], routes: 0, closed: false,
           pages() { return this.live.filter(page => !page.closed); },
@@ -51,6 +51,42 @@ test('pool context cleanup removes extra pages; cache mode installs no routes', 
   assert.equal(lease.context.pages().length, 1); assert.equal(lease.context.routes, 0);
   await pool.close();
 });
+test('shared pool defaults to headed Chrome with native user agent and full resource loading', async () => {
+  const fake = fakeLaunch();
+  const pool = new SharedBrowserPool({ launch: fake.launch, browserCount: 1, concurrency: 1 });
+  try {
+    const lease = await pool.acquire('flipkart');
+    assert.deepEqual(fake.browsers[0].options, { headless: false, channel: 'chrome' });
+    assert.equal(Object.hasOwn(lease.context.options, 'userAgent'), false);
+    assert.equal(lease.context.routes, 0);
+  } finally { await pool.close(); }
+});
+for (const resources of ['block-media', 'block-assets']) {
+  test(`${resources} permits page assets and blocks only media`, async () => {
+    const fake = fakeLaunch();
+    const pool = new SharedBrowserPool({ launch: fake.launch, browserCount: 1, concurrency: 1, resources });
+    const launch = pool.launch;
+    pool.launch = async options => {
+      const browser = await launch(options);
+      const newContext = browser.newContext.bind(browser);
+      browser.newContext = async options => {
+        const context = await newContext(options);
+        context.route = async (_, handler) => {
+          for (const type of ['document', 'script', 'stylesheet', 'image', 'font', 'xhr', 'media']) {
+            const decision = await handler({
+              request: () => ({ resourceType: () => type }),
+              abort: () => 'blocked', continue: () => 'allowed',
+            });
+            assert.equal(decision, type === 'media' ? 'blocked' : 'allowed', type);
+          }
+        };
+        return context;
+      };
+      return browser;
+    };
+    try { await pool.acquire('bookchor'); } finally { await pool.close(); }
+  });
+}
 test('closing a pool during browser launch closes the newly launched browser and rejects its waiter', async () => {
   const fake = fakeLaunch(); let resolveLaunch;
   const pool = new SharedBrowserPool({ browserCount: 1, concurrency: 1, launch: () => new Promise(resolve => { resolveLaunch = resolve; }) });
@@ -101,20 +137,44 @@ test('interruption leaves the in-flight input unsaved and resumable', () => fixt
   const states=await runShared({jobs,items:[{searched_isbn:'a'},{searched_isbn:'b'}],pool,signal:stop.signal,sleep:async()=>{},logger:()=>{}});
   assert.equal(states.a.state,'Stopped');assert.equal(states.a.processed,1);assert.equal(fs.readFileSync(output,'utf8').trim().split('\n').length,1);
 }));
-test('registry calls all eight platform interfaces correctly and excludes Amazon', async () => {
-  const names={atlanticbooks:'scrapeAtlanticBook',bookswagon:'scrapeBookswagon',flipkart:'scrapeFlipkart',mypustak:'scrapeMyPustakBook',sapnaonline:'scrapeSapnaOnline',ompublication:'scrapeOmPublication',bookchor:'scrapeBookChor',abebooks:'scrapeAbeBooksBook'};
+test('registry calls all ten platform interfaces correctly and excludes Amazon', async () => {
+  const names={atlanticbooks:'scrapeAtlanticBook',bookswagon:'scrapeBookswagon',flipkart:'scrapeFlipkart',mypustak:'scrapeMyPustakBook',sapnaonline:'scrapeSapnaOnline',ompublication:'scrapeOmPublication',bookchor:'scrapeBookChor',abebooks:'scrapeAbeBooksBook','abebooks-co-uk':'scrapeAbeBooksUk',bestbookmart:'scrapeBestBookMart'};
   const registered=registry();assert.deepEqual(Object.keys(registered).sort(),Object.keys(names).sort());
   const item={searched_isbn:'9780306406157',buy_url:'https://example.test/book'},page={};
   for(const [name,key] of Object.entries(names)){
-    const module=require(`../scrapers/${name}/scraper`),original=module[key];let received;
+    const entry = name === 'bestbookmart' ? 'bestbookmart-isbn' : 'scraper';
+    const module=require(`../scrapers/${name}/${entry}`),original=module[key];let received;
     module[key]=async(...args)=>{received=args;return {};};
     try{await registered[name].scrape(page,item);assert.equal(received[0],page);
-      if(['atlanticbooks','mypustak','abebooks'].includes(name))assert.deepEqual(received[1],{isbn:item.searched_isbn,directUrl:item.buy_url});
+      if(['atlanticbooks','mypustak','abebooks','abebooks-co-uk'].includes(name))assert.deepEqual(received[1],{isbn:item.searched_isbn,directUrl:item.buy_url});
       else assert.deepEqual(received.slice(1),[item.buy_url,item.searched_isbn]);
     }finally{module[key]=original;}
   }
   assert.deepEqual(registered.bookswagon.prepareItems([item,item]).map(row=>row.input_occurrence),[1,2]);
 });
+
+test('the new shared jobs resume with saved listing URLs and report AbeBooks UK match types', () => fixture(async dir => {
+  const platforms = registry();
+  const items = [{ searched_isbn: '9780306406157' }, { searched_isbn: '9780816069613' }];
+  const calls = [];
+  const jobs = ['abebooks-co-uk', 'bestbookmart'].map(name => {
+    const output = path.join(dir, name + '.jsonl');
+    fs.writeFileSync(output, JSON.stringify({
+      ...items[0], url: 'https://example.test/listing', input_url: null,
+      found: true, match_type: 'exact', isbn_matched: true, stock_status: 'In Stock',
+    }) + '\n');
+    return { ...platforms[name], output, scrape: async (page, item) => {
+      calls.push(item.searched_isbn);
+      return { found: true, match_type: 'closest_match', stock_status: 'In Stock' };
+    } };
+  });
+  const pool = new SharedBrowserPool({ launch: fakeLaunch().launch, browserCount: 1, concurrency: 1 });
+  const states = await runShared({ jobs, items, pool, sleep: async () => {}, logger: () => {} });
+  assert.deepEqual(calls, [items[1].searched_isbn, items[1].searched_isbn]);
+  assert.ok(Object.values(states).every(state => state.state === 'Finished' && state.processed === 2));
+  assert.equal(states['abebooks-co-uk'].matched_count, 1);
+  assert.equal(states['abebooks-co-uk'].verified_count, 2);
+}));
 
 test('shared runner resumes legacy AbeBooks output that contains a derived product URL', () => fixture(async dir => {
   const fake=fakeLaunch(),pool=new SharedBrowserPool({launch:fake.launch,browserCount:1,concurrency:1});

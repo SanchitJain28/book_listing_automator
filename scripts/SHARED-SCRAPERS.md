@@ -1,12 +1,12 @@
 # Shared Playwright scraper runner
 
-Runs Atlantic Books, BooksWagon, Flipkart, MyPustak, SapnaOnline, Om Publications, BookChor and AbeBooks in one Node process. All extraction uses the existing Playwright scraper functions. Amazon scrapers, including Amazon.in, are excluded and unchanged.
+Runs Atlantic Books, BooksWagon, Flipkart, MyPustak, SapnaOnline, Om Publications, BookChor and AbeBooks in one Node process. The shared registry also supports AbeBooks UK (`abebooks-co-uk`) and Best Book Mart (`bestbookmart`) through `--platforms`. All ten use the same pool settings. All extraction uses the existing Playwright scraper functions. Amazon scrapers, including Amazon.in, are excluded and unchanged.
 
 ```sh
-node scripts/run-shared-scrapers.js input-data/manual-search/2026-10-27/input.txt --headless
+bash scripts/run-shared-scrapers-headed.sh input-data/manual-search/2026-10-27/input.txt
 ```
 
-The default pool uses up to two Chromium browser instances and four active browser contexts. Each platform has an isolated context. At 100 saved inputs, its context is closed and it joins the end of the queue for another batch. This bounds context lifetimes and lets all eight jobs make progress with fewer active contexts. Scrapers remain sequential within their own platform and retain their between-ISBN pacing.
+The default pool uses up to two headed Google Chrome Stable browser instances with the browser’s native User-Agent and four active browser contexts. Each platform has an isolated context. At 100 saved inputs, its context is closed and it joins the end of the queue for another batch. This bounds context lifetimes and lets all eight jobs make progress with fewer active contexts. Scrapers remain sequential within their own platform and retain their between-ISBN pacing.
 
 Existing outputs for the dated input remain at `output/<platform>/manual-search/2026-10-27/results.jsonl`; AbeBooks retains `output/manual-search/2026-10-27/input.json`. Resume validates saved input identities and continues after the saved prefix. Failed rows remain processed, as before. A blocked result pauses only that platform, saves its attempt separately, and preserves the pending input. Its `.shared-pause.json` enforces at least 30 minutes before a manual restart; longer server timing is retained when supplied by the scraper. There is no automatic restart loop.
 
@@ -24,10 +24,12 @@ Options:
 - `--browsers 2`: maximum shared browser instances, launched lazily.
 - `--concurrency 4`: maximum active contexts. Use a smaller number to reduce peak memory further. Inactive queued jobs do not retain open contexts.
 - `--batch-size 100`: saved inputs before releasing a context and yielding to queued platforms.
-- `--resources block-assets`: default, blocks images, media and fonts like the current runners.
-- `--resources cache`: does not install request interception, preserving the browser's HTTP cache. It may download more assets. Compare accuracy and memory on a representative sample before choosing this for a live platform.
+- `--resources block-media`: blocks media downloads while allowing scripts, stylesheets, images and fonts. Existing `block-assets` commands use this same media-only policy.
+- `--resources cache`: default, loads all resources and preserves the browser’s HTTP cache without request interception.
 - `--output-subdir <relative-folder>`: selects a separate output directory under `output/`.
-- Omit `--headless` for visible browsers.
+- Headed Chrome is the default. Use `--headless` explicitly for headless Chrome. On Linux VPSs use the headed launcher above, which provides Xvfb. Local desktops can run `node scripts/run-shared-scrapers.js <input>` directly.
+
+The VPS launcher requires Google Chrome Stable, Xvfb and xauth. Install Chrome with `npx playwright install chrome` on supported Debian/Ubuntu systems. On Ubuntu, install the display packages with `sudo apt-get install -y xvfb xauth`. Existing scraper delays are retained.
 
 The runner logs page counts and Node RSS periodically and writes a runtime snapshot to the printed `output/shared-runs/<id>.status.json` path. Each context is limited to a main page plus one temporary product page; surplus pages close immediately and extra pages close at every input boundary. The MyPustak popup guard also closes late popups when no candidate is being inspected. Failed context cleanup retires the owning browser; affected in-flight jobs can resume their unsaved inputs after restarting.
 
@@ -42,4 +44,4 @@ npm run test:shared-browsers
 npm run verify:shared-browsers
 ```
 
-The first command is offline. The second launches real Chromium against a temporary loopback fixture: eight simulated jobs, two browsers, at most four contexts, popup cleanup, context recycling, session isolation and both resource modes. It makes no retailer requests and leaves no fixture outputs behind. Its timing/RSS numbers are fixture diagnostics, not predicted production RAM savings. Retailer extraction still requires representative live regression checks before deployment.
+The first command is offline. The second launches headed Google Chrome against a temporary loopback fixture: ten simulated jobs, two browsers, at most four contexts, popup cleanup, context recycling, session isolation and both resource modes. It makes no retailer requests and leaves no fixture outputs behind. Its timing/RSS numbers are fixture diagnostics, not predicted production RAM savings. Retailer extraction still requires representative live regression checks before deployment.

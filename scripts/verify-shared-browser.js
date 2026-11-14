@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Real Chromium lifecycle check against a loopback fixture; no retail requests.
+// Real headed Chrome lifecycle check against a loopback fixture; no retail requests.
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
@@ -23,14 +23,16 @@ const { openFirstResult } = require('../scrapers/mypustak/core/search');
   let pool;
   try {
     const results = [];
-    for (const resources of ['block-assets', 'cache']) {
+    for (const resources of ['block-media', 'cache']) {
       pool = new SharedBrowserPool({ browserCount: 2, concurrency: 4, stateDir: path.join(dir, resources, 'state'), resources, logger: () => {} });
       let peakContexts = 0, peakBrowsers = 0;
       const assetStart = assetRequests;
-      const callsPerJob = Array(8).fill(0);
-      const jobs = Array.from({ length: 8 }, (_, index) => ({ name: `fixture${index}`, output: path.join(dir, resources, `${index}.jsonl`), identity: row => row.searched_isbn,
+      const callsPerJob = Array(10).fill(0);
+      const jobs = Array.from({ length: 10 }, (_, index) => ({ name: `fixture${index}`, output: path.join(dir, resources, `${index}.jsonl`), identity: row => row.searched_isbn,
         scrape: async page => {
           await page.goto(url, { waitUntil: 'domcontentloaded' });
+          assert.ok(await page.evaluate(() => window.fixtureLoaded));
+          assert.equal(await page.evaluate(() => navigator.userAgent.includes('HeadlessChrome')), false);
           const previous = await page.evaluate(() => localStorage.getItem('fixture-owner'));
           if (callsPerJob[index]++ === 0) assert.equal(previous, null);
           else assert.equal(previous, `fixture${index}`);
@@ -46,7 +48,7 @@ const { openFirstResult } = require('../scrapers/mypustak/core/search');
       assert.equal(peakBrowsers, 2); assert.equal(peakContexts, 4);
       assert.ok(Object.values(state).every(row => row.processed === 12 && row.context_batches === 3 && row.state === 'Finished'));
       assert.equal(pool.stats().active_contexts, 0); assert.equal(pool.stats().browser_instances, 0);
-      results.push({ resources, browser_instances: peakBrowsers, peak_active_contexts: peakContexts, contexts_recycled: 24, inputs_saved: 96, unexpected_pages_after_input: 0, static_asset_requests: assetRequests - assetStart, elapsed_ms: Date.now() - started, node_rss_mib: Math.round(process.memoryUsage().rss / 1024 ** 2) });
+      results.push({ resources, browser_instances: peakBrowsers, peak_active_contexts: peakContexts, contexts_recycled: 30, inputs_saved: 120, unexpected_pages_after_input: 0, static_asset_requests: assetRequests - assetStart, elapsed_ms: Date.now() - started, node_rss_mib: Math.round(process.memoryUsage().rss / 1024 ** 2) });
     }
     assert.ok(results[1].static_asset_requests < results[0].static_asset_requests);
     console.log(JSON.stringify({ fixture: 'localhost only', results }, null, 2));

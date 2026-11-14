@@ -30,10 +30,10 @@ function deadline(promise, ms, label, onLate) {
   return Promise.race([task, new Promise((_, reject) => { timer = setTimeout(() => { expired = true; reject(Object.assign(new Error(label), { code: 'browser_lifecycle' })); }, ms); })]).finally(() => clearTimeout(timer));
 }
 class SharedBrowserPool {
-  constructor({ browserCount = 2, concurrency = 4, stateDir, headless = true, resources = 'block-assets',
+  constructor({ browserCount = 2, concurrency = 4, stateDir, headless = false, resources = 'cache',
     contextTimeout = 30000, launch = options => require('playwright').chromium.launch(options), logger = console.log } = {}) {
     if (![browserCount, concurrency].every(value => Number.isInteger(value) && value > 0) || browserCount > concurrency) throw new Error('Use positive browser/concurrency counts with browsers <= concurrency.');
-    if (!['block-assets', 'cache'].includes(resources)) throw new Error('Resources must be block-assets or cache.');
+    if (!['block-media', 'block-assets', 'cache'].includes(resources)) throw new Error('Resources must be block-media or cache (block-assets is a legacy alias for block-media).');
     this.slots = Array.from({ length: browserCount }, (_, id) => ({ id, browser: null, active: 0, generation: 0, retiring: false }));
     Object.assign(this, { concurrency, stateDir, headless, resources, launch, logger, contextTimeout });
     this.queue = []; this.active = new Set(); this.owners = new Set(); this.closed = false; this.draining = false;
@@ -76,14 +76,14 @@ class SharedBrowserPool {
           stateFile = this.stateDir ? path.join(this.stateDir, `${task.stateKey}.json`) : null;
           storageState = this.loadState(stateFile, task.owner);
           if (!slot.browser || !slot.browser.isConnected()) {
-            slot.browser = await this.launch({ headless: this.headless }); slot.generation++;
+            slot.browser = await this.launch({ headless: this.headless, channel: 'chrome' }); slot.generation++;
             const browser = slot.browser;
             browser.on?.('disconnected', () => { if (!this.closed) this.logger(`[Browser pool] Browser slot ${slot.id} generation ${slot.generation} disconnected; affected scrapers: ${[...this.active].filter(l => l.browser === browser).map(l => l.owner).join(', ') || 'context creation'}.`); });
           }
           if (this.closed) throw new Error('Browser pool is closed.');
           context = await deadline(slot.browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-IN', timezoneId: 'Asia/Kolkata', ...(storageState ? { storageState } : {}) }), this.contextTimeout,
             `Browser context creation timed out for ${task.owner}.`, late => late.close().catch(() => {}));
-          if (this.resources === 'block-assets') await context.route('**/*', route => ['image', 'media', 'font'].includes(route.request().resourceType()) ? route.abort() : route.continue());
+          if (this.resources !== 'cache') await context.route('**/*', route => route.request().resourceType() === 'media' ? route.abort() : route.continue());
           const page = await context.newPage();
           context.on('page', opened => { if (context.pages().length > 2) Promise.resolve().then(() => opened.close()).catch(() => {}); });
           if (this.closed) throw new Error('Browser pool is closed.');

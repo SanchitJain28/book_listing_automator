@@ -59,6 +59,22 @@ class ManagerTests(unittest.TestCase):
         data=manager['output_stats'](f)
         self.assertEqual((data['processed'],data['matched'],data['blocked'],data['errors']),(3,1,1,1))
 
+    def test_shared_concurrency_restart_shows_only_latest_batch(self):
+        status_file = 'output/shared-runs/batch.status.json'
+        snapshot = self.root/status_file
+        snapshot.parent.mkdir(parents=True)
+        snapshot.write_text(json.dumps({'pid':124}))
+        common = {'kind':'scraper-process', 'shared':True, 'input':'input-data/sample.txt',
+                  'input_sha256':'same-input', 'status_file':status_file, 'created_at':1}
+        old = {**common, 'id':'process-'+'a'*20, 'pid':123, 'start':'1', 'command_key':'four'}
+        new = {**common, 'id':'process-'+'b'*20, 'pid':124, 'start':'2', 'command_key':'ten'}
+        separate = {**old, 'id':'process-'+'c'*20, 'status_file':'output/shared-runs/other.status.json'}
+        active = [({'pid':124,'start':'2'},new)]
+        with patch.dict(manager, {'tracked_records':lambda:[old,new,separate], 'known_processes':lambda:active}):
+            self.assertEqual(manager['discover_groups'](), [new,separate])
+            active.clear()
+            self.assertEqual(manager['discover_groups'](), [new,separate])
+
     def test_enhanced_amazon_job_is_running_with_namespaced_output(self):
         name = 'amazon-isbn-enchanced'
         script = f'scrapers/{name}/{name}.js'
@@ -250,6 +266,18 @@ class MonitoringTests(unittest.TestCase):
 class LauncherRegressionTests(unittest.TestCase):
     setUp=ManagerTests.setUp
     tearDown=ManagerTests.tearDown
+
+    def test_headed_shared_launcher_uses_xvfb_and_keeps_original_command(self):
+        self.state.mkdir()
+        command=['node',manager['SHARED'],'input-data/sample.txt','--platforms','flipkart,bookchor']
+        original=command.copy()
+        launcher=self.state/'headed.sh'
+        record={'id':'headed-shared'}
+        with patch.object(manager['shutil'],'which',side_effect=lambda executable:'/usr/bin/'+executable), \
+             patch.object(manager['os'],'access',return_value=True):
+            manager['build_launcher'](record,command,launcher,self.state/'exit','attempt')
+        self.assertIn('xvfb-run -a node scripts/run-shared-scrapers.js',launcher.read_text())
+        self.assertEqual(command,original)
 
     def test_amazon_india_headed_launch_preserves_the_node_command_for_resume(self):
         name='amazon-in'; script=manager['SCRIPTS'][name]

@@ -62,32 +62,73 @@ export class VpsLiveService {
     if (cursor && cursor.length > 1024) throw new Error('Invalid log cursor.');
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     res.write('retry: 3000\n\n');
-    let closed = false, active = false, ticks = 0;
-    const send = (event, data, id) => { if (closed) return; if (res.writableLength > 256000) { res.destroy(); return; } res.write(`${id ? `id: ${id}\n` : ''}event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    res.flushHeaders?.();
+    const maxBufferBytes = 4 * 1024 * 1024;
+    let closed = false, active = false, ticks = 0, drainWake = null, interval;
+    const cleanup = () => { if (closed) return; closed = true; clearInterval(interval); drainWake?.(); res.end(); this.clients.delete(cleanup); this.connectionListeners.delete(cleanup); };
+    const send = (event, data, id) => {
+      if (closed) return true;
+      if (res.writableLength > maxBufferBytes) { cleanup(); res.destroy?.(); return false; }
+      return res.write(`${id ? `id: ${id}\n` : ''}event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+    const waitDrain = () => {
+      if (closed || (!res.writableNeedDrain && !(res.writableLength > 65536))) return Promise.resolve();
+      return new Promise(resolve => {
+        let settled = false;
+        const finish = (timedOut = false) => {
+          if (settled) return;
+          settled = true;
+          if (drainWake === onDrain) drainWake = null;
+          res.off?.('drain', onDrain);
+          clearTimeout(timer);
+          if (timedOut && res.writableLength > 256000) { cleanup(); res.destroy?.(); }
+          resolve();
+        };
+        const onDrain = () => finish(false);
+        drainWake = onDrain;
+        const timer = setTimeout(() => finish(true), 2000);
+        timer.unref?.();
+        res.once?.('drain', onDrain);
+      });
+    };
     const tick = async () => {
       if (closed || active || this.closed) return; active = true;
       try {
-        await Promise.all(ids.map(async id => {
+        const ordered = selected ? [selected, ...ids.filter(id => id !== selected)] : ids;
+        const cached = [], stale = [];
+        for (const id of ordered) {
           const server = servers.find(item => item.id === id); const entry = this.cache.get(id);
-          const interval = id === selected ? 10000 : 30000;
-          if (!entry?.value || Date.now() - entry.at >= interval) {
-            try { const data = await this.run(server, { op: 'status' }); send('status', { server: id, data }); }
-            catch (error) { send('connection', { server: id, ...this.getConnectionState(id), error: error.message }); }
-          } else if (ticks === 0) send('status', { server: id, data: entry.value });
-          send('connection', { server: id, ...this.getConnectionState(id) });
+          const refreshMs = id === selected ? 10000 : 30000;
+          if (!entry?.value || Date.now() - entry.at >= refreshMs) stale.push(server);
+          else cached.push({ id, data: entry.value });
+        }
+        const pendingStale = Promise.all(stale.map(async server => {
+          try { const data = await this.run(server, { op: 'status' }); send('status', { server: server.id, data }); }
+          catch (error) { send('connection', { server: server.id, ...this.getConnectionState(server.id), error: error.message }); }
+          send('connection', { server: server.id, ...this.getConnectionState(server.id) });
         }));
+        if (ticks === 0) {
+          for (const item of cached) {
+            if (closed) break;
+            const ok = send('status', { server: item.id, data: item.data });
+            send('connection', { server: item.id, ...this.getConnectionState(item.id) });
+            if (!ok || res.writableLength > 65536) await waitDrain();
+          }
+        } else {
+          for (const item of cached) send('connection', { server: item.id, ...this.getConnectionState(item.id) });
+        }
+        await pendingStale;
         const server = servers.find(item => item.id === selected);
-        if (server) {
+        if (server && !closed) {
           send('activity', { server: selected, entries: await this.history(server) });
           if (job) try { const data = await this.run(server, { op: 'logs', job, scraper, source, cursor, attempt }); cursor = data.cursor || cursor; send('logs', { server: selected, job, data }, cursor ? 'log:' + cursor : null); } catch (error) { send('logs', { server: selected, job, data: { available: false, message: error.message, entries: [] } }); }
         }
-        ticks++; if(!closed)res.write(': heartbeat\n\n');
+        ticks++; if (!closed) res.write(': heartbeat\n\n');
       } finally { active = false; }
     };
-    const interval = setInterval(() => { void tick().catch(() => {}); }, 2000); interval.unref();
-    const cleanup = () => { if (closed) return; closed = true; clearInterval(interval); res.end(); this.clients.delete(cleanup);this.connectionListeners.delete(cleanup); };
-    req.on('close', cleanup); res.on('close', cleanup);res.on('error',cleanup); this.clients.add(cleanup);this.connectionListeners.set(cleanup,{ids,send});
-    void tick().catch(() => { res.end(); cleanup(); });
+    interval = setInterval(() => { void tick().catch(() => {}); }, 2000); interval.unref();
+    req.on('close', cleanup); res.on('close', cleanup); res.on('error', cleanup); this.clients.add(cleanup); this.connectionListeners.set(cleanup, { ids, send });
+    void tick().catch(() => { cleanup(); });
   }
   close() { this.closed = true; for (const cleanup of this.clients) cleanup(); this.clients.clear(); }
 }

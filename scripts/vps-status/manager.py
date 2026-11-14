@@ -189,7 +189,7 @@ def shared_rows(identity,spec):
             if snapshot.get('pid')!=identity['pid']: continue
             rows=[]
             for name,row in snapshot.get('scrapers',{}).items():
-                if name not in SCRIPTS: continue
+                if name not in SCRIPTS and name != 'bestbookmart': continue
                 value=Path(row['output']); output=str(value.relative_to(ROOT)) if value.is_absolute() else str(value)
                 safe_path(output,'output')
                 rows.append({'scraper':name,'input':spec['input'],'output':output,'total':row.get('total',spec['total'])})
@@ -215,8 +215,34 @@ def discover_groups():
     def enhanced_job_key(record):
         return record.get('input'),record.get('input_sha256'),record.get('output')
     corrected={enhanced_job_key(r) for r in records if r.get('scraper')==ENHANCED_AMAZON and KEEP_RESOURCES in r.get('command',[])}
-    return [r for r in records if r.get('scraper')!=ENHANCED_AMAZON or r['id'] in bound
-            or KEEP_RESOURCES in r.get('command',[]) or enhanced_job_key(r) not in corrected]
+    # A concurrency change creates a different command for the same shared batch.
+    # Keep its records on disk, but show the current owner of its output files.
+    shared_groups = {}
+    for record in records:
+        if record.get('shared') and record.get('status_file') and record.get('input_sha256'):
+            key = (record['input'], record['input_sha256'], record['status_file'])
+            shared_groups.setdefault(key, []).append(record)
+    superseded = set()
+    for group in shared_groups.values():
+        if len(group) < 2:
+            continue
+        current = {r['id'] for r in group if r['id'] in bound}
+        if not current:
+            snapshot_pid = None
+            try:
+                snapshot = json.loads(safe_path(group[0]['status_file'], 'output').read_text())
+                snapshot_pid = snapshot.get('pid')
+            except (OSError, ValueError, AttributeError):
+                pass
+            latest = max(group, key=lambda r: (
+                snapshot_pid is not None and r.get('pid') == snapshot_pid,
+                r.get('created_at', 0), r['id'],
+            ))
+            current.add(latest['id'])
+        superseded.update(r['id'] for r in group if r['id'] not in current)
+    return [r for r in records if r['id'] not in superseded
+            and (r.get('scraper')!=ENHANCED_AMAZON or r['id'] in bound
+                 or KEEP_RESOURCES in r.get('command',[]) or enhanced_job_key(r) not in corrected)]
 
 def live_record(record):
     identity=process_identity(record.get('pid',0))
@@ -351,10 +377,11 @@ def validate_resume(record,ignore_identity=None,skip_cooldown=False):
 
 def build_launcher(record,command,launcher,exitfile,attempt):
     """Each attempt owns a bounded console log; process command identity stays unchanged."""
-    if '--chrome' in command[3:] and '--headless' not in command[3:]:
+    headed_shared=len(command)>1 and command[1]==SHARED and '--headless' not in command[3:]
+    if ('--chrome' in command[3:] or headed_shared) and '--headless' not in command[3:]:
         for dependency in ('xvfb-run','xauth'):
-            if not shutil.which(dependency): raise ValueError('Headed Amazon scraping requires '+dependency+'.')
-        if not os.access('/opt/google/chrome/chrome',os.X_OK): raise ValueError('Headed Amazon scraping requires Google Chrome Stable. Install it with npx playwright install chrome.')
+            if not shutil.which(dependency): raise ValueError('Headed scraping requires '+dependency+'.')
+        if not os.access('/opt/google/chrome/chrome',os.X_OK): raise ValueError('Headed scraping requires Google Chrome Stable. Install it with npx playwright install chrome.')
         command=['xvfb-run','-a',*command]
     if not globals().get('RUNTIME_SOURCE'):
         log=STATE/(record['id']+'.log')

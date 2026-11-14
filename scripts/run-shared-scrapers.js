@@ -7,13 +7,14 @@ const { SharedBrowserPool, browserLifecycleError } = require('../utils/sharedBro
 const { getResumeIndex } = require('../utils/resume');
 const { readSearchTerms, readJsonLines, appendResult } = require('../utils/file');
 const root = path.resolve(__dirname, '..');
+const additionalPlatforms = ['abebooks-co-uk', 'bestbookmart'];
 
 function registry() {
   const platforms = {};
-  const add = (name, scrape) => {
+  const add = (name, scrape, report) => {
     const runner = require(`../scrapers/${name}/runner`);
     platforms[name] = { name, scrape, identity: runner.identity,
-      report: (output, items) => runner.writeReport(output, items, runner.latestRecords(output)) };
+      report: report || ((output, items) => runner.writeReport(output, items, runner.latestRecords(output))) };
   };
   add('atlanticbooks', (page, item) => require('../scrapers/atlanticbooks/scraper').scrapeAtlanticBook(page, { isbn: item.searched_isbn || item.isbn, directUrl: item.buy_url || item.url }));
   add('bookswagon', (page, item) => require('../scrapers/bookswagon/scraper').scrapeBookswagon(page, item.buy_url || item.url, item.searched_isbn || item.isbn));
@@ -41,6 +42,17 @@ function registry() {
       fs.mkdirSync(path.dirname(output), { recursive: true }); fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
       return { report, reportPath };
     } };
+  add('abebooks-co-uk',
+    (page, item) => require('../scrapers/abebooks-co-uk/scraper').scrapeAbeBooksUk(page, { isbn: item.searched_isbn || item.isbn, directUrl: item.buy_url || item.url }),
+    (output, items) => require('../scrapers/abebooks-co-uk/runner').writeReport(output, items));
+  platforms.bestbookmart = {
+    name: 'bestbookmart',
+    identity: item => JSON.stringify([
+      Object.hasOwn(item, 'searched_isbn') ? item.searched_isbn || null : item.isbn || null,
+      Object.hasOwn(item, 'input_url') ? item.input_url : item.buy_url || item.url || null,
+    ]),
+    scrape: (page, item) => require('../scrapers/bestbookmart/bestbookmart-isbn').scrapeBestBookMart(page, item.buy_url || item.url, item.searched_isbn || item.isbn),
+  };
   return platforms;
 }
 function blocked(row) { return /blocked|rate.limit|captcha|robot|429/i.test(String(row.stock_status || '')) || row.error_code === 'blocked'; }
@@ -146,7 +158,9 @@ async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signa
         event('scraper_state', { message: state.state, state: state.state, input_index: state.processed });
         if (job.report) try {
           const report = job.report(job.output, jobItems);
-          state.report = report.reportPath; state.matched_count = report.report.matched_count;
+          state.report = report.reportPath;
+          state.matched_count = report.report.matched_count ?? report.report.exact_match_count;
+          if (report.report.verified_count !== undefined) state.verified_count = report.report.verified_count;
         } catch (error) { state.report_error = error.message; }
         snapshot();
       }
@@ -161,7 +175,7 @@ async function runShared({ jobs, items, pool, batchSize = 100, statusFile, signa
 }
 async function main() {
   const args = process.argv.slice(2), input = args.shift();
-  if (!input || input.startsWith('--')) throw new Error('Usage: node scripts/run-shared-scrapers.js input.txt [--headless] [--platforms a,b] [--concurrency 4] [--browsers 2] [--batch-size 100] [--resources block-assets|cache] [--output-subdir manual-search/date]');
+  if (!input || input.startsWith('--')) throw new Error('Usage: node scripts/run-shared-scrapers.js input.txt [--headless] [--platforms a,b] [--concurrency 4] [--browsers 2] [--batch-size 100] [--resources cache|block-media] [--output-subdir manual-search/date]');
   const options = {};
   while (args.length) {
     const flag = args.shift();
@@ -170,7 +184,8 @@ async function main() {
       const value = args.shift(); if (!value || value.startsWith('--')) throw new Error(`${flag} needs a value.`); options[flag.slice(2)] = value;
     } else throw new Error(`Unknown option: ${flag}`);
   }
-  const platforms = registry(), names = options.platforms ? options.platforms.split(',') : Object.keys(platforms);
+  // Keep the original default so resuming a command without --platforms does not add jobs.
+  const platforms = registry(), names = options.platforms ? options.platforms.split(',') : Object.keys(platforms).filter(name => !additionalPlatforms.includes(name));
   if (!names.length || new Set(names).size !== names.length || names.some(name => !platforms[name])) throw new Error('Choose supported, distinct platform names. Amazon scrapers are not part of this runner.');
   const numeric = (name, fallback) => { const value = options[name] === undefined ? fallback : Number(options[name]); if (!Number.isInteger(value) || value < 1 || value > 10000) throw new Error(`Invalid --${name}.`); return value; };
   const concurrency = numeric('concurrency', 4), browsers = numeric('browsers', 2), batchSize = numeric('batch-size', 100);
@@ -182,14 +197,14 @@ async function main() {
   const jobs = names.map(name => ({ ...platforms[name], output: name === 'abebooks' ? path.join(root, 'output', folder, path.parse(input).name + '.json') : path.join(root, 'output', name, folder, 'results.jsonl') }));
   const key = crypto.createHash('sha256').update(JSON.stringify(jobs.map(job => job.output))).digest('hex').slice(0, 12);
   const statusFile = path.join(root, 'output/shared-runs', key + '.status.json');
-  const pool = new SharedBrowserPool({ browserCount: browsers, concurrency, stateDir: path.join(root, 'profiles/shared-scrapers', key), headless: !!options.headless, resources: options.resources || 'block-assets' });
-  console.log(`Shared runner: ${browsers} browser(s), at most ${concurrency} active contexts, ${batchSize} inputs per context batch.\nStatus: ${statusFile}`);
+  const pool = new SharedBrowserPool({ browserCount: browsers, concurrency, stateDir: path.join(root, 'profiles/shared-scrapers', key), headless: !!options.headless, resources: options.resources || 'cache' });
+  console.log(`Shared runner: ${browsers} Google Chrome browser(s), ${options.headless ? 'headless' : 'headed'}, resources: ${pool.resources}, at most ${concurrency} active contexts, ${batchSize} inputs per context batch.\nStatus: ${statusFile}`);
   const stop = new AbortController();
   const onSignal = () => { console.log('Stopping after current scraper calls finish; pending inputs remain resumable.'); stop.abort(); };
   process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
   try {
     const states = await runShared({ items, jobs, pool, batchSize, statusFile, signal: stop.signal });
-    process.exitCode = stop.signal.aborted ? 130 : Object.values(states).some(state => state.state === 'Failed' || state.report_error) ? 1 : Object.values(states).some(state => state.state === 'Blocked') ? 3 : Object.values(states).some(state => state.matched_count < state.total) ? 2 : 0;
+    process.exitCode = stop.signal.aborted ? 130 : Object.values(states).some(state => state.state === 'Failed' || state.report_error) ? 1 : Object.values(states).some(state => state.state === 'Blocked') ? 3 : Object.values(states).some(state => (state.verified_count ?? state.matched_count) < state.total) ? 2 : 0;
   } finally { process.removeListener('SIGINT', onSignal); process.removeListener('SIGTERM', onSignal); }
 }
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
